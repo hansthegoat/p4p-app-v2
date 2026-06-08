@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useP4P } from "@/lib/p4p/store";
-import { fmtGHS, fmtNum } from "@/lib/p4p/calc";
+import { fmtGHS, fmtGHSFull, fmtNum } from "@/lib/p4p/calc";
 import { ChevronDown, ChevronRight, Download, Search, User } from "lucide-react";
 
 export const Route = createFileRoute("/_app/trace")({
@@ -95,9 +95,10 @@ function TracePage() {
     exportCSV(rows, "p4p_calculation_log.csv");
   };
 
-  const stat = (l: string, v: string) => (
-    <div className="flex justify-between py-1 text-sm border-b last:border-0">
-      <span className="text-muted-foreground">{l}</span><span className="font-mono">{v}</span>
+  const stat = (l: string, v: string, fullV?: string) => (
+    <div className="flex justify-between py-1.5 text-sm border-b last:border-0 gap-4">
+      <span className="text-muted-foreground">{l}</span>
+      <span className="font-mono whitespace-nowrap" title={fullV}>{v}</span>
     </div>
   );
 
@@ -234,14 +235,14 @@ function TracePage() {
       </Card>
 
       <Section title="Global Calculation">
-        {stat("Total Revenue", fmtGHS(globals.totalRevenue))}
+        {stat("Total Revenue", fmtGHS(globals.totalRevenue), fmtGHSFull(globals.totalRevenue))}
         {stat("P4P %", `${globals.p4pPercent}%`)}
-        {stat("Total P4P Pool = Revenue × P4P%", fmtGHS(calc.totalPool))}
+        {stat("Total P4P Pool = Revenue × P4P%", fmtGHS(calc.totalPool), fmtGHSFull(calc.totalPool))}
         {stat("Adjunct %", `${globals.adjunctPercent}%`)}
-        {stat("Adjunct Pool = Total × Adjunct%", fmtGHS(calc.adjunctPool))}
-        {stat("Employee Pool = Total × (1 − Adjunct%)", fmtGHS(calc.employeePool))}
+        {stat("Adjunct Pool = Total × Adjunct%", fmtGHS(calc.adjunctPool), fmtGHSFull(calc.adjunctPool))}
+        {stat("Employee Pool = Total × (1 − Adjunct%)", fmtGHS(calc.employeePool), fmtGHSFull(calc.employeePool))}
         {stat("Sum of Weights (non-adjuncts)", fmtNum(calc.sumWeights, 4))}
-        {stat("Value per Weight Unit = Pool / Sum", fmtGHS(calc.valuePerUnit))}
+        {stat("Value per Weight Unit = Pool / Sum", fmtGHS(calc.valuePerUnit), fmtGHSFull(calc.valuePerUnit))}
       </Section>
 
       <Section title={`Non-Adjunct Employees (${nonAdjuncts.length})`}>
@@ -253,7 +254,7 @@ function TracePage() {
               <div key={e.id} className="p-3 border rounded-md bg-muted/20">
                 <div className="flex justify-between items-center">
                   <div className="font-medium">{e.name} <span className="text-xs text-muted-foreground">({gradeMap.get(e.jobGrade)?.name || e.jobGrade})</span></div>
-                  <div className="font-bold">{fmtGHS(r.bonus)}</div>
+                  <div className="font-bold whitespace-nowrap" title={fmtGHSFull(r.bonus)}>{fmtGHS(r.bonus)}</div>
                 </div>
                 <div className="text-xs mt-2 grid grid-cols-2 md:grid-cols-4 gap-2">
                   <div><span className="text-muted-foreground">Grade Pts:</span> {r.gradePoints}</div>
@@ -284,7 +285,7 @@ function TracePage() {
           {adjuncts.map((a) => (
             <div key={a.id} className="flex justify-between p-3 border rounded-md">
               <span>{a.name}</span>
-              <span className="font-mono font-semibold">{fmtGHS(calc.perAdjunctBonus)}</span>
+              <span className="font-mono font-semibold whitespace-nowrap" title={fmtGHSFull(calc.perAdjunctBonus)}>{fmtGHS(calc.perAdjunctBonus)}</span>
             </div>
           ))}
         </div>

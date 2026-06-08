@@ -159,18 +159,18 @@ function EmployeesPage() {
       </Card>
 
       <Card className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[800px]">
+        <table className="w-full text-sm min-w-[820px]">
           <thead className="bg-muted/50 text-left">
             <tr>
               <th className="p-3 w-8"></th>
               <th className="p-3">Name</th>
-              <th className="p-3">Grade</th>
-              <th className="p-3">Points</th>
-              <th className="p-3">Sales</th>
-              <th className="p-3">Multiplier</th>
-              <th className="p-3">Months</th>
-              <th className="p-3 text-right">Final Bonus</th>
-              <th className="p-3 w-24"></th>
+              <th className="p-3 w-16">Grade</th>
+              <th className="p-3 w-20">Points</th>
+              <th className="p-3 w-16">Sales</th>
+              <th className="p-3 w-24">Multiplier</th>
+              <th className="p-3 w-20">Months</th>
+              <th className="p-3 w-36 text-right">Final Bonus</th>
+              <th className="p-3 w-20"></th>
             </tr>
           </thead>
           <tbody>
@@ -199,7 +199,7 @@ function EmployeesPage() {
                     <td className="p-3">{e.isSalesRole ? "Yes" : "—"}</td>
                     <td className="p-3">{r && !e.isAdjunct ? fmtNum(r.performanceMultiplier, 2) : "—"}</td>
                     <td className="p-3">{e.monthsWorked}</td>
-                    <td className="p-3 text-right font-semibold">{r ? fmtGHS(r.bonus) : "—"}</td>
+                    <td className="p-3 text-right font-semibold whitespace-nowrap" title={r ? new Intl.NumberFormat("en-GH",{style:"currency",currency:"GHS",maximumFractionDigits:2}).format(r.bonus) : ""}>{r ? fmtGHS(r.bonus) : "—"}</td>
                     <td className="p-3">
                       <div className="flex gap-1 justify-end">
                         <button onClick={() => handleEdit(e)} className="p-1.5 hover:bg-accent rounded">

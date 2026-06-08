@@ -100,10 +100,32 @@ export function calculate(
   };
 }
 
-export const fmtGHS = (n: number) =>
-  new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(
-    Number.isFinite(n) ? n : 0,
-  );
+/** Format a GHS amount with compact K/M suffixes for large values */
+export function fmtGHS(n: number): string {
+  const v = Number.isFinite(n) ? n : 0;
+  if (Math.abs(v) >= 1_000_000) {
+    const m = v / 1_000_000;
+    return `GH₵ ${m % 1 === 0 ? m.toFixed(0) : m.toFixed(2)}M`;
+  }
+  if (Math.abs(v) >= 1_000) {
+    const k = v / 1_000;
+    return `GH₵ ${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}K`;
+  }
+  return new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(v);
+}
+
+/** Format a plain number with compact K/M suffixes */
+export function fmtGHSFull(n: number): string {
+  const v = Number.isFinite(n) ? n : 0;
+  return new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(v);
+}
+
+/** Compact axis tick formatter — used in charts */
+export function fmtCompact(v: number): string {
+  if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
+  return String(v);
+}
 
 export const fmtNum = (n: number, d = 2) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits: d }).format(Number.isFinite(n) ? n : 0);
