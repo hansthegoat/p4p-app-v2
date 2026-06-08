@@ -256,12 +256,12 @@ function TracePage() {
                   <div className="font-medium">{e.name} <span className="text-xs text-muted-foreground">({gradeMap.get(e.jobGrade)?.name || e.jobGrade})</span></div>
                   <div className="font-bold whitespace-nowrap" title={fmtGHSFull(r.bonus)}>{fmtGHS(r.bonus)}</div>
                 </div>
-                <div className="text-xs mt-2 grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="text-xs mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div><span className="text-muted-foreground">Grade Pts:</span> {r.gradePoints}</div>
                   <div><span className="text-muted-foreground">Multiplier:</span> {fmtNum(r.performanceMultiplier, 3)}</div>
                   <div><span className="text-muted-foreground">Proration:</span> {fmtNum(r.proration, 3)}</div>
                   <div><span className="text-muted-foreground">Sales:</span> ×{r.salesMult}</div>
-                  <div className="col-span-2 md:col-span-4">
+                  <div className="col-span-2 sm:col-span-4 break-words">
                     <span className="text-muted-foreground">Weight:</span> {r.gradePoints} × {fmtNum(r.performanceMultiplier, 3)} × {fmtNum(r.proration, 2)} × {r.salesMult} = <span className="font-mono">{fmtNum(r.weight, 4)}</span>
                   </div>
                 </div>

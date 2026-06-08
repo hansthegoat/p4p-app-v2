@@ -133,7 +133,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <div>
                             <Label className="text-xs">Metric</Label>
                             <Select value={k.metric} onValueChange={(v) => updKpi(k.id, { metric: v })}>

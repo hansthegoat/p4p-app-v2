@@ -34,7 +34,7 @@ function GradesPage() {
       </div>
 
       <Card className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[320px]">
           <thead className="bg-muted/50 text-left">
             <tr><th className="p-3">Code</th><th className="p-3">Name</th><th className="p-3 w-48">Points</th></tr>
           </thead>

@@ -108,17 +108,17 @@ function EmployeesPage() {
           <p className="text-muted-foreground text-sm mt-1">Manage employees and view computed bonuses.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={handleAdd}><Plus className="h-4 w-4 mr-1" /> Add</Button>
-          <Button variant="outline" onClick={() => downloadFile(CSV_TEMPLATE, "p4p_template.csv")}>
+          <Button size="sm" onClick={handleAdd}><Plus className="h-4 w-4 mr-1" /> Add</Button>
+          <Button size="sm" variant="outline" onClick={() => downloadFile(CSV_TEMPLATE, "p4p_template.csv")}>
             <Download className="h-4 w-4 mr-1" /> Template
           </Button>
-          <Button variant="outline" onClick={() => fileRef.current?.click()}>
+          <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
             <Upload className="h-4 w-4 mr-1" /> Upload CSV
           </Button>
           <input ref={fileRef} type="file" accept=".csv" hidden
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ""; }} />
-          <Button variant="outline" onClick={loadDemo}><Database className="h-4 w-4 mr-1" /> Demo</Button>
-          <Button variant="outline" onClick={clearEmployees}><X className="h-4 w-4 mr-1" /> Clear</Button>
+          <Button size="sm" variant="outline" onClick={loadDemo}><Database className="h-4 w-4 mr-1" /> Demo</Button>
+          <Button size="sm" variant="outline" onClick={clearEmployees}><X className="h-4 w-4 mr-1" /> Clear</Button>
         </div>
       </div>
 
@@ -215,7 +215,7 @@ function EmployeesPage() {
                     <tr className="border-t bg-muted/20">
                       <td colSpan={9} className="p-4">
                         <div className="text-xs font-medium mb-2 text-muted-foreground">KPI Breakdown</div>
-                        <table className="w-full text-xs">
+                        <div className="overflow-x-auto"><table className="w-full text-xs min-w-[400px]">
                           <thead><tr className="text-left text-muted-foreground">
                             <th className="pb-1">Description</th><th>Metric</th><th>Target</th>
                             <th>Actual</th><th>Ratio</th>
@@ -231,7 +231,7 @@ function EmployeesPage() {
                               </tr>
                             ))}
                           </tbody>
-                        </table>
+                        </table></div>
                       </td>
                     </tr>
                   )}

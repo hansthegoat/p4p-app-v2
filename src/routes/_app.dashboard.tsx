@@ -146,7 +146,7 @@ function Dashboard() {
       </div>
 
       {/* Stat cards — 2 cols on sm, 3 on md, 6 on xl */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 items-stretch">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 items-stretch">
         <StatCard
           icon={<DollarSign className="h-3.5 w-3.5" />}
           label="Revenue"
@@ -209,7 +209,7 @@ function Dashboard() {
             <PieIcon className="h-4 w-4 text-primary" />
             <h3 className="font-semibold text-sm">Pool Split</h3>
           </div>
-          <div className="h-64">
+          <div className="h-48 sm:h-64">
             <ResponsiveContainer>
               <PieChart>
                 <Pie data={poolData} dataKey="value" innerRadius={68} outerRadius={100} paddingAngle={3}>
@@ -235,7 +235,7 @@ function Dashboard() {
             <BarChart3 className="h-4 w-4 text-primary" />
             <h3 className="font-semibold text-sm">Top 6 Earners</h3>
           </div>
-          <div className="h-64">
+          <div className="h-48 sm:h-64">
             <ResponsiveContainer>
               <BarChart data={topEarners} margin={{ left: 8 }}>
                 <defs>
@@ -266,7 +266,7 @@ function Dashboard() {
             <Target className="h-4 w-4 text-primary" />
             <h3 className="font-semibold text-sm">P4P % of Revenue</h3>
           </div>
-          <div className="h-56 relative">
+          <div className="h-44 sm:h-56 relative">
             <ResponsiveContainer>
               <RadialBarChart innerRadius="65%" outerRadius="100%" data={radialData} startAngle={210} endAngle={-30}>
                 <RadialBar dataKey="value" cornerRadius={10} background={{ fill: "hsl(var(--muted))" }} />
@@ -284,7 +284,7 @@ function Dashboard() {
             <BarChart3 className="h-4 w-4 text-primary" />
             <h3 className="font-semibold text-sm">Bonus by Job Grade</h3>
           </div>
-          <div className="h-56">
+          <div className="h-44 sm:h-56">
             <ResponsiveContainer>
               <AreaChart data={gradeDistribution} margin={{ left: 8 }}>
                 <defs>
@@ -349,18 +349,21 @@ function Dashboard() {
 
           <div>
             <Label>P4P % of Revenue</Label>
-            <div className="flex gap-2 items-center">
+            <div className="flex flex-wrap gap-2 items-center">
               <Input
+                className="min-w-0 flex-1"
                 type="number"
                 step="0.1"
                 value={globals.p4pPercent}
                 onChange={(e) => setGlobals({ p4pPercent: Number(e.target.value) })}
               />
-              {[2, 2.5, 3].map((v) => (
-                <Button key={v} size="sm" variant="outline" onClick={() => setGlobals({ p4pPercent: v })}>
-                  {v}%
-                </Button>
-              ))}
+              <div className="flex gap-1 shrink-0">
+                {[2, 2.5, 3].map((v) => (
+                  <Button key={v} size="sm" variant="outline" onClick={() => setGlobals({ p4pPercent: v })}>
+                    {v}%
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
 
