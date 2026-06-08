@@ -209,18 +209,17 @@ function Dashboard() {
             <PieIcon className="h-4 w-4 text-primary" />
             <h3 className="font-semibold text-sm">Pool Split</h3>
           </div>
-          {/* relative wrapper so the center label can be absolutely positioned */}
-          <div className="relative h-48 sm:h-64">
+          <div className="h-44 sm:h-56">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={poolData}
                   dataKey="value"
-                  innerRadius="35%"
-                  outerRadius="52%"
+                  innerRadius="38%"
+                  outerRadius="60%"
                   paddingAngle={3}
                   cx="50%"
-                  cy="45%"
+                  cy="50%"
                 >
                   {poolData.map((_, i) => <Cell key={i} fill={POOL_COLORS[i]} stroke="none" />)}
                 </Pie>
@@ -231,11 +230,11 @@ function Dashboard() {
                 <Legend wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
-            {/* Center label — absolutely positioned so it works at any height */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-6">
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Total</div>
-              <div className="font-bold text-sm leading-tight">{fmtGHS(calc.totalPool)}</div>
-            </div>
+          </div>
+          {/* Total shown below the chart — never overlaps */}
+          <div className="mt-2 pt-2 border-t flex items-center justify-between text-sm">
+            <span className="text-muted-foreground text-xs uppercase tracking-wider">Total Pool</span>
+            <span className="font-bold tabular-nums">{fmtGHS(calc.totalPool)}</span>
           </div>
         </Card>
 
