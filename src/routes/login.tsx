@@ -61,7 +61,7 @@ function LoginPage() {
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Login"}
           </Button>
           <p className="text-xs text-muted-foreground text-center">
-            Leave both fields empty to enter demo mode.
+            Login with any username and password to access the calculator.
           </p>
         </form>
       </motion.div>
