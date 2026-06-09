@@ -27,7 +27,7 @@ function LoginPage() {
       if (login(u, p)) {
         navigate({ to: "/dashboard" });
       } else {
-        setErr("Invalid credentials. Leave both fields empty for demo mode.");
+        setErr("Invalid credentials.");
         setLoading(false);
       }
     }, 1000);
