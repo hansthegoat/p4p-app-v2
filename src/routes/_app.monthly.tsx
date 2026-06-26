@@ -609,7 +609,7 @@ function MonthlyPage() {
                   </div>
                 </button>
 
-                {/* Expanded details - WITH CATEGORY BREAKDOWN */}
+                {/* Expanded details - USING CURRENT EMPLOYEE DATA */}
                 {isExpanded && (
                   <div className="p-4 border-t bg-muted/10">
                     {history.length === 0 ? (
@@ -640,7 +640,7 @@ function MonthlyPage() {
                           </div>
                         </div>
 
-                        {/* WEIGHTED CATEGORY PERFORMANCE - Like Calculation Trace */}
+                        {/* WEIGHTED CATEGORY PERFORMANCE - USING CURRENT EMPLOYEE DATA */}
                         {emp.categories && emp.categories.length > 0 ? (
                           <div className="space-y-3 mb-4">
                             <p className="font-medium text-sm flex items-center gap-2">
@@ -648,67 +648,37 @@ function MonthlyPage() {
                             </p>
                             <div className="space-y-3">
                               {emp.categories.map((category, catIdx) => {
-                                // Get the latest month data for this category
-                                const latestMonth = history[history.length - 1];
-                                let categoryScore = 1;
-                                let catStatus = 'met';
+                                // Calculate category score from current KPI values
+                                let categoryScore = 0;
+                                let totalKpiWeight = 0;
                                 let kpiDetails: any[] = [];
 
-                                // Try to get KPI data from the saved monthly snapshot
-                                if (latestMonth?.categories) {
-                                  const catData = latestMonth.categories.find(c => c.id === category.id);
-                                  if (catData && catData.kpis.length > 0) {
-                                    let totalRatio = 0;
-                                    let kpiCount = 0;
-                                    kpiDetails = catData.kpis.map(k => {
-                                      const target = Number(k.target) || 0;
-                                      const actual = Number(k.actual) || 0;
-                                      const ratio = target > 0 ? actual / target : 0;
-                                      const achievement = ratio * 100;
-                                      if (target > 0) {
-                                        totalRatio += ratio;
-                                        kpiCount++;
-                                      }
-                                      return {
-                                        description: k.description,
-                                        target,
-                                        actual,
-                                        ratio,
-                                        achievement,
-                                        metric: k.metric || '%'
-                                      };
-                                    });
-                                    categoryScore = kpiCount > 0 ? totalRatio / kpiCount : 1;
-                                  }
-                                }
-
-                                // If no KPI data in snapshot, use current employee data
-                                if (kpiDetails.length === 0 && category.kpis.length > 0) {
-                                  let totalRatio = 0;
-                                  let kpiCount = 0;
-                                  kpiDetails = category.kpis.map(k => {
-                                    const target = Number(k.target) || 0;
-                                    const actual = Number(k.actual) || 0;
+                                if (category.kpis && category.kpis.length > 0) {
+                                  for (const kpi of category.kpis) {
+                                    const target = Number(kpi.target) || 0;
+                                    const actual = Number(kpi.actual) || 0;
                                     const ratio = target > 0 ? actual / target : 0;
                                     const achievement = ratio * 100;
-                                    if (target > 0) {
-                                      totalRatio += ratio;
-                                      kpiCount++;
-                                    }
-                                    return {
-                                      description: k.description,
+                                    const weight = Number(kpi.weight) || 100;
+                                    
+                                    kpiDetails.push({
+                                      description: kpi.description,
                                       target,
                                       actual,
                                       ratio,
                                       achievement,
-                                      metric: k.metric || '%'
-                                    };
-                                  });
-                                  categoryScore = kpiCount > 0 ? totalRatio / kpiCount : 1;
+                                      metric: kpi.metric || '%'
+                                    });
+                                    
+                                    if (target > 0) {
+                                      categoryScore += ratio * weight;
+                                      totalKpiWeight += weight;
+                                    }
+                                  }
                                 }
 
-                                const achievement = categoryScore * 100;
-                                catStatus = achievement >= 100 ? 'exceeded' : achievement >= 70 ? 'met' : achievement >= 50 ? 'partial' : 'missed';
+                                const finalScore = totalKpiWeight > 0 ? (categoryScore / totalKpiWeight) * 100 : 0;
+                                const catStatus = finalScore >= 100 ? 'exceeded' : finalScore >= 70 ? 'met' : finalScore >= 50 ? 'partial' : 'missed';
 
                                 return (
                                   <div key={catIdx} className="border rounded-md p-3 bg-white">
@@ -723,7 +693,7 @@ function MonthlyPage() {
                                         catStatus === 'partial' ? 'text-yellow-600' : 
                                         'text-red-600'
                                       }`}>
-                                        {fmtNum(achievement, 1)}%
+                                        {fmtNum(finalScore, 1)}%
                                       </div>
                                     </div>
                                     <div className="w-full bg-gray-200 rounded-full h-2">
@@ -734,7 +704,7 @@ function MonthlyPage() {
                                           catStatus === 'partial' ? 'bg-yellow-500' : 
                                           'bg-red-500'
                                         }`}
-                                        style={{ width: `${Math.min(100, achievement)}%` }}
+                                        style={{ width: `${Math.min(100, finalScore)}%` }}
                                       />
                                     </div>
                                     <div className="mt-2 grid grid-cols-1 gap-1">

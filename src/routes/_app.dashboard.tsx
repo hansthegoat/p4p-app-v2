@@ -12,6 +12,7 @@ import { motion } from "framer-motion";
 import {
   TrendingUp, Wallet, Users, UserCheck, DollarSign,
   Activity, PieChart as PieIcon, BarChart3, Sparkles, Target,
+  Star, AlertTriangle, Calendar, Award, TrendingDown
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
@@ -100,7 +101,80 @@ const chartTooltipStyle = {
 };
 
 function Dashboard() {
-  const { globals, setGlobals, calc, employees, grades } = useP4P();
+  const { 
+    globals, 
+    setGlobals, 
+    calc, 
+    employees, 
+    grades,
+    getMonthlyStats,
+    getAllTrends,
+    monthlyData,
+    detectTriggers  // ADDED THIS
+  } = useP4P();
+
+  const trends = getAllTrends();
+  const stats = getMonthlyStats();
+
+  // Rising Stars (improving over time)
+  const risingStars = useMemo(() => {
+    return trends
+      .filter(t => t.trendDirection === 'improving' && t.currentScore > 1.0)
+      .sort((a, b) => (b.currentScore - b.averageScore) - (a.currentScore - a.averageScore))
+      .slice(0, 5);
+  }, [trends]);
+
+  // Underachievers (declining)
+  const underachievers = useMemo(() => {
+    return trends
+      .filter(t => t.trendDirection === 'declining' && t.currentScore < 0.7)
+      .sort((a, b) => (a.currentScore - a.averageScore) - (b.currentScore - b.averageScore))
+      .slice(0, 5);
+  }, [trends]);
+
+  // Performance distribution
+  const performanceDistribution = useMemo(() => {
+    const ranges = {
+      'Excellent (≥1.2)': 0,
+      'Good (1.0-1.2)': 0,
+      'Average (0.8-1.0)': 0,
+      'Below (0.5-0.8)': 0,
+      'Critical (<0.5)': 0
+    };
+    for (const t of trends) {
+      if (t.currentScore >= 1.2) ranges['Excellent (≥1.2)']++;
+      else if (t.currentScore >= 1.0) ranges['Good (1.0-1.2)']++;
+      else if (t.currentScore >= 0.8) ranges['Average (0.8-1.0)']++;
+      else if (t.currentScore >= 0.5) ranges['Below (0.5-0.8)']++;
+      else ranges['Critical (<0.5)']++;
+    }
+    return Object.entries(ranges).map(([name, value]) => ({ name, value }));
+  }, [trends]);
+
+  // Monthly trend data for chart
+  const monthlyTrendData = useMemo(() => {
+    const months = monthlyData
+      .filter(d => !employees.find(e => e.id === d.employeeId)?.isAdjunct)
+      .sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return a.month - b.month;
+      });
+
+    const grouped: Record<string, { month: string; avg: number; count: number; total: number }> = {};
+    for (const d of months) {
+      const key = `${d.year}-${String(d.month).padStart(2, '0')}`;
+      const label = `${new Date(d.year, d.month - 1, 1).toLocaleString('default', { month: 'short' })} ${d.year}`;
+      if (!grouped[key]) grouped[key] = { month: label, avg: 0, count: 0, total: 0 };
+      grouped[key].total += d.performanceMultiplier;
+      grouped[key].count++;
+    }
+    return Object.values(grouped).map(g => ({
+      month: g.month,
+      avgMultiplier: g.total / g.count,
+      employeeCount: g.count
+    }));
+  }, [monthlyData, employees]);
+
   const disabled = globals.totalRevenue <= 0;
 
   const poolData = useMemo(() => ([
@@ -129,6 +203,18 @@ function Dashboard() {
 
   const radialData = [{ name: "P4P", value: globals.p4pPercent, fill: COLORS.primary }];
 
+  // Get triggers - with error handling
+  const triggers = useMemo(() => {
+    try {
+      return detectTriggers();
+    } catch (error) {
+      console.error("Error loading triggers:", error);
+      return { pip: [], probation: [], managementAction: [], total: 0 };
+    }
+  }, [detectTriggers]);
+
+  const hasTriggers = triggers.total > 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between flex-wrap gap-3">
@@ -137,11 +223,12 @@ function Dashboard() {
             <Sparkles className="h-5 w-5 text-primary" /> P4P Dashboard
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Live overview of pools, payouts and performance signals.
+            Live overview of pools, payouts, performance signals, and monthly trends.
           </p>
         </div>
-        <div className="text-xs px-3 py-1.5 rounded-full bg-muted text-muted-foreground font-medium border">
-          {employees.length} employees tracked
+        <div className="text-xs px-3 py-1.5 rounded-full bg-muted text-muted-foreground font-medium border flex items-center gap-2">
+          <Calendar className="h-3 w-3" />
+          {monthlyData.length > 0 ? `${monthlyData.length} data points` : 'No monthly data yet'}
         </div>
       </div>
 
@@ -188,6 +275,100 @@ function Dashboard() {
         />
       </div>
 
+      {/* Rising Stars & Underachievers */}
+      {(risingStars.length > 0 || underachievers.length > 0) && (
+        <div className="grid md:grid-cols-2 gap-4">
+          {risingStars.length > 0 && (
+            <Card className="p-4 border-green-200 bg-green-50/50">
+              <div className="flex items-center gap-2 mb-3">
+                <Star className="h-4 w-4 text-green-600" />
+                <h3 className="font-semibold text-sm text-green-800">🌟 Rising Stars</h3>
+                <span className="text-xs bg-green-200 text-green-700 px-2 py-0.5 rounded-full ml-auto">
+                  {risingStars.length} employees
+                </span>
+              </div>
+              <div className="space-y-2">
+                {risingStars.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between p-2 bg-white rounded-md border border-green-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{t.name}</span>
+                      <span className="text-xs text-green-600">📈 +{fmtNum((t.currentScore - t.averageScore) * 100, 0)}%</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{fmtNum(t.currentScore, 2)}</span>
+                      <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-green-500 rounded-full"
+                          style={{ width: `${Math.min(100, (t.currentScore / 2) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {underachievers.length > 0 && (
+            <Card className="p-4 border-red-200 bg-red-50/50">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+                <h3 className="font-semibold text-sm text-red-800">⚠️ Underachievers</h3>
+                <span className="text-xs bg-red-200 text-red-700 px-2 py-0.5 rounded-full ml-auto">
+                  {underachievers.length} employees
+                </span>
+              </div>
+              <div className="space-y-2">
+                {underachievers.map((t, i) => (
+                  <div key={i} className="flex items-center justify-between p-2 bg-white rounded-md border border-red-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{t.name}</span>
+                      <span className="text-xs text-red-600">📉 {fmtNum((t.averageScore - t.currentScore) * 100, 0)}%</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{fmtNum(t.currentScore, 2)}</span>
+                      <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-red-500 rounded-full"
+                          style={{ width: `${Math.min(100, (t.currentScore / 2) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Triggers Summary */}
+      {hasTriggers && (
+        <Card className="p-4 border-orange-200 bg-orange-50/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              <h3 className="font-semibold text-orange-800">Performance Alerts</h3>
+            </div>
+            <span className="text-sm font-bold text-orange-700">{triggers.total} triggers</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            <div className="text-center p-2 bg-yellow-100 rounded-md">
+              <div className="text-sm font-bold text-yellow-700">{triggers.pip.length}</div>
+              <div className="text-xs text-yellow-600">PIP Required</div>
+            </div>
+            <div className="text-center p-2 bg-orange-100 rounded-md">
+              <div className="text-sm font-bold text-orange-700">{triggers.probation.length}</div>
+              <div className="text-xs text-orange-600">Probation</div>
+            </div>
+            <div className="text-center p-2 bg-red-100 rounded-md">
+              <div className="text-sm font-bold text-red-700">{triggers.managementAction.length}</div>
+              <div className="text-xs text-red-600">Mgmt Action</div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {disabled && (
         <div className="p-4 rounded-md bg-destructive/10 text-destructive text-sm">
           Total revenue is 0 — set a revenue value to enable calculations.
@@ -202,7 +383,76 @@ function Dashboard() {
         </div>
       )}
 
-      {/* Charts row 1 */}
+      {/* Charts row 1 - Monthly Trend + Performance Distribution */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        {/* Monthly Trend Chart */}
+        <Card className="p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm">Monthly Performance Trend</h3>
+            <span className="text-xs text-muted-foreground ml-auto">{monthlyTrendData.length} months</span>
+          </div>
+          <div className="h-44 sm:h-56">
+            <ResponsiveContainer>
+              <AreaChart data={monthlyTrendData} margin={{ left: 8 }}>
+                <defs>
+                  <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={COLORS.primary} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={COLORS.primary} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
+                <XAxis dataKey="month" fontSize={10} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 2]} fontSize={10} axisLine={false} tickLine={false} width={28} />
+                <Tooltip
+                  contentStyle={chartTooltipStyle}
+                  formatter={(v: number) => [fmtNum(v, 2), "Avg Multiplier"]}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="avgMultiplier" 
+                  stroke={COLORS.primary} 
+                  strokeWidth={2} 
+                  fill="url(#trendFill)" 
+                  dot={{ r: 3, fill: COLORS.primary, strokeWidth: 0 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          {monthlyTrendData.length === 0 && (
+            <div className="text-center text-xs text-muted-foreground py-2">
+              No monthly data yet. Upload data via the Monthly page.
+            </div>
+          )}
+        </Card>
+
+        {/* Performance Distribution */}
+        <Card className="p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm">Performance Distribution</h3>
+            <span className="text-xs text-muted-foreground ml-auto">{trends.length} employees</span>
+          </div>
+          <div className="h-44 sm:h-56">
+            <ResponsiveContainer>
+              <BarChart data={performanceDistribution} layout="vertical" margin={{ left: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.15} horizontal={false} />
+                <XAxis type="number" fontSize={10} axisLine={false} tickLine={false} />
+                <YAxis dataKey="name" type="category" fontSize={9} axisLine={false} tickLine={false} width={80} />
+                <Tooltip contentStyle={chartTooltipStyle} />
+                <Bar 
+                  dataKey="value" 
+                  fill={COLORS.primary} 
+                  radius={[0, 4, 4, 0]} 
+                  maxBarSize={32}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
+
+      {/* Charts row 2 - Pool Split + Top Earners */}
       <div className="grid lg:grid-cols-3 gap-4">
         <Card className="p-5 lg:col-span-1">
           <div className="flex items-center gap-2 mb-3">
@@ -231,7 +481,6 @@ function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
           </div>
-          {/* Total shown below the chart — never overlaps */}
           <div className="mt-2 pt-2 border-t flex items-center justify-between text-sm">
             <span className="text-muted-foreground text-xs uppercase tracking-wider">Total Pool</span>
             <span className="font-bold tabular-nums">{fmtGHS(calc.totalPool)}</span>
@@ -243,7 +492,7 @@ function Dashboard() {
             <BarChart3 className="h-4 w-4 text-primary" />
             <h3 className="font-semibold text-sm">Top 6 Earners</h3>
           </div>
-          <div className="h-48 sm:h-64">
+          <div className="h-48 sm:h-56">
             <ResponsiveContainer>
               <BarChart data={topEarners} margin={{ left: 8 }}>
                 <defs>
@@ -267,7 +516,7 @@ function Dashboard() {
         </Card>
       </div>
 
-      {/* Charts row 2 */}
+      {/* Charts row 3 - P4P % + Bonus by Grade */}
       <div className="grid lg:grid-cols-3 gap-4">
         <Card className="p-5">
           <div className="flex items-center gap-2 mb-3">
@@ -340,6 +589,28 @@ function Dashboard() {
             ))}
           </div>
         </Card>
+      )}
+
+      {/* Summary Stats */}
+      {trends.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card className="p-3 text-center">
+            <div className="text-xl font-bold text-primary">{trends.length}</div>
+            <div className="text-xs text-muted-foreground">Tracked Employees</div>
+          </Card>
+          <Card className="p-3 text-center">
+            <div className="text-xl font-bold text-green-600">{fmtNum(stats.avgMultiplier, 2)}</div>
+            <div className="text-xs text-muted-foreground">Average Multiplier</div>
+          </Card>
+          <Card className="p-3 text-center border-green-200 bg-green-50/50">
+            <div className="text-xl font-bold text-green-700">{stats.risingStars.length}</div>
+            <div className="text-xs text-green-600">Rising Stars</div>
+          </Card>
+          <Card className="p-3 text-center border-red-200 bg-red-50/50">
+            <div className="text-xl font-bold text-red-700">{stats.underachievers.length}</div>
+            <div className="text-xs text-red-600">Underachievers</div>
+          </Card>
+        </div>
       )}
 
       {/* Global Inputs */}

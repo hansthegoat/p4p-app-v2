@@ -1,8 +1,48 @@
-import type { CalcResult, Employee, GradePoint, Globals, KPI } from "./types";
+import type { CalcResult, Employee, GradePoint, Globals, KPI, Category } from "./types";
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-// Updated: simple average of actual/target, no manual weights
+export function performanceMultiplierFromCategories(
+  categories: Category[], 
+  floor: number, 
+  cap: number
+): number {
+  if (!categories || categories.length === 0) return 1;
+  
+  let totalWeightedScore = 0;
+  let totalWeight = 0;
+  
+  for (const category of categories) {
+    if (!category.kpis || category.kpis.length === 0) continue;
+    
+    let categorySum = 0;
+    let kpiCount = 0;
+    
+    for (const kpi of category.kpis) {
+      const target = Number(kpi.target);
+      const actual = Number(kpi.actual);
+      if (!target || target <= 0) continue;
+      
+      const kpiScore = actual / target;
+      const kpiWeight = kpi.weight || 1;
+      categorySum += kpiScore * kpiWeight;
+      kpiCount += kpiWeight;
+    }
+    
+    if (kpiCount === 0) continue;
+    
+    const categoryScore = categorySum / kpiCount;
+    const categoryWeight = category.weight || 0;
+    totalWeightedScore += categoryScore * (categoryWeight / 100);
+    totalWeight += categoryWeight / 100;
+  }
+  
+  if (totalWeight === 0) return 1;
+  
+  const multiplier = totalWeightedScore / totalWeight;
+  return clamp(multiplier, floor, cap);
+}
+
 export function performanceMultiplier(kpis: KPI[], floor: number, cap: number): number {
   if (!kpis || kpis.length === 0) return 1;
   let sum = 0;
@@ -43,13 +83,58 @@ export function calculate(
 
   const perEmployee: CalcResult["perEmployee"] = {};
 
-  // First pass: weights (no user weight, only grade, performance multiplier, proration, sales)
-  const weights: { id: string; weight: number; pm: number; proration: number; salesMult: number; gp: number; kpiBreakdown: any[] }[] = [];
+  const weights: { 
+    id: string; 
+    weight: number; 
+    pm: number; 
+    proration: number; 
+    salesMult: number; 
+    gp: number; 
+    kpiBreakdown: any[];
+    categoryBreakdown?: any[];
+  }[] = [];
+  
   for (const e of nonAdjuncts) {
     const gp = gradeMap.get(e.jobGrade) ?? 0;
     if (!gradeMap.has(e.jobGrade)) warnings.push(`${e.name}: unknown job grade "${e.jobGrade}".`);
-    if (!e.kpis || e.kpis.length === 0) warnings.push(`${e.name}: has no KPIs — multiplier defaults to 1.`);
-    const pm = performanceMultiplier(e.kpis, floor, cap);
+    
+    let pm: number;
+    let kpiBreakdown: any[] = [];
+    let categoryBreakdown: any[] | undefined;
+    
+    if (e.categories && e.categories.length > 0) {
+      pm = performanceMultiplierFromCategories(e.categories, floor, cap);
+      
+      categoryBreakdown = e.categories.map(cat => ({
+        categoryName: cat.name,
+        categoryWeight: cat.weight,
+        kpis: (cat.kpis || []).map(k => ({
+          description: k.description,
+          target: k.target,
+          actual: k.actual,
+          ratio: k.target > 0 ? k.actual / k.target : 0,
+          weight: k.weight
+        })),
+        categoryScore: cat.kpis && cat.kpis.length > 0 
+          ? cat.kpis.reduce((sum, k) => {
+              const ratio = k.target > 0 ? k.actual / k.target : 0;
+              const kpiWeight = k.weight || 1;
+              return sum + ratio * kpiWeight;
+            }, 0) / cat.kpis.reduce((sum, k) => sum + (k.weight || 1), 0)
+          : 1
+      }));
+    } else if (e.kpis && e.kpis.length > 0) {
+      pm = performanceMultiplier(e.kpis, floor, cap);
+      kpiBreakdown = (e.kpis || []).map((k) => ({
+        description: k.description,
+        ratio: k.target > 0 ? k.actual / k.target : 0,
+      }));
+    } else {
+      pm = 1;
+      if (!e.kpis || e.kpis.length === 0) 
+        warnings.push(`${e.name}: has no KPIs or Categories — multiplier defaults to 1.`);
+    }
+    
     let months = Number(e.monthsWorked);
     if (g.prorationOn && (!months || months <= 0)) {
       warnings.push(`${e.name}: months worked missing — defaulted to 12.`);
@@ -58,12 +143,17 @@ export function calculate(
     const proration = g.prorationOn ? clamp(months / 12, 0, 1) : 1;
     const salesMult = e.isSalesRole ? (Number(g.salesMultiplier) || 1) : 1;
     const weight = gp * pm * proration * salesMult;
-    // KPI breakdown now excludes weight field
-    const kpiBreakdown = (e.kpis || []).map((k) => ({
-      description: k.description,
-      ratio: k.target > 0 ? k.actual / k.target : 0,
-    }));
-    weights.push({ id: e.id, weight, pm, proration, salesMult, gp, kpiBreakdown });
+    
+    weights.push({ 
+      id: e.id, 
+      weight, 
+      pm, 
+      proration, 
+      salesMult, 
+      gp, 
+      kpiBreakdown,
+      categoryBreakdown 
+    });
   }
 
   const sumWeights = weights.reduce((s, w) => s + w.weight, 0);
@@ -80,13 +170,20 @@ export function calculate(
       weight: w.weight,
       bonus: w.weight * valuePerUnit,
       kpiBreakdown: w.kpiBreakdown,
+      categoryBreakdown: w.categoryBreakdown,
     };
   }
+  
   for (const a of adjuncts) {
     perEmployee[a.id] = {
-      performanceMultiplier: 1, proration: 1, salesMult: 1,
+      performanceMultiplier: 1, 
+      proration: 1, 
+      salesMult: 1,
       gradePoints: gradeMap.get(a.jobGrade) ?? 0,
-      weight: 0, bonus: perAdjunctBonus, kpiBreakdown: [],
+      weight: 0, 
+      bonus: perAdjunctBonus, 
+      kpiBreakdown: [],
+      categoryBreakdown: undefined,
     };
   }
 
@@ -100,7 +197,6 @@ export function calculate(
   };
 }
 
-/** Format a GHS amount with compact K/M suffixes for large values */
 export function fmtGHS(n: number): string {
   const v = Number.isFinite(n) ? n : 0;
   if (Math.abs(v) >= 1_000_000) {
@@ -114,13 +210,11 @@ export function fmtGHS(n: number): string {
   return new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(v);
 }
 
-/** Format a plain number with compact K/M suffixes */
 export function fmtGHSFull(n: number): string {
   const v = Number.isFinite(n) ? n : 0;
   return new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(v);
 }
 
-/** Compact axis tick formatter — used in charts */
 export function fmtCompact(v: number): string {
   if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
   if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(0)}K`;

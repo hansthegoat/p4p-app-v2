@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppTraceRouteImport } from './routes/_app.trace'
+import { Route as AppMonthlyRouteImport } from './routes/_app.monthly'
 import { Route as AppGradesRouteImport } from './routes/_app.grades'
 import { Route as AppEmployeesRouteImport } from './routes/_app.employees'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
@@ -34,6 +35,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppTraceRoute = AppTraceRouteImport.update({
   id: '/trace',
   path: '/trace',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMonthlyRoute = AppMonthlyRouteImport.update({
+  id: '/monthly',
+  path: '/monthly',
   getParentRoute: () => AppRoute,
 } as any)
 const AppGradesRoute = AppGradesRouteImport.update({
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AppDashboardRoute
   '/employees': typeof AppEmployeesRoute
   '/grades': typeof AppGradesRoute
+  '/monthly': typeof AppMonthlyRoute
   '/trace': typeof AppTraceRoute
 }
 export interface FileRoutesByTo {
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardRoute
   '/employees': typeof AppEmployeesRoute
   '/grades': typeof AppGradesRoute
+  '/monthly': typeof AppMonthlyRoute
   '/trace': typeof AppTraceRoute
 }
 export interface FileRoutesById {
@@ -76,13 +84,28 @@ export interface FileRoutesById {
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/employees': typeof AppEmployeesRoute
   '/_app/grades': typeof AppGradesRoute
+  '/_app/monthly': typeof AppMonthlyRoute
   '/_app/trace': typeof AppTraceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/dashboard' | '/employees' | '/grades' | '/trace'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/dashboard'
+    | '/employees'
+    | '/grades'
+    | '/monthly'
+    | '/trace'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/dashboard' | '/employees' | '/grades' | '/trace'
+  to:
+    | '/'
+    | '/login'
+    | '/dashboard'
+    | '/employees'
+    | '/grades'
+    | '/monthly'
+    | '/trace'
   id:
     | '__root__'
     | '/'
@@ -91,6 +114,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/employees'
     | '/_app/grades'
+    | '/_app/monthly'
     | '/_app/trace'
   fileRoutesById: FileRoutesById
 }
@@ -130,6 +154,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTraceRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/monthly': {
+      id: '/_app/monthly'
+      path: '/monthly'
+      fullPath: '/monthly'
+      preLoaderRoute: typeof AppMonthlyRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/grades': {
       id: '/_app/grades'
       path: '/grades'
@@ -158,6 +189,7 @@ interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppEmployeesRoute: typeof AppEmployeesRoute
   AppGradesRoute: typeof AppGradesRoute
+  AppMonthlyRoute: typeof AppMonthlyRoute
   AppTraceRoute: typeof AppTraceRoute
 }
 
@@ -165,6 +197,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppEmployeesRoute: AppEmployeesRoute,
   AppGradesRoute: AppGradesRoute,
+  AppMonthlyRoute: AppMonthlyRoute,
   AppTraceRoute: AppTraceRoute,
 }
 

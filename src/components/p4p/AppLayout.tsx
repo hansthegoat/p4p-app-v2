@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutDashboard, Users, Settings2, FileText, LogOut, Menu, X, Calculator } from "lucide-react";
+import { LayoutDashboard, Users, Settings2, FileText, LogOut, Menu, X, Calculator, Calendar } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { logout } from "@/lib/p4p/auth";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ const NAV = [
   { to: "/employees", label: "Employees", icon: Users },
   { to: "/grades", label: "Grade Points", icon: Settings2 },
   { to: "/trace", label: "Calculation Trace", icon: FileText },
+  { to: "/monthly", label: "Monthly Performance", icon: Calendar }, // ADD THIS LINE
 ] as const;
 
 export function AppLayout({ children }: { children: ReactNode }) {
