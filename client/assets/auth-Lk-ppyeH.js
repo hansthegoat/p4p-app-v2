@@ -1,0 +1,1 @@
+import{s as o}from"./index-BvRCUGUC.js";async function i(t,r){const{data:n,error:a}=await o.auth.signInWithPassword({email:t,password:r});if(a)throw a;return n}async function u(t,r){const{data:n,error:a}=await o.auth.signUp({email:t,password:r});if(a)throw a;return n}async function c(){const{error:t}=await o.auth.signOut();if(t)throw t}export{c as a,i as l,u as r};
