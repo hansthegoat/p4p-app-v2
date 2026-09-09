@@ -1,70 +1,89 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { motion } from "framer-motion";
-import { Loader2, Calculator } from "lucide-react";
 import { useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/lib/p4p/auth";
 
 export const Route = createFileRoute("/login")({
-  ssr: false,
   component: LoginPage,
 });
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [u, setU] = useState("");
-  const [p, setP] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
+  const [error, setError] = useState("");
 
-  const submit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErr("");
     setLoading(true);
-    setTimeout(() => {
-      if (login(u, p)) {
-        navigate({ to: "/dashboard" });
-      } else {
-        setErr("Invalid credentials.");
-        setLoading(false);
-      }
-    }, 1000);
+    setError("");
+
+    try {
+      await login(email, password);
+      navigate({ to: "/dashboard" });
+    } catch (err: any) {
+      setError(err.message || "Login failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-primary/5 p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-md bg-card rounded-2xl shadow-xl border p-8"
-      >
-        <div className="flex flex-col items-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center mb-3">
-            <Calculator className="h-7 w-7" />
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+      <Card className="w-full max-w-md p-6">
+        <h1 className="text-2xl font-bold text-center mb-2">P4P Calculator</h1>
+        <p className="text-sm text-muted-foreground text-center mb-6">
+          Sign in to your account
+        </p>
+
+        {error && (
+          <div className="text-sm text-red-600 bg-red-50 p-2 rounded mb-4">
+            {error}
           </div>
-          <h1 className="text-2xl font-bold">P4P Bonus Calculator</h1>
-          <p className="text-sm text-muted-foreground mt-1">Sign in to continue</p>
-        </div>
-        <form onSubmit={submit} className="space-y-4">
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label>Username</Label>
-            <Input value={u} onChange={(e) => setU(e.target.value)} placeholder="Username" autoFocus />
+            <Label>Email</Label>
+            <Input
+              type="email"
+              placeholder="you@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
           </div>
           <div>
             <Label>Password</Label>
-            <Input type="password" value={p} onChange={(e) => setP(e.target.value)} placeholder="Password" />
+            <Input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+            />
           </div>
-          {err && <div className="text-sm text-destructive">{err}</div>}
+
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Login"}
+            {loading ? "Signing in..." : "Sign In"}
           </Button>
-          <p className="text-xs text-muted-foreground text-center">
-            Login with username and password to access the calculator.
-          </p>
         </form>
-      </motion.div>
+
+        <p className="text-sm text-muted-foreground text-center mt-4">
+          Don't have an account?{" "}
+          <button
+            onClick={() => navigate({ to: "/register" })}
+            className="text-primary hover:underline"
+          >
+            Register
+          </button>
+        </p>
+      </Card>
     </div>
   );
 }

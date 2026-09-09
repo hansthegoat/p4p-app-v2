@@ -15,6 +15,19 @@ import {
   ChevronDown, ChevronRight, Trash2, CheckCircle, XCircle,
   Database, Save, Target, RefreshCw
 } from "lucide-react";
+import { redirect } from "@tanstack/react-router";
+import { supabase } from "@/lib/supabase";
+
+
+// Example for employees route
+beforeLoad: async () => {
+  const user = await supabase.auth.getUser();
+  if (!user.data.user) throw redirect({ to: "/login" });
+  // We'd need to check role, but we don't have access to store here easily.
+  // Instead, we can rely on the layout's condition, but for extra security, we can redirect if role is not admin/hr.
+  // We'll implement a simpler approach: on the client side, the layout already hides nav, but they can still type URL.
+  // To truly protect, we can wrap the component with a check using the useUser hook inside the component and redirect.
+}
 
 export const Route = createFileRoute("/_app/monthly")({
   component: MonthlyPage,
@@ -54,6 +67,64 @@ function MonthlyPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // ===== EDITING STATE =====
+  const [editingKPI, setEditingKPI] = useState<{
+    employeeId: string;
+    categoryId: string;
+    kpiId: string;
+    field: 'target' | 'actual';
+    value: number;
+  } | null>(null);
+
+  // ===== EDITING FUNCTIONS =====
+  const startEditing = (employeeId: string, categoryId: string, kpiId: string, field: 'target' | 'actual', currentValue: number) => {
+    setEditingKPI({
+      employeeId,
+      categoryId,
+      kpiId,
+      field,
+      value: currentValue
+    });
+  };
+
+  const saveEdit = () => {
+    if (!editingKPI) return;
+
+    // Find the employee and update the specific KPI
+    const updatedEmployees = employees.map(emp => {
+      if (emp.id !== editingKPI.employeeId) return emp;
+
+      const updatedCategories = (emp.categories || []).map(cat => {
+        if (cat.id !== editingKPI.categoryId) return cat;
+        
+        const updatedKpis = cat.kpis.map(k => {
+          if (k.id !== editingKPI.kpiId) return k;
+          return {
+            ...k,
+            [editingKPI.field]: editingKPI.value
+          };
+        });
+        return { ...cat, kpis: updatedKpis };
+      });
+
+      return { ...emp, categories: updatedCategories };
+    });
+
+    setEmployees(updatedEmployees);
+
+    // Save monthly snapshot for this employee
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+    saveMonthlySnapshot(editingKPI.employeeId, currentYear, currentMonth);
+
+    setEditingKPI(null);
+    alert('✅ KPI updated successfully!');
+  };
+
+  const cancelEdit = () => {
+    setEditingKPI(null);
+  };
 
   const stats = getMonthlyStats();
   const trends = getAllTrends();
@@ -609,7 +680,7 @@ function MonthlyPage() {
                   </div>
                 </button>
 
-                {/* Expanded details - USING CURRENT EMPLOYEE DATA */}
+                {/* Expanded details - WITH EDITABLE KPIs */}
                 {isExpanded && (
                   <div className="p-4 border-t bg-muted/10">
                     {history.length === 0 ? (
@@ -640,11 +711,11 @@ function MonthlyPage() {
                           </div>
                         </div>
 
-                        {/* WEIGHTED CATEGORY PERFORMANCE - USING CURRENT EMPLOYEE DATA */}
+                        {/* WEIGHTED CATEGORY PERFORMANCE - WITH EDITABLE KPIs */}
                         {emp.categories && emp.categories.length > 0 ? (
                           <div className="space-y-3 mb-4">
                             <p className="font-medium text-sm flex items-center gap-2">
-                              <Target className="h-4 w-4" /> Weighted Category Performance
+                              <Target className="h-4 w-4" /> Weighted Category Performance <span className="text-xs text-muted-foreground font-normal">(click numbers to edit)</span>
                             </p>
                             <div className="space-y-3">
                               {emp.categories.map((category, catIdx) => {
@@ -662,6 +733,7 @@ function MonthlyPage() {
                                     const weight = Number(kpi.weight) || 100;
                                     
                                     kpiDetails.push({
+                                      id: kpi.id,
                                       description: kpi.description,
                                       target,
                                       actual,
@@ -709,22 +781,86 @@ function MonthlyPage() {
                                     </div>
                                     <div className="mt-2 grid grid-cols-1 gap-1">
                                       {kpiDetails.length > 0 ? (
-                                        kpiDetails.map((kpi, kIdx) => (
-                                          <div key={kIdx} className="grid grid-cols-5 gap-2 text-xs border-b border-muted pb-1 last:border-0">
-                                            <div className="col-span-2">{kpi.description}</div>
-                                            <div>Target: {fmtNum(kpi.target)} {kpi.metric}</div>
-                                            <div>Actual: {fmtNum(kpi.actual)} {kpi.metric}</div>
-                                            <div className={`font-semibold ${
-                                              kpi.achievement >= 100 ? 'text-green-600' : 
-                                              kpi.achievement >= 70 ? 'text-yellow-600' : 
-                                              'text-red-600'
-                                            }`}>
-                                              {fmtNum(kpi.achievement, 1)}%
-                                              {kpi.achievement >= 100 && ' ✅'}
-                                              {kpi.achievement < 50 && ' ⚠️'}
+                                        kpiDetails.map((kpi, kIdx) => {
+                                          const isEditingTarget = editingKPI?.employeeId === emp.id && 
+                                                                 editingKPI?.categoryId === category.id && 
+                                                                 editingKPI?.kpiId === kpi.id && 
+                                                                 editingKPI?.field === 'target';
+                                          const isEditingActual = editingKPI?.employeeId === emp.id && 
+                                                                 editingKPI?.categoryId === category.id && 
+                                                                 editingKPI?.kpiId === kpi.id && 
+                                                                 editingKPI?.field === 'actual';
+
+                                          return (
+                                            <div key={kIdx} className="grid grid-cols-6 gap-2 text-xs border-b border-muted pb-1 last:border-0 items-center">
+                                              <div className="col-span-2">{kpi.description}</div>
+                                              
+                                              {/* Target - Editable */}
+                                              <div className="col-span-1">
+                                                {isEditingTarget ? (
+                                                  <Input
+                                                    type="number"
+                                                    className="h-6 w-full text-xs p-1"
+                                                    value={editingKPI?.value || 0}
+                                                    onChange={(e) => setEditingKPI(prev => prev ? { ...prev, value: Number(e.target.value) } : null)}
+                                                    onBlur={saveEdit}
+                                                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                                                    autoFocus
+                                                  />
+                                                ) : (
+                                                  <button 
+                                                    className="hover:bg-muted/30 rounded px-1 py-0.5 w-full text-left hover:text-blue-600 transition-colors"
+                                                    onClick={() => startEditing(emp.id, category.id, kpi.id, 'target', kpi.target)}
+                                                  >
+                                                    {fmtNum(kpi.target)} {kpi.metric}
+                                                  </button>
+                                                )}
+                                              </div>
+                                              
+                                              {/* Actual - Editable */}
+                                              <div className="col-span-1">
+                                                {isEditingActual ? (
+                                                  <Input
+                                                    type="number"
+                                                    className="h-6 w-full text-xs p-1"
+                                                    value={editingKPI?.value || 0}
+                                                    onChange={(e) => setEditingKPI(prev => prev ? { ...prev, value: Number(e.target.value) } : null)}
+                                                    onBlur={saveEdit}
+                                                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                                                    autoFocus
+                                                  />
+                                                ) : (
+                                                  <button 
+                                                    className="hover:bg-muted/30 rounded px-1 py-0.5 w-full text-left hover:text-blue-600 transition-colors"
+                                                    onClick={() => startEditing(emp.id, category.id, kpi.id, 'actual', kpi.actual)}
+                                                  >
+                                                    {fmtNum(kpi.actual)} {kpi.metric}
+                                                  </button>
+                                                )}
+                                              </div>
+                                              
+                                              {/* Achievement */}
+                                              <div className={`col-span-1 font-semibold ${
+                                                kpi.achievement >= 100 ? 'text-green-600' : 
+                                                kpi.achievement >= 70 ? 'text-yellow-600' : 
+                                                'text-red-600'
+                                              }`}>
+                                                {fmtNum(kpi.achievement, 1)}%
+                                                {kpi.achievement >= 100 && ' ✅'}
+                                                {kpi.achievement < 50 && ' ⚠️'}
+                                              </div>
+
+                                              {/* Edit indicator */}
+                                              <div className="col-span-1 text-right">
+                                                {isEditingTarget || isEditingActual ? (
+                                                  <span className="text-blue-500 text-[10px]">editing...</span>
+                                                ) : (
+                                                  <span className="text-[10px] text-muted-foreground">✎ click</span>
+                                                )}
+                                              </div>
                                             </div>
-                                          </div>
-                                        ))
+                                          );
+                                        })
                                       ) : (
                                         <div className="text-xs text-muted-foreground">No KPI data available</div>
                                       )}

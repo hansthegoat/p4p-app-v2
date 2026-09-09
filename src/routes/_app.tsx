@@ -1,21 +1,24 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { AppLayout } from "@/components/p4p/AppLayout";
 import { P4PProvider } from "@/lib/p4p/store";
+import { supabase } from "@/lib/supabase";
+import { UserProvider } from "@/lib/p4p/user-context";
 
 export const Route = createFileRoute("/_app")({
   ssr: false,
-  beforeLoad: () => {
-    // Only check auth on the client — localStorage doesn't exist during SSR
-    if (typeof window === "undefined") return;
-    if (localStorage.getItem("p4p_logged_in") !== "1") {
+  beforeLoad: async () => {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) {
       throw redirect({ to: "/login" });
     }
   },
   component: () => (
     <P4PProvider>
-      <AppLayout>
-        <Outlet />
-      </AppLayout>
+      <UserProvider>
+        <AppLayout>
+          <Outlet />
+        </AppLayout>
+      </UserProvider>
     </P4PProvider>
   ),
 });

@@ -9,15 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppTraceRouteImport } from './routes/_app.trace'
+import { Route as AppSupervisorsRouteImport } from './routes/_app.supervisors'
 import { Route as AppMonthlyRouteImport } from './routes/_app.monthly'
+import { Route as AppKpiFrameworkRouteImport } from './routes/_app.kpi-framework'
 import { Route as AppGradesRouteImport } from './routes/_app.grades'
 import { Route as AppEmployeesRouteImport } from './routes/_app.employees'
+import { Route as AppEmployeeRouteImport } from './routes/_app.employee'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppAppraisalsReviewRouteImport } from './routes/_app.appraisals-review'
+import { Route as AppAppraisalsRouteImport } from './routes/_app.appraisals'
 
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -37,9 +48,19 @@ const AppTraceRoute = AppTraceRouteImport.update({
   path: '/trace',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSupervisorsRoute = AppSupervisorsRouteImport.update({
+  id: '/supervisors',
+  path: '/supervisors',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMonthlyRoute = AppMonthlyRouteImport.update({
   id: '/monthly',
   path: '/monthly',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppKpiFrameworkRoute = AppKpiFrameworkRouteImport.update({
+  id: '/kpi-framework',
+  path: '/kpi-framework',
   getParentRoute: () => AppRoute,
 } as any)
 const AppGradesRoute = AppGradesRouteImport.update({
@@ -52,28 +73,55 @@ const AppEmployeesRoute = AppEmployeesRouteImport.update({
   path: '/employees',
   getParentRoute: () => AppRoute,
 } as any)
+const AppEmployeeRoute = AppEmployeeRouteImport.update({
+  id: '/employee',
+  path: '/employee',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAppraisalsReviewRoute = AppAppraisalsReviewRouteImport.update({
+  id: '/appraisals-review',
+  path: '/appraisals-review',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAppraisalsRoute = AppAppraisalsRouteImport.update({
+  id: '/appraisals',
+  path: '/appraisals',
   getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
+  '/appraisals': typeof AppAppraisalsRoute
+  '/appraisals-review': typeof AppAppraisalsReviewRoute
   '/dashboard': typeof AppDashboardRoute
+  '/employee': typeof AppEmployeeRoute
   '/employees': typeof AppEmployeesRoute
   '/grades': typeof AppGradesRoute
+  '/kpi-framework': typeof AppKpiFrameworkRoute
   '/monthly': typeof AppMonthlyRoute
+  '/supervisors': typeof AppSupervisorsRoute
   '/trace': typeof AppTraceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
+  '/appraisals': typeof AppAppraisalsRoute
+  '/appraisals-review': typeof AppAppraisalsReviewRoute
   '/dashboard': typeof AppDashboardRoute
+  '/employee': typeof AppEmployeeRoute
   '/employees': typeof AppEmployeesRoute
   '/grades': typeof AppGradesRoute
+  '/kpi-framework': typeof AppKpiFrameworkRoute
   '/monthly': typeof AppMonthlyRoute
+  '/supervisors': typeof AppSupervisorsRoute
   '/trace': typeof AppTraceRoute
 }
 export interface FileRoutesById {
@@ -81,10 +129,16 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/register': typeof RegisterRoute
+  '/_app/appraisals': typeof AppAppraisalsRoute
+  '/_app/appraisals-review': typeof AppAppraisalsReviewRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/employee': typeof AppEmployeeRoute
   '/_app/employees': typeof AppEmployeesRoute
   '/_app/grades': typeof AppGradesRoute
+  '/_app/kpi-framework': typeof AppKpiFrameworkRoute
   '/_app/monthly': typeof AppMonthlyRoute
+  '/_app/supervisors': typeof AppSupervisorsRoute
   '/_app/trace': typeof AppTraceRoute
 }
 export interface FileRouteTypes {
@@ -92,29 +146,47 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/register'
+    | '/appraisals'
+    | '/appraisals-review'
     | '/dashboard'
+    | '/employee'
     | '/employees'
     | '/grades'
+    | '/kpi-framework'
     | '/monthly'
+    | '/supervisors'
     | '/trace'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/register'
+    | '/appraisals'
+    | '/appraisals-review'
     | '/dashboard'
+    | '/employee'
     | '/employees'
     | '/grades'
+    | '/kpi-framework'
     | '/monthly'
+    | '/supervisors'
     | '/trace'
   id:
     | '__root__'
     | '/'
     | '/_app'
     | '/login'
+    | '/register'
+    | '/_app/appraisals'
+    | '/_app/appraisals-review'
     | '/_app/dashboard'
+    | '/_app/employee'
     | '/_app/employees'
     | '/_app/grades'
+    | '/_app/kpi-framework'
     | '/_app/monthly'
+    | '/_app/supervisors'
     | '/_app/trace'
   fileRoutesById: FileRoutesById
 }
@@ -122,10 +194,18 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  RegisterRoute: typeof RegisterRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -154,11 +234,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTraceRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/supervisors': {
+      id: '/_app/supervisors'
+      path: '/supervisors'
+      fullPath: '/supervisors'
+      preLoaderRoute: typeof AppSupervisorsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/monthly': {
       id: '/_app/monthly'
       path: '/monthly'
       fullPath: '/monthly'
       preLoaderRoute: typeof AppMonthlyRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/kpi-framework': {
+      id: '/_app/kpi-framework'
+      path: '/kpi-framework'
+      fullPath: '/kpi-framework'
+      preLoaderRoute: typeof AppKpiFrameworkRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/grades': {
@@ -175,6 +269,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppEmployeesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/employee': {
+      id: '/_app/employee'
+      path: '/employee'
+      fullPath: '/employee'
+      preLoaderRoute: typeof AppEmployeeRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -182,22 +283,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/appraisals-review': {
+      id: '/_app/appraisals-review'
+      path: '/appraisals-review'
+      fullPath: '/appraisals-review'
+      preLoaderRoute: typeof AppAppraisalsReviewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/appraisals': {
+      id: '/_app/appraisals'
+      path: '/appraisals'
+      fullPath: '/appraisals'
+      preLoaderRoute: typeof AppAppraisalsRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppAppraisalsRoute: typeof AppAppraisalsRoute
+  AppAppraisalsReviewRoute: typeof AppAppraisalsReviewRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppEmployeeRoute: typeof AppEmployeeRoute
   AppEmployeesRoute: typeof AppEmployeesRoute
   AppGradesRoute: typeof AppGradesRoute
+  AppKpiFrameworkRoute: typeof AppKpiFrameworkRoute
   AppMonthlyRoute: typeof AppMonthlyRoute
+  AppSupervisorsRoute: typeof AppSupervisorsRoute
   AppTraceRoute: typeof AppTraceRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAppraisalsRoute: AppAppraisalsRoute,
+  AppAppraisalsReviewRoute: AppAppraisalsReviewRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppEmployeeRoute: AppEmployeeRoute,
   AppEmployeesRoute: AppEmployeesRoute,
   AppGradesRoute: AppGradesRoute,
+  AppKpiFrameworkRoute: AppKpiFrameworkRoute,
   AppMonthlyRoute: AppMonthlyRoute,
+  AppSupervisorsRoute: AppSupervisorsRoute,
   AppTraceRoute: AppTraceRoute,
 }
 
@@ -207,6 +332,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  RegisterRoute: RegisterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

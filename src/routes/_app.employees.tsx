@@ -22,7 +22,7 @@ Alice,G,false,true,2025-01-15,12,Strategic,30,Revenue,500000,600000,40,₵
 Alice,G,false,true,2025-01-15,12,Strategic,30,CSAT,90,85,30,%
 Alice,G,false,true,2025-01-15,12,Strategic,30,Market Share,25,20,30,%
 Alice,G,false,true,2025-01-15,12,Operations,20,Process Efficiency,95,88,100,%
-Jane Adjunct,5,true,false,2025-01-01,12,,,,,,,,
+Jane Adjunct,5,true,false,2025-01-01,12,,,,,,,,,
 `;
 
 function downloadFile(content: string, name: string, type = "text/csv") {
@@ -41,7 +41,7 @@ function EmployeesPage() {
     clearEmployees, 
     loadDemo, 
     setEmployees,
-    getTriggersForEmployee  // ADDED THIS
+    getTriggersForEmployee
   } = useP4P();
   
   const [mode, setMode] = useState<"company" | "individual">("company");
@@ -93,10 +93,8 @@ function EmployeesPage() {
             
             const emp = groups.get(key)!;
             
-            // Skip KPI parsing for adjuncts
             if (emp.isAdjunct) continue;
             
-            // Check if this row has category data
             const categoryName = row.Category;
             if (categoryName) {
               if (!emp.categories) emp.categories = [];
@@ -124,7 +122,6 @@ function EmployeesPage() {
                 });
               }
             } 
-            // Legacy KPI format (no category)
             else if (row.KPI_Description && !emp.isAdjunct) {
               if (!emp.kpis) emp.kpis = [];
               emp.kpis.push({
@@ -150,7 +147,6 @@ function EmployeesPage() {
     });
   };
 
-  // Helper to render category breakdown
   const renderCategoryBreakdown = (employee: Employee, calcResult: any) => {
     if (!employee.categories || employee.categories.length === 0) {
       if (employee.kpis && employee.kpis.length > 0) {
@@ -328,7 +324,6 @@ function EmployeesPage() {
               const hasExpandable = (hasCategories || hasKpis) && !e.isAdjunct;
               const isOpen = expanded === e.id;
               
-              // Get triggers for this employee
               const empTriggers = getTriggersForEmployee ? getTriggersForEmployee(e.id) : [];
               const hasProbation = empTriggers.some(t => t.type === 'probation');
               const hasManagement = empTriggers.some(t => t.type === 'management_action');

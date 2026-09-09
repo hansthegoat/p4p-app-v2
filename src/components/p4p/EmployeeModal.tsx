@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
+import { getTemplateForJobGrade } from "@/lib/p4p/kpi-templates";
 import { useP4P } from "@/lib/p4p/store";
 import type { Employee, KPI, Category } from "@/lib/p4p/types";
 import { newId } from "@/lib/p4p/defaults";
@@ -21,30 +22,89 @@ function blank(): Employee {
   return {
     id: newId(),
     name: "",
+    email: "",
     jobGrade: "4",
+    department: "",
+    role: "",
     isAdjunct: false,
     isSalesRole: false,
     joinDate: new Date().toISOString().slice(0, 10),
     monthsWorked: 12,
     kpis: [],
     categories: [],
+    supervisorId: "",
+    supervisorName: "",
+    isManager: false,
+    roleType: "employee",
   };
 }
 
 export function EmployeeModal({ open, onClose, employee }: Props) {
-  const { grades, globals, upsertEmployee } = useP4P();
+  const { grades, globals, upsertEmployee, employees } = useP4P();
   const [data, setData] = useState<Employee>(blank());
 
   useEffect(() => {
     if (open) {
       const emp = employee ? JSON.parse(JSON.stringify(employee)) : blank();
       if (!emp.categories) emp.categories = [];
+      if (!emp.supervisorId) emp.supervisorId = "";
+      if (!emp.supervisorName) emp.supervisorName = "";
       setData(emp);
     }
   }, [open, employee]);
 
   const setField = <K extends keyof Employee>(k: K, v: Employee[K]) =>
     setData((d) => ({ ...d, [k]: v }));
+
+  // Auto-populate KPIs when job grade changes (only if no categories exist yet)
+  useEffect(() => {
+    if (!data.jobGrade || data.isAdjunct) return;
+    if (data.categories && data.categories.length > 0) return;
+
+    const template = getTemplateForJobGrade(data.jobGrade);
+    if (!template) return;
+
+    const categories = template.categories.map((cat) => ({
+      id: newId(),
+      name: cat.name,
+      weight: cat.weight,
+      kpis: cat.kpis.map((k) => ({
+        id: newId(),
+        description: k.description,
+        metric: k.metric,
+        target: k.target,
+        actual: 0,
+        weight: 100,
+        measurementSource: k.measurementSource || "",
+      })),
+    }));
+
+    setData((prev) => ({ ...prev, categories }));
+  }, [data.jobGrade, data.isAdjunct]);
+
+  // Load template manually
+  const loadTemplate = () => {
+    const template = getTemplateForJobGrade(data.jobGrade);
+    if (!template) {
+      alert(`No KPI template found for job grade "${data.jobGrade}"`);
+      return;
+    }
+    const categories = template.categories.map((cat) => ({
+      id: newId(),
+      name: cat.name,
+      weight: cat.weight,
+      kpis: cat.kpis.map((k) => ({
+        id: newId(),
+        description: k.description,
+        metric: k.metric,
+        target: k.target,
+        actual: 0,
+        weight: 100,
+        measurementSource: k.measurementSource || "",
+      })),
+    }));
+    setData((prev) => ({ ...prev, categories }));
+  };
 
   // Calculate total weight and remaining
   const getWeightStats = (categories: Category[]) => {
@@ -92,6 +152,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
       target: 0,
       actual: 0,
       weight: 1,
+      measurementSource: "",
     };
     setData((d) => ({
       ...d,
@@ -132,7 +193,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
       ...d,
       kpis: [
         ...d.kpis,
-        { id: newId(), description: "", metric: "%", target: 0, actual: 0, weight: 1 },
+        { id: newId(), description: "", metric: "%", target: 0, actual: 0, weight: 1, measurementSource: "" },
       ],
     }));
 
@@ -150,18 +211,28 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
 
   const save = () => {
     if (!data.name.trim()) return;
-    
+
     const categories = data.categories || [];
     const stats = getWeightStats(categories);
-    
-    // Prevent saving if weights don't sum to 100%
+
     if (categories.length > 0 && !stats.isComplete) {
       alert(`Category weights must sum to 100%. Currently: ${stats.total}%. Please adjust.`);
       return;
     }
-    
+
+    // If supervisorId is set, find the supervisor name
+    let supervisorName = data.supervisorName || "";
+    if (data.supervisorId) {
+      const supervisor = employees.find(e => e.id === data.supervisorId);
+      if (supervisor) {
+        supervisorName = supervisor.name;
+      }
+    }
+
     upsertEmployee({
       ...data,
+      email: data.email?.trim() || "",
+      supervisorName: supervisorName,
       monthsWorked: Number(data.monthsWorked) || 0,
       kpis: data.isAdjunct ? [] : data.kpis,
       categories: data.isAdjunct ? [] : categories,
@@ -172,6 +243,10 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
   const hasCategories = (data.categories || []).length > 0;
   const hasLegacyKPIs = data.kpis.length > 0;
   const weightStats = getWeightStats(data.categories || []);
+  const hasTemplate = !!getTemplateForJobGrade(data.jobGrade);
+
+  // Get managers for supervisor dropdown
+  const managers = employees.filter(e => e.isManager === true && e.id !== data.id);
 
   return (
     <AnimatePresence>
@@ -189,7 +264,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.3 }}
-            className="fixed right-0 top-0 bottom-0 w-full sm:w-[650px] bg-background z-50 shadow-2xl overflow-y-auto"
+            className="fixed right-0 top-0 bottom-0 w-full sm:w-[700px] bg-background z-50 shadow-2xl overflow-y-auto"
           >
             <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-background z-10">
               <h2 className="text-lg font-semibold">
@@ -212,6 +287,16 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
               </div>
 
               <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={data.email || ""}
+                  onChange={(e) => setField("email", e.target.value)}
+                  placeholder="Email address"
+                />
+              </div>
+
+              <div>
                 <Label>Job Grade</Label>
                 <Select
                   value={data.jobGrade}
@@ -228,6 +313,68 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <Label>Department</Label>
+                <Input
+                  value={data.department || ""}
+                  onChange={(e) => setField("department", e.target.value)}
+                  placeholder="Department"
+                />
+              </div>
+
+              <div>
+                <Label>Role</Label>
+                <Input
+                  value={data.role || ""}
+                  onChange={(e) => setField("role", e.target.value)}
+                  placeholder="Role (e.g., Senior Specialist)"
+                />
+              </div>
+
+              {/* Supervisor Dropdown - FIXED */}
+              <div>
+                <Label>Supervisor/Manager</Label>
+                <Select
+                  value={data.supervisorId || "none"}
+                  onValueChange={(v) => {
+                    if (v === "none") {
+                      setField("supervisorId", "");
+                      setField("supervisorName", "");
+                    } else {
+                      const supervisor = employees.find(e => e.id === v);
+                      setField("supervisorId", v);
+                      setField("supervisorName", supervisor?.name || "");
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select supervisor (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {managers.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name} ({m.department})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {data.supervisorName && data.supervisorId && data.supervisorId !== "none" && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Supervisor: {data.supervisorName}
+                  </p>
+                )}
+              </div>
+
+              {/* Manager Toggle */}
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox
+                  checked={data.isManager || false}
+                  onCheckedChange={(v) => setField("isManager", !!v)}
+                />
+                <Label className="text-sm cursor-pointer">This employee is a Manager/Supervisor</Label>
               </div>
 
               <div className="flex gap-6">
@@ -275,20 +422,29 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                 <div className="pt-4 border-t">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-medium">Weighted Categories</h3>
-                    <Button size="sm" variant="outline" onClick={addCategory}>
-                      <FolderPlus className="h-4 w-4 mr-1" /> Add Category
-                    </Button>
+                    <div className="flex gap-2">
+                      {hasTemplate && (
+                        <Button size="sm" variant="outline" onClick={loadTemplate}>
+                          <FolderPlus className="h-4 w-4 mr-1" /> Load Template
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={addCategory}>
+                        <Plus className="h-4 w-4 mr-1" /> Add Category
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Weight Status Banner */}
                   {hasCategories && (
-                    <div className={`rounded-md p-3 mb-3 text-sm flex items-center gap-2 ${
-                      weightStats.isOver 
-                        ? 'bg-red-50 border border-red-200 text-red-700' 
-                        : weightStats.isComplete
-                        ? 'bg-green-50 border border-green-200 text-green-700'
-                        : 'bg-blue-50 border border-blue-200 text-blue-700'
-                    }`}>
+                    <div
+                      className={`rounded-md p-3 mb-3 text-sm flex items-center gap-2 ${
+                        weightStats.isOver
+                          ? "bg-red-50 border border-red-200 text-red-700"
+                          : weightStats.isComplete
+                          ? "bg-green-50 border border-green-200 text-green-700"
+                          : "bg-blue-50 border border-blue-200 text-blue-700"
+                      }`}
+                    >
                       <AlertCircle className="h-4 w-4 flex-shrink-0" />
                       <span>
                         {weightStats.isOver ? (
@@ -297,8 +453,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                           <strong>✅ Perfect!</strong>
                         ) : (
                           <strong>📊 Assign weights</strong>
-                        )}
-                        {' '}
+                        )}{" "}
                         Total: <strong>{weightStats.total}%</strong>
                         {!weightStats.isOver && !weightStats.isComplete && (
                           <> · Remaining: <strong>{weightStats.remaining}%</strong></>
@@ -329,18 +484,21 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                                 value={category.weight}
                                 onChange={(e) => {
                                   const newWeight = Number(e.target.value);
-                                  // Don't allow negative numbers
                                   if (newWeight < 0) return;
-                                  
-                                  // Check if this would exceed 100% total
-                                  const otherCategories = (data.categories || []).filter(c => c.id !== category.id);
-                                  const otherTotal = otherCategories.reduce((sum, c) => sum + c.weight, 0);
+                                  const otherCategories = (data.categories || []).filter(
+                                    (c) => c.id !== category.id
+                                  );
+                                  const otherTotal = otherCategories.reduce(
+                                    (sum, c) => sum + c.weight,
+                                    0
+                                  );
                                   const maxAllowed = 100 - otherTotal;
-                                  
                                   if (newWeight <= maxAllowed) {
                                     updateCategory(category.id, { weight: newWeight });
                                   } else {
-                                    alert(`Cannot set weight to ${newWeight}%. Only ${maxAllowed}% remaining.`);
+                                    alert(
+                                      `Cannot set weight to ${newWeight}%. Only ${maxAllowed}% remaining.`
+                                    );
                                   }
                                 }}
                                 placeholder="Weight %"
@@ -365,15 +523,17 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                           </div>
 
                           <div className="pl-4 space-y-2">
-                            <div className="grid grid-cols-10 gap-2 text-xs font-medium text-muted-foreground">
-                              <div className="col-span-4">KPI Description</div>
+                            <div className="grid grid-cols-11 gap-2 text-xs font-medium text-muted-foreground">
+                              <div className="col-span-3">KPI Description</div>
                               <div className="col-span-2">Metric</div>
                               <div className="col-span-2">Target</div>
                               <div className="col-span-2">Actual</div>
+                              <div className="col-span-1">Source</div>
+                              <div className="col-span-1">Action</div>
                             </div>
 
                             {category.kpis.map((kpi) => (
-                              <div key={kpi.id} className="grid grid-cols-10 gap-2">
+                              <div key={kpi.id} className="grid grid-cols-11 gap-2">
                                 <Input
                                   value={kpi.description}
                                   onChange={(e) =>
@@ -382,7 +542,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                                     })
                                   }
                                   placeholder="KPI name"
-                                  className="col-span-4"
+                                  className="col-span-3"
                                 />
                                 <Select
                                   value={kpi.metric}
@@ -421,6 +581,16 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                                   }
                                   className="col-span-2"
                                 />
+                                <Input
+                                  value={kpi.measurementSource || ""}
+                                  onChange={(e) =>
+                                    updateKPI(category.id, kpi.id, {
+                                      measurementSource: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Source"
+                                  className="col-span-1"
+                                />
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -446,7 +616,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                     </div>
                   ) : (
                     <div className="text-sm text-muted-foreground p-4 bg-muted/40 rounded-md text-center">
-                      No categories yet. Click "Add Category" to start.
+                      No categories yet. Click "Add Category" or "Load Template" to start.
                     </div>
                   )}
                 </div>
@@ -526,6 +696,16 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                                 }
                               />
                             </div>
+                            <div>
+                              <Label className="text-xs">Source</Label>
+                              <Input
+                                value={k.measurementSource || ""}
+                                onChange={(e) =>
+                                  updLegacyKpi(k.id, { measurementSource: e.target.value })
+                                }
+                                placeholder="Measurement source"
+                              />
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -539,8 +719,8 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
               )}
 
               <div className="flex gap-2 pt-4 sticky bottom-0 bg-background pb-2 border-t">
-                <Button 
-                  onClick={save} 
+                <Button
+                  onClick={save}
                   className="flex-1"
                   disabled={hasCategories && !weightStats.isComplete}
                 >

@@ -1,18 +1,34 @@
-const KEY = "p4p_logged_in";
+import { supabase } from "@/lib/supabase";
 
-export function isLoggedIn(): boolean {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem(KEY) === "1";
+export async function login(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error) throw error;
+  return data;
 }
 
-export function login(username: string, password: string): boolean {
-  const valid =
-    (username.trim() === "Sarah Amartey Amarh" && password === "hr@aoholdings.net") ||
-    (username.trim() === "" && password === "");
-  if (valid && typeof window !== "undefined") localStorage.setItem(KEY, "1");
-  return valid;
+export async function register(email: string, password: string) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+  });
+  if (error) throw error;
+  return data;
 }
 
-export function logout() {
-  if (typeof window !== "undefined") localStorage.removeItem(KEY);
+export async function logout() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+export async function getSession() {
+  const { data } = await supabase.auth.getSession();
+  return data.session;
+}
+
+export async function getUser() {
+  const { data } = await supabase.auth.getUser();
+  return data.user;
 }
