@@ -9,6 +9,7 @@ import { P4PProvider, useP4P } from "@/lib/p4p/store";
 import { register, login } from "@/lib/p4p/auth";
 import { getDepartments, getRolesForDepartment, getTemplateByDepartmentAndRole } from "@/lib/p4p/kpi-templates";
 import { newId } from "@/lib/p4p/defaults";
+import { supabase } from "@/lib/supabase";
 
 // Manager roles that should be auto-marked as supervisors
 const MANAGER_ROLES = [
@@ -50,7 +51,12 @@ function RegisterForm() {
     setError("");
 
     try {
+      // Register the user
       await register(email, password);
+
+      // Get the current user to get their authUserId
+      const { data: { user } } = await supabase.auth.getUser();
+      const authUserId = user?.id || "";
 
       const template = getTemplateByDepartmentAndRole(department, role);
       if (!template) {
@@ -68,6 +74,7 @@ function RegisterForm() {
         id: newId(),
         name,
         email,
+        authUserId, // ← NEW: Supabase Auth user ID added here
         department,
         role,
         jobGrade: template.jobGrade || "4",

@@ -9,31 +9,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useP4P } from "@/lib/p4p/store";
 import { fmtGHS, fmtNum } from "@/lib/p4p/calc";
+import { showToast } from "@/lib/toast";
 import { 
   Upload, Download, Calendar, FileSpreadsheet, 
-  TrendingUp, TrendingDown, Users, Award, AlertTriangle,
-  ChevronDown, ChevronRight, Trash2, CheckCircle, XCircle,
-  Database, Save, Target, RefreshCw
+  TrendingUp, Users, Award, AlertTriangle,
+  ChevronDown, ChevronRight, Trash2, CheckCircle,
+  Save, Target, RefreshCw
 } from "lucide-react";
-import { redirect } from "@tanstack/react-router";
-import { supabase } from "@/lib/supabase";
-
-
-// Example for employees route
-beforeLoad: async () => {
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) throw redirect({ to: "/login" });
-  // We'd need to check role, but we don't have access to store here easily.
-  // Instead, we can rely on the layout's condition, but for extra security, we can redirect if role is not admin/hr.
-  // We'll implement a simpler approach: on the client side, the layout already hides nav, but they can still type URL.
-  // To truly protect, we can wrap the component with a check using the useUser hook inside the component and redirect.
-}
 
 export const Route = createFileRoute("/_app/monthly")({
   component: MonthlyPage,
 });
 
-// CSV/Excel Template
 const TEMPLATE_CSV = `Employee Name,Employee ID,Category,Category Weight (%),KPI Description,KPI Metric,KPI Target,KPI Actual
 Alice Johnson,emp1,Strategic,30,Revenue Growth,GHS,500000,600000
 Alice Johnson,emp1,Strategic,30,CSAT Score,%,90,85
@@ -55,7 +42,6 @@ function MonthlyPage() {
     getMonthlyStats,
     deleteMonthlyData,
     calc,
-    upsertEmployee,
     setEmployees,
     detectTriggers,
     getTriggersForEmployee
@@ -68,7 +54,6 @@ function MonthlyPage() {
   const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // ===== EDITING STATE =====
   const [editingKPI, setEditingKPI] = useState<{
     employeeId: string;
     categoryId: string;
@@ -77,7 +62,6 @@ function MonthlyPage() {
     value: number;
   } | null>(null);
 
-  // ===== EDITING FUNCTIONS =====
   const startEditing = (employeeId: string, categoryId: string, kpiId: string, field: 'target' | 'actual', currentValue: number) => {
     setEditingKPI({
       employeeId,
@@ -91,7 +75,6 @@ function MonthlyPage() {
   const saveEdit = () => {
     if (!editingKPI) return;
 
-    // Find the employee and update the specific KPI
     const updatedEmployees = employees.map(emp => {
       if (emp.id !== editingKPI.employeeId) return emp;
 
@@ -113,13 +96,12 @@ function MonthlyPage() {
 
     setEmployees(updatedEmployees);
 
-    // Save monthly snapshot for this employee
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
     saveMonthlySnapshot(editingKPI.employeeId, currentYear, currentMonth);
 
     setEditingKPI(null);
-    alert('✅ KPI updated successfully!');
+    showToast.success("KPI Updated", "The KPI value has been saved.");
   };
 
   const cancelEdit = () => {
@@ -130,10 +112,8 @@ function MonthlyPage() {
   const trends = getAllTrends();
   const monthsWithData = stats.monthsWithData || [];
 
-  // Check if data exists for selected month
   const hasDataForMonth = monthsWithData.some(m => m.year === selectedYear && m.month === selectedMonth);
 
-  // Download template
   const downloadTemplate = () => {
     const blob = new Blob([TEMPLATE_CSV], { type: "text/csv" });
     const a = document.createElement("a");
@@ -141,9 +121,9 @@ function MonthlyPage() {
     a.download = `monthly_performance_template_${selectedMonth}_${selectedYear}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
+    showToast.success("Template Downloaded", "CSV template has been downloaded.");
   };
 
-  // Force save all current employee data
   const refreshMonthlyData = () => {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
@@ -156,10 +136,9 @@ function MonthlyPage() {
       }
     }
     
-    alert(`✅ Refreshed data for ${count} employees for ${currentMonth}/${currentYear}`);
+    showToast.success("Data Refreshed", `Refreshed data for ${count} employees.`);
   };
 
-  // Handle file upload
   const handleUpload = (file: File) => {
     setIsUploading(true);
     setUploadStatus(null);
@@ -168,7 +147,6 @@ function MonthlyPage() {
     
     const processData = (data: any[]) => {
       try {
-        // Parse the uploaded data
         const headers = Object.keys(data[0] || {});
         const required = ["Employee Name", "KPI Description", "KPI Target", "KPI Actual"];
         const missing = required.filter(r => !headers.some(h => h.trim() === r));
@@ -177,7 +155,6 @@ function MonthlyPage() {
           throw new Error(`Missing columns: ${missing.join(", ")}`);
         }
 
-        // Group by employee
         const employeeMap = new Map<string, { name: string; categories: Map<string, { weight: number; kpis: any[] }> }>();
         
         for (const row of data) {
@@ -193,10 +170,7 @@ function MonthlyPage() {
           if (!empName || !kpiDesc || isNaN(kpiTarget) || isNaN(kpiActual)) continue;
 
           if (!employeeMap.has(empId)) {
-            employeeMap.set(empId, { 
-              name: empName, 
-              categories: new Map() 
-            });
+            employeeMap.set(empId, { name: empName, categories: new Map() });
           }
 
           const emp = employeeMap.get(empId)!;
@@ -210,11 +184,10 @@ function MonthlyPage() {
             metric: kpiMetric,
             target: kpiTarget,
             actual: kpiActual,
-            weight: 100 // equal weight within category
+            weight: 100
           });
         }
 
-        // Convert to Employee format and save
         const updatedEmployees = [...employees];
         let newCount = 0;
         let updateCount = 0;
@@ -237,22 +210,22 @@ function MonthlyPage() {
             });
           }
 
-          // Find if employee exists
           const existingIdx = updatedEmployees.findIndex(e => e.name === empData.name);
           if (existingIdx >= 0) {
-            // Update existing employee
             updatedEmployees[existingIdx] = {
               ...updatedEmployees[existingIdx],
               categories: categories,
-              kpis: [] // Clear legacy KPIs when using categories
+              kpis: []
             };
             updateCount++;
           } else {
-            // Create new employee
             updatedEmployees.push({
               id: empId,
               name: empData.name,
+              email: '',
               jobGrade: "4",
+              department: '',
+              role: '',
               isAdjunct: false,
               isSalesRole: false,
               joinDate: new Date().toISOString().slice(0, 10),
@@ -264,10 +237,8 @@ function MonthlyPage() {
           }
         }
 
-        // Update employees in store
         setEmployees(updatedEmployees);
 
-        // Save monthly snapshot for all employees
         for (const emp of updatedEmployees) {
           if (!emp.isAdjunct && emp.categories && emp.categories.length > 0) {
             saveMonthlySnapshot(emp.id, selectedYear, selectedMonth);
@@ -276,17 +247,18 @@ function MonthlyPage() {
 
         setUploadStatus({ 
           ok: true, 
-          msg: `✅ Uploaded ${employeeMap.size} employees (${newCount} new, ${updateCount} updated) for ${selectedMonth}/${selectedYear}` 
+          msg: `Uploaded ${employeeMap.size} employees (${newCount} new, ${updateCount} updated).`
         });
+        showToast.success("Upload Complete", `Uploaded ${employeeMap.size} employees (${newCount} new, ${updateCount} updated).`);
         
       } catch (error: any) {
         setUploadStatus({ ok: false, msg: error.message || "Failed to process file" });
+        showToast.error("Upload Failed", error.message || "Failed to process file");
       } finally {
         setIsUploading(false);
       }
     };
 
-    // Parse based on file type
     if (fileExtension === 'csv') {
       Papa.parse(file, {
         header: true,
@@ -296,11 +268,13 @@ function MonthlyPage() {
             processData(result.data);
           } else {
             setUploadStatus({ ok: false, msg: "No data found in file" });
+            showToast.error("Upload Failed", "No data found in file");
             setIsUploading(false);
           }
         },
         error: (err) => {
           setUploadStatus({ ok: false, msg: err.message });
+          showToast.error("Upload Failed", err.message);
           setIsUploading(false);
         }
       });
@@ -316,28 +290,29 @@ function MonthlyPage() {
             processData(jsonData);
           } else {
             setUploadStatus({ ok: false, msg: "No data found in file" });
+            showToast.error("Upload Failed", "No data found in file");
             setIsUploading(false);
           }
         } catch (err: any) {
           setUploadStatus({ ok: false, msg: err.message });
+          showToast.error("Upload Failed", err.message);
           setIsUploading(false);
         }
       };
       reader.readAsArrayBuffer(file);
     } else {
-      setUploadStatus({ ok: false, msg: "Unsupported file format. Please use CSV or Excel (.xlsx)" });
+      setUploadStatus({ ok: false, msg: "Unsupported file format" });
+      showToast.error("Upload Failed", "Please use CSV or Excel (.xlsx)");
       setIsUploading(false);
     }
 
-    // Reset file input
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  // Export data for a specific month
   const exportMonthData = (year: number, month: number) => {
     const monthData = monthlyData.filter(d => d.year === year && d.month === month);
     if (monthData.length === 0) {
-      alert(`No data found for ${month}/${year}`);
+      showToast.warning("No Data", `No data found for ${month}/${year}`);
       return;
     }
 
@@ -375,9 +350,9 @@ function MonthlyPage() {
     a.download = `monthly_data_${month}_${year}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
+    showToast.success("Export Complete", `Downloaded data for ${month}/${year}.`);
   };
 
-  // Get triggers for display
   const allTriggers = useMemo(() => {
     try {
       return detectTriggers();
@@ -397,7 +372,6 @@ function MonthlyPage() {
         </div>
       </div>
 
-      {/* Upload Section */}
       <Card className="p-6">
         <h3 className="font-semibold mb-4 flex items-center gap-2">
           <Upload className="h-5 w-5" /> Upload Monthly Data
@@ -488,7 +462,6 @@ function MonthlyPage() {
         )}
       </Card>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -522,14 +495,12 @@ function MonthlyPage() {
         </Card>
       </div>
 
-      {/* TRIGGERS SECTION */}
       {allTriggers.total > 0 && (
         <Card className="p-4 border-orange-200 bg-orange-50/50">
           <h3 className="font-semibold mb-3 flex items-center gap-2 text-orange-800">
             <AlertTriangle className="h-5 w-5" /> Performance Alerts & Triggers
           </h3>
           
-          {/* PIP */}
           {allTriggers.pip.length > 0 && (
             <div className="mb-3">
               <h4 className="text-sm font-medium text-yellow-700 mb-2">⚠️ PIP Required ({allTriggers.pip.length})</h4>
@@ -544,7 +515,6 @@ function MonthlyPage() {
             </div>
           )}
           
-          {/* Probation */}
           {allTriggers.probation.length > 0 && (
             <div className="mb-3">
               <h4 className="text-sm font-medium text-orange-700 mb-2">📋 Probation Period ({allTriggers.probation.length})</h4>
@@ -559,7 +529,6 @@ function MonthlyPage() {
             </div>
           )}
           
-          {/* Management Action */}
           {allTriggers.managementAction.length > 0 && (
             <div>
               <h4 className="text-sm font-medium text-red-700 mb-2">🔴 Management Action Required ({allTriggers.managementAction.length})</h4>
@@ -576,7 +545,6 @@ function MonthlyPage() {
         </Card>
       )}
 
-      {/* Month Selector for Viewing */}
       {monthsWithData.length > 0 && (
         <Card className="p-4">
           <h3 className="font-semibold mb-3">📅 Available Months</h3>
@@ -605,6 +573,7 @@ function MonthlyPage() {
                       for (const d of monthData) {
                         deleteMonthlyData(d.employeeId, d.year, d.month);
                       }
+                      showToast.success("Data Deleted", `Removed data for ${m.month}/${m.year}.`);
                     }
                   }}
                 >
@@ -616,7 +585,6 @@ function MonthlyPage() {
         </Card>
       )}
 
-      {/* Employee Trend List */}
       <Card className="p-4">
         <h3 className="font-semibold mb-4">📈 Employee Performance Trends</h3>
         <div className="space-y-3">
@@ -625,7 +593,6 @@ function MonthlyPage() {
             const history = getMonthlyHistory(emp.id);
             const isExpanded = expandedEmployee === emp.id;
             
-            // Check for triggers
             const empTriggers = getTriggersForEmployee(emp.id);
             const hasManagement = empTriggers.some(t => t.type === 'management_action');
             const hasProbation = empTriggers.some(t => t.type === 'probation');
@@ -666,9 +633,6 @@ function MonthlyPage() {
                         ⚠️ PIP
                       </span>
                     )}
-                    {history.length === 0 && (
-                      <span className="text-xs text-muted-foreground">No data yet</span>
-                    )}
                   </div>
                   <div className="flex items-center gap-3">
                     {trend && (
@@ -680,14 +644,12 @@ function MonthlyPage() {
                   </div>
                 </button>
 
-                {/* Expanded details - WITH EDITABLE KPIs */}
                 {isExpanded && (
                   <div className="p-4 border-t bg-muted/10">
                     {history.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No monthly data yet. Upload a file to start tracking.</p>
                     ) : (
                       <>
-                        {/* Summary Cards */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                           <div className="bg-white p-3 rounded-md border">
                             <div className="text-xs text-muted-foreground">Current Score</div>
@@ -711,7 +673,6 @@ function MonthlyPage() {
                           </div>
                         </div>
 
-                        {/* WEIGHTED CATEGORY PERFORMANCE - WITH EDITABLE KPIs */}
                         {emp.categories && emp.categories.length > 0 ? (
                           <div className="space-y-3 mb-4">
                             <p className="font-medium text-sm flex items-center gap-2">
@@ -719,7 +680,6 @@ function MonthlyPage() {
                             </p>
                             <div className="space-y-3">
                               {emp.categories.map((category, catIdx) => {
-                                // Calculate category score from current KPI values
                                 let categoryScore = 0;
                                 let totalKpiWeight = 0;
                                 let kpiDetails: any[] = [];
@@ -795,7 +755,6 @@ function MonthlyPage() {
                                             <div key={kIdx} className="grid grid-cols-6 gap-2 text-xs border-b border-muted pb-1 last:border-0 items-center">
                                               <div className="col-span-2">{kpi.description}</div>
                                               
-                                              {/* Target - Editable */}
                                               <div className="col-span-1">
                                                 {isEditingTarget ? (
                                                   <Input
@@ -817,7 +776,6 @@ function MonthlyPage() {
                                                 )}
                                               </div>
                                               
-                                              {/* Actual - Editable */}
                                               <div className="col-span-1">
                                                 {isEditingActual ? (
                                                   <Input
@@ -839,7 +797,6 @@ function MonthlyPage() {
                                                 )}
                                               </div>
                                               
-                                              {/* Achievement */}
                                               <div className={`col-span-1 font-semibold ${
                                                 kpi.achievement >= 100 ? 'text-green-600' : 
                                                 kpi.achievement >= 70 ? 'text-yellow-600' : 
@@ -850,7 +807,6 @@ function MonthlyPage() {
                                                 {kpi.achievement < 50 && ' ⚠️'}
                                               </div>
 
-                                              {/* Edit indicator */}
                                               <div className="col-span-1 text-right">
                                                 {isEditingTarget || isEditingActual ? (
                                                   <span className="text-blue-500 text-[10px]">editing...</span>
@@ -869,7 +825,6 @@ function MonthlyPage() {
                                 );
                               })}
 
-                              {/* Overall Score */}
                               {trend && (
                                 <div className={`p-3 rounded-lg ${
                                   trend.currentScore < 0.5 ? 'bg-red-50 border border-red-200' :
@@ -901,7 +856,6 @@ function MonthlyPage() {
                             </div>
                           </div>
                         ) : (
-                          // Fallback: Monthly History table (if no categories)
                           <div className="space-y-2">
                             <p className="font-medium text-sm">📊 Monthly History</p>
                             <div className="grid grid-cols-6 md:grid-cols-12 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
@@ -925,6 +879,7 @@ function MonthlyPage() {
                                     onClick={() => {
                                       if (confirm(`Delete ${h.month}/${h.year} data?`)) {
                                         deleteMonthlyData(emp.id, h.year, h.month);
+                                        showToast.success("Data Deleted", `Removed ${h.month}/${h.year}.`);
                                       }
                                     }}
                                   >

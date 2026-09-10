@@ -282,3 +282,22 @@ export interface UploadedFile {
   uploadedBy: string;
   kpiId: string;
 }
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  authUserId?: string; // ← NEW: Supabase Auth user ID
+  jobGrade: string;
+  department: string;
+  role: string;
+  isAdjunct: boolean;
+  isSalesRole: boolean;
+  joinDate: string;
+  monthsWorked: number;
+  kpis: KPI[];
+  categories?: Category[];
+  roleType?: 'employee' | 'hr' | 'admin';
+  supervisorId?: string;
+  supervisorName?: string;
+  isManager?: boolean;
+}

@@ -14,6 +14,7 @@ import {
   RefreshCw, Check, X, Edit3, Paperclip, Download, Users, FileQuestion
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/supabase";
+import { showToast } from "@/lib/toast";
 
 export const Route = createFileRoute("/_app/appraisals-review")({
   component: AppraisalsReviewPage,
@@ -38,7 +39,8 @@ function AppraisalsReviewPage() {
   const [allAppraisals, setAllAppraisals] = useState<any[]>([]);
   const [selectedAppraisal, setSelectedAppraisal] = useState<any>(null);
   const [reviewerName, setReviewerName] = useState("");
-  const [commentText, setCommentText] = useState(""); // used for posting comments
+  const [rejectReason, setRejectReason] = useState("");
+  const [commentText, setCommentText] = useState("");
   const [activeTab, setActiveTab] = useState("pending");
   const [actionLoading, setActionLoading] = useState(false);
   const [filterDepartment, setFilterDepartment] = useState("all");
@@ -47,7 +49,6 @@ function AppraisalsReviewPage() {
   const [directReportIds, setDirectReportIds] = useState<string[]>([]);
   const [expandedAppraisal, setExpandedAppraisal] = useState<string | null>(null);
 
-  // Get current user and their direct reports
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -103,25 +104,27 @@ function AppraisalsReviewPage() {
     loadAppraisals();
     setSelectedAppraisal(null);
     setActionLoading(false);
-    alert("✅ Appraisal approved successfully!");
+    showToast.success("Appraisal Approved", "The appraisal has been approved.");
   };
 
   const handleReject = (appraisalId: string) => {
     setActionLoading(true);
-    rejectAppraisal(appraisalId, user?.id || "reviewer", reviewerName, "");
+    rejectAppraisal(appraisalId, user?.id || "reviewer", reviewerName, rejectReason || "");
     loadAppraisals();
     setSelectedAppraisal(null);
+    setRejectReason("");
     setActionLoading(false);
-    alert("❌ Appraisal rejected.");
+    showToast.error("Appraisal Rejected", "The appraisal has been rejected.");
   };
 
   const handleRequestChanges = (appraisalId: string) => {
     setActionLoading(true);
-    requestChanges(appraisalId, user?.id || "reviewer", reviewerName, "");
+    requestChanges(appraisalId, user?.id || "reviewer", reviewerName, rejectReason || "");
     loadAppraisals();
     setSelectedAppraisal(null);
+    setRejectReason("");
     setActionLoading(false);
-    alert("📝 Changes requested.");
+    showToast.warning("Changes Requested", "Feedback sent to the employee.");
   };
 
   const handleAddComment = (appraisalId: string) => {
@@ -129,6 +132,7 @@ function AppraisalsReviewPage() {
     addAppraisalComment(appraisalId, user?.id || "reviewer", reviewerName, commentText);
     setCommentText("");
     loadAppraisals();
+    showToast.success("Comment Posted", "Your comment has been added.");
   };
 
   const getStatusBadge = (status: string) => {
@@ -295,7 +299,6 @@ function AppraisalsReviewPage() {
 
                 {selectedAppraisal?.id === appraisal.id && (
                   <div className="mt-4 pt-4 border-t space-y-4">
-                    {/* ===== DETAILED KPI VIEW ===== */}
                     <div>
                       <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
                         <FileText className="h-4 w-4" />
@@ -319,7 +322,6 @@ function AppraisalsReviewPage() {
 
                                 return (
                                   <div key={kpi.id} className="bg-white rounded-md border p-3">
-                                    {/* Row 1: KPI data */}
                                     <div className="grid grid-cols-12 gap-2 text-sm items-start">
                                       <div className="col-span-5 font-medium break-words whitespace-normal">
                                         {kpi.description}
@@ -353,44 +355,28 @@ function AppraisalsReviewPage() {
                                       </div>
                                     </div>
 
-                                    {/* Row 2: Proof files (if any) */}
-                                    <div className="mt-2">
-                                      {hasProof ? (
-                                        <div className="flex flex-wrap gap-2">
-                                          {kpi.proof.map((p: any) => (
-                                            <a
-                                              key={p.id}
-                                              href={p.fileUrl}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-md hover:bg-blue-100 flex items-center gap-1 transition-colors"
-                                            >
-                                              <Download className="h-3 w-3" />
-                                              {p.fileName}
-                                            </a>
-                                          ))}
-                                        </div>
-                                      ) : (
-                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                          <FileQuestion className="h-3 w-3" />
-                                          No proof uploaded
-                                        </span>
-                                      )}
-                                    </div>
+                                    {hasProof && (
+                                      <div className="mt-2 flex flex-wrap gap-2">
+                                        {kpi.proof.map((p: any) => (
+                                          <a
+                                            key={p.id}
+                                            href={p.fileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-md hover:bg-blue-100 flex items-center gap-1 transition-colors"
+                                          >
+                                            <Download className="h-3 w-3" />
+                                            {p.fileName}
+                                          </a>
+                                        ))}
+                                      </div>
+                                    )}
 
-                                    {/* Row 3: Employee comment (if any) */}
-                                    <div className="mt-2">
-                                      {hasComment ? (
-                                        <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-md">
-                                          💬 <span className="font-medium">Employee comment:</span> {kpi.comment}
-                                        </div>
-                                      ) : (
-                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                          <MessageSquare className="h-3 w-3" />
-                                          No comment
-                                        </span>
-                                      )}
-                                    </div>
+                                    {hasComment && (
+                                      <div className="mt-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded-md">
+                                        💬 <span className="font-medium">Employee comment:</span> {kpi.comment}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })}
@@ -400,7 +386,6 @@ function AppraisalsReviewPage() {
                       </div>
                     </div>
 
-                    {/* ===== COMMENT SECTION ===== */}
                     <div className="border-t pt-3">
                       <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
                         <MessageSquare className="h-4 w-4" />
@@ -439,7 +424,6 @@ function AppraisalsReviewPage() {
                       </Button>
                     </div>
 
-                    {/* ===== REVIEW DECISION ===== */}
                     <div className="border-t pt-3">
                       <h4 className="font-medium text-sm mb-2">📋 Review Decision</h4>
                       <div className="flex flex-wrap gap-3">
@@ -545,14 +529,6 @@ function AppraisalsReviewPage() {
                       <p className="text-sm text-yellow-700 bg-yellow-50 p-2 rounded-md mt-2">
                         📝 {appraisal.revisionReason}
                       </p>
-                    )}
-                    {appraisal.comments.length > 0 && (
-                      <div className="mt-2">
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <MessageSquare className="h-3 w-3" />
-                          {appraisal.comments.length} comment(s)
-                        </span>
-                      </div>
                     )}
                   </div>
                   <div className="flex items-center gap-3">

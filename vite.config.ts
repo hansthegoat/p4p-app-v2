@@ -10,6 +10,7 @@ export default defineConfig({
   vite: {
     base: "/p4p-app-v2/",
   },
+  base: '/p4p-app-v2/',
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this

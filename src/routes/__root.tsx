@@ -7,10 +7,76 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { Toaster } from "sonner";
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { P4PProvider } from "@/lib/p4p/store";
+import { UserProvider } from "@/lib/p4p/user-context";
+
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  head: () => ({
+    meta: [
+      { charSet: "utf-8" },
+      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { title: "P4P Bonus Calculator" },
+      {
+        name: "description",
+        content: "Calculate and trace pay-for-performance bonus grades and traces for employees.",
+      },
+      { name: "author", content: "Iddo Adu Gyamfi" },
+      { property: "og:title", content: "P4P Bonus Calculator" },
+      {
+        property: "og:description",
+        content: "Calculate and trace pay-for-performance bonus grades and traces for employees.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+      { name: "twitter:site", content: "@Lovable" },
+    ],
+    links: [
+      {
+        rel: "stylesheet",
+        href: appCss,
+      },
+    ],
+  }),
+  shellComponent: RootShell,
+  component: RootComponent,
+  notFoundComponent: NotFoundComponent,
+  errorComponent: ErrorComponent,
+});
+
+function RootShell({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {children}
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      {/* ✅ P4PProvider MUST come first because UserProvider uses useP4P() */}
+      <P4PProvider>
+        <UserProvider>
+          <Outlet />
+          <Toaster position="top-right" richColors closeButton />
+        </UserProvider>
+      </P4PProvider>
+    </QueryClientProvider>
+  );
+}
 
 function NotFoundComponent() {
   return (
@@ -69,57 +135,5 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         </div>
       </div>
     </div>
-  );
-}
-
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "P4P Bonus Calculator" },
-      { name: "description", content: "Calculate and trace pay-for-performance bonus grades and traces for employees." },
-      { name: "author", content: "Iddo Adu Gyamfi" },
-      { property: "og:title", content: "P4P Bonus Calculator" },
-      { property: "og:description", content: "Calculate and trace pay-for-performance bonus grades and traces for employees." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-    ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-    ],
-  }),
-  shellComponent: RootShell,
-  component: RootComponent,
-  notFoundComponent: NotFoundComponent,
-  errorComponent: ErrorComponent,
-});
-
-function RootShell({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
-
-function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-    </QueryClientProvider>
   );
 }

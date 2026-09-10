@@ -20,13 +20,13 @@ import type {
   Category
 } from "./types";
 import { newId } from "./defaults";
+import { sendEmail } from "@/lib/email"; // ← NEW: Email helper
 
 const LS_KEY = "p4p_state_v1";
 const MONTHLY_KEY = "p4p_monthly_data";
 const TEMPLATES_KEY = "p4p_kpi_templates";
 const APPRAISALS_KEY = "p4p_appraisals";
 const NOTIFICATIONS_KEY = "p4p_notifications";
-const EMPLOYEE_TEMPLATE_KEY = "p4p_employee_templates_applied";
 
 // Helper functions
 function loadMonthlyData(): MonthlyPerformance[] {
@@ -134,8 +134,7 @@ interface Ctx extends State {
   getTemplate: (department: string, role: string) => KPITemplate | undefined;
   getAllTemplates: () => Record<string, KPITemplate>;
   applyTemplateToEmployees: (department: string, role: string, template: KPITemplate) => number;
-  // NEW: Ensure all employees have their KPIs
-  ensureAllEmployeesHaveKPIs: () => number;
+  hardDeleteEmployee: (id: string) => void;
   submitAppraisal: (employeeId: string, period: string, year: number, month: number) => void;
   approveAppraisal: (id: string, reviewerId: string, reviewerName: string) => void;
   rejectAppraisal: (id: string, reviewerId: string, reviewerName: string, reason: string) => void;
@@ -168,41 +167,10 @@ function loadInitial(): State {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Ensure employees is an array
-      let employees = Array.isArray(parsed.employees) ? parsed.employees : DEMO_EMPLOYEES;
-      
-      // Ensure every employee has categories (not just kpis)
-      employees = employees.map(emp => {
-        if (!emp.categories || emp.categories.length === 0) {
-          // Try to find a template for this employee's department and role
-          const templates = loadTemplates();
-          const key = `${emp.department}-${emp.role}`;
-          const template = templates[key];
-          if (template) {
-            const categories = template.categories.map(cat => ({
-              id: newId(),
-              name: cat.name,
-              weight: cat.weight,
-              kpis: cat.kpis.map(k => ({
-                id: newId(),
-                description: k.description,
-                metric: k.metric,
-                target: k.target,
-                actual: 0,
-                weight: 100,
-                measurementSource: k.measurementSource || "",
-              })),
-            }));
-            return { ...emp, categories };
-          }
-        }
-        return emp;
-      });
-      
       return {
         globals: { ...DEFAULT_GLOBALS, ...parsed.globals },
         grades: parsed.grades?.length ? parsed.grades : DEFAULT_GRADES,
-        employees,
+        employees: Array.isArray(parsed.employees) ? parsed.employees : DEMO_EMPLOYEES,
         monthlyData: loadMonthlyData(),
         kpiTemplates: loadTemplates(),
         appraisals: loadAppraisals(),
@@ -278,53 +246,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   
   const setEmployees = useCallback((list: Employee[]) =>
     setState((s) => ({ ...s, employees: list })), []);
-
-  // ===== NEW: Ensure all employees have KPIs =====
-  const ensureAllEmployeesHaveKPIs = useCallback((): number => {
-    const templates = state.kpiTemplates;
-    let updatedCount = 0;
-    
-    const updatedEmployees = state.employees.map(emp => {
-      // Skip adjunct employees
-      if (emp.isAdjunct) return emp;
-      
-      // Check if employee already has categories
-      if (emp.categories && emp.categories.length > 0) {
-        return emp;
-      }
-      
-      // Try to find a template for this employee
-      const key = `${emp.department}-${emp.role}`;
-      const template = templates[key];
-      
-      if (template) {
-        const categories = template.categories.map(cat => ({
-          id: newId(),
-          name: cat.name,
-          weight: cat.weight,
-          kpis: cat.kpis.map(k => ({
-            id: newId(),
-            description: k.description,
-            metric: k.metric,
-            target: k.target,
-            actual: 0,
-            weight: 100,
-            measurementSource: k.measurementSource || "",
-          })),
-        }));
-        updatedCount++;
-        return { ...emp, categories };
-      }
-      
-      return emp;
-    });
-    
-    if (updatedCount > 0) {
-      setState(s => ({ ...s, employees: updatedEmployees }));
-    }
-    
-    return updatedCount;
-  }, [state.employees, state.kpiTemplates]);
 
   // ===== CALC =====
   const calc = useMemo(() => calculate(state.employees, state.grades, state.globals), [state]);
@@ -634,6 +555,107 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     return employeesToUpdate.length;
   }, [state.employees]);
 
+  // ===== HARD DELETE EMPLOYEE =====
+  const hardDeleteEmployee = useCallback((id: string) => {
+    setState(s => ({
+      ...s,
+      employees: s.employees.filter(e => e.id !== id),
+      monthlyData: s.monthlyData.filter(d => d.employeeId !== id),
+      appraisals: s.appraisals.filter(a => a.employeeId !== id),
+      notifications: s.notifications.filter(n => n.userId !== id),
+    }));
+  }, []);
+
+  // ===== EMAIL HELPERS =====
+  const getManagerEmails = useCallback((employee: Employee): string[] => {
+    const emails: string[] = []
+    if (employee.supervisorId) {
+      const manager = state.employees.find(e => e.id === employee.supervisorId)
+      if (manager?.email) emails.push(manager.email)
+    }
+    // Also include all HR/Admin
+    const hrAdmins = state.employees.filter(e => e.roleType === 'admin' || e.roleType === 'hr')
+    hrAdmins.forEach(e => {
+      if (e.email && !emails.includes(e.email)) emails.push(e.email)
+    })
+    return emails
+  }, [state.employees])
+
+  const sendAppraisalNotification = useCallback(async (
+    type: 'submitted' | 'approved' | 'rejected' | 'requested_changes',
+    appraisal: AppraisalRequest,
+    reason?: string
+  ) => {
+    try {
+      const employee = state.employees.find(e => e.id === appraisal.employeeId)
+      if (!employee) return
+
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+
+      let recipients: string[] = []
+      let subject = ''
+      let html = ''
+
+      if (type === 'submitted') {
+        recipients = getManagerEmails(employee)
+        subject = `📋 New Appraisal Submitted: ${employee.name} (${appraisal.period})`
+        html = `
+          <h2>New Appraisal Submitted</h2>
+          <p><strong>Employee:</strong> ${employee.name}</p>
+          <p><strong>Department:</strong> ${employee.department}</p>
+          <p><strong>Role:</strong> ${employee.role}</p>
+          <p><strong>Period:</strong> ${appraisal.period}</p>
+          <p><strong>Overall Score:</strong> ${fmtNum(appraisal.overallPercent, 1)}%</p>
+          <p><strong>Performance Band:</strong> ${appraisal.performanceBand}</p>
+          <hr>
+          <p><a href="${baseUrl}/appraisals-review">Click here to review</a></p>
+        `
+      } else if (type === 'approved') {
+        recipients = [employee.email]
+        subject = `✅ Appraisal Approved: ${appraisal.period}`
+        html = `
+          <h2>Your Appraisal Has Been Approved!</h2>
+          <p><strong>Period:</strong> ${appraisal.period}</p>
+          <p><strong>Overall Score:</strong> ${fmtNum(appraisal.overallPercent, 1)}%</p>
+          <p><strong>Performance Band:</strong> ${appraisal.performanceBand}</p>
+          ${appraisal.reviewerComment ? `<p><strong>Reviewer Feedback:</strong> ${appraisal.reviewerComment}</p>` : ''}
+          <hr>
+          <p><a href="${baseUrl}/employee">View your dashboard</a></p>
+        `
+      } else if (type === 'rejected') {
+        recipients = [employee.email]
+        subject = `❌ Appraisal Rejected: ${appraisal.period}`
+        html = `
+          <h2>Your Appraisal Was Rejected</h2>
+          <p><strong>Period:</strong> ${appraisal.period}</p>
+          ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+          <hr>
+          <p>Please contact your manager for more details.</p>
+          <p><a href="${baseUrl}/employee">Go to dashboard</a></p>
+        `
+      } else if (type === 'requested_changes') {
+        recipients = [employee.email]
+        subject = `📝 Changes Requested for Appraisal: ${appraisal.period}`
+        html = `
+          <h2>Changes Requested for Your Appraisal</h2>
+          <p><strong>Period:</strong> ${appraisal.period}</p>
+          ${reason ? `<p><strong>Feedback:</strong> ${reason}</p>` : ''}
+          <hr>
+          <p>Please update your KPI data and resubmit.</p>
+          <p><a href="${baseUrl}/employee">Edit and resubmit</a></p>
+        `
+      }
+
+      if (recipients.length > 0 && recipients[0]) {
+        await sendEmail({ to: recipients, subject, html })
+        console.log('Email sent successfully for', type, 'to', recipients)
+      }
+    } catch (error) {
+      console.error('Email notification failed:', error)
+      // Don't block the main flow
+    }
+  }, [state.employees, getManagerEmails])
+
   // ===== APPRAISAL FUNCTIONS =====
   const getPerformanceBand = (score: number): string => {
     if (score >= 1.2) return "Exceptional";
@@ -707,7 +729,10 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       appraisals: [...s.appraisals, appraisal],
       notifications: [...s.notifications, notification],
     }));
-  }, [state.employees]);
+
+    // Send email notification
+    sendAppraisalNotification('submitted', appraisal);
+  }, [state.employees, sendAppraisalNotification]);
 
   const saveKPIProof = useCallback((employeeId: string, kpiId: string, fileData: { 
     id: string; 
@@ -784,8 +809,33 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         ...s,
         notifications: [...s.notifications, ...newNotifications]
       }));
+
+      // Send email to HR/Admin
+      const employee = state.employees.find(e => e.id === employeeId);
+      if (employee) {
+        const hrAdmins = state.employees.filter(e => e.roleType === 'admin' || e.roleType === 'hr').map(e => e.email);
+        if (hrAdmins.length > 0) {
+          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+          sendEmail({
+            to: hrAdmins,
+            subject: `⚠️ Performance Alert: ${employee.name}`,
+            html: `
+              <h2>Performance Alert</h2>
+              <p><strong>Employee:</strong> ${employee.name}</p>
+              <p><strong>Department:</strong> ${employee.department}</p>
+              <p><strong>Role:</strong> ${employee.role}</p>
+              <hr>
+              <h3>Triggers Detected:</h3>
+              <ul>
+                ${employeeTriggers.map(t => `<li>${t.message}</li>`).join('')}
+              </ul>
+              <p><a href="${baseUrl}/employees">View employee</a></p>
+            `
+          }).catch(err => console.error('Trigger email failed:', err));
+        }
+      }
     }
-  }, [detectTriggers]);
+  }, [detectTriggers, state.employees]);
 
   const approveAppraisal = useCallback((id: string, reviewerId: string, reviewerName: string) => {
     let employeeId = '';
@@ -815,7 +865,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       return { ...s, appraisals: updated };
     });
 
-    if (employeeId && year && month && categories && categories.length > 0) {
+    if (employeeId && year && month && categories && categories.length > 0 && appraisalToApprove) {
       let totalWeightedScore = 0;
       let totalWeight = 0;
       for (const cat of categories) {
@@ -870,14 +920,20 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         return { ...s, employees: updatedEmployees };
       });
 
+      // Send email notification
+      sendAppraisalNotification('approved', appraisalToApprove);
+
+      // Trigger detection after approval
       setTimeout(() => triggerAfterApproval(employeeId), 100);
     }
-  }, [triggerAfterApproval, state.employees]);
+  }, [triggerAfterApproval, state.employees, sendAppraisalNotification]);
 
   const rejectAppraisal = useCallback((id: string, reviewerId: string, reviewerName: string, reason: string) => {
+    let appraisalToReject: AppraisalRequest | null = null;
     setState(s => {
       const updated = s.appraisals.map(a => {
         if (a.id === id) {
+          appraisalToReject = a;
           return {
             ...a,
             status: 'rejected',
@@ -891,12 +947,17 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       });
       return { ...s, appraisals: updated };
     });
-  }, []);
+    if (appraisalToReject) {
+      sendAppraisalNotification('rejected', appraisalToReject, reason);
+    }
+  }, [sendAppraisalNotification]);
 
   const requestChanges = useCallback((id: string, reviewerId: string, reviewerName: string, reason: string) => {
+    let appraisalToChange: AppraisalRequest | null = null;
     setState(s => {
       const updated = s.appraisals.map(a => {
         if (a.id === id) {
+          appraisalToChange = a;
           return {
             ...a,
             status: 'needs_revision',
@@ -910,7 +971,10 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       });
       return { ...s, appraisals: updated };
     });
-  }, []);
+    if (appraisalToChange) {
+      sendAppraisalNotification('requested_changes', appraisalToChange, reason);
+    }
+  }, [sendAppraisalNotification]);
 
   const getEmployeeAppraisals = useCallback((employeeId: string): AppraisalRequest[] => {
     return state.appraisals
@@ -987,7 +1051,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     getTemplate,
     getAllTemplates,
     applyTemplateToEmployees,
-    ensureAllEmployeesHaveKPIs,
+    hardDeleteEmployee,
     submitAppraisal,
     approveAppraisal,
     rejectAppraisal,

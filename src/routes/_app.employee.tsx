@@ -14,6 +14,7 @@ import {
   File, X, MessageSquare, Info
 } from "lucide-react";
 import { getCurrentUser, uploadProofFile } from "@/lib/supabase";
+import { showToast } from "@/lib/toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
 
 export const Route = createFileRoute("/_app/employee")({
@@ -31,7 +32,6 @@ function EmployeePortal() {
     saveKPIComment
   } = useP4P();
 
-  // ===== STATE =====
   const [loading, setLoading] = useState(true);
   const [employee, setEmployee] = useState<any>(null);
   const [editingActuals, setEditingActuals] = useState<Record<string, number>>({});
@@ -46,7 +46,6 @@ function EmployeePortal() {
   const [submittingAppraisal, setSubmittingAppraisal] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  // Get current period
   const getCurrentPeriod = () => {
     const now = new Date();
     const year = now.getFullYear();
@@ -59,7 +58,6 @@ function EmployeePortal() {
     return `${quarter} ${year}`;
   };
 
-  // ===== MEMOIZED VALUES =====
   const yearData = useMemo(() => {
     if (!employee) return [];
     const history = getMonthlyHistory(employee.id);
@@ -102,7 +100,6 @@ function EmployeePortal() {
     return { best, worst, avg, count: scores.length };
   }, [yearData]);
 
-  // ===== PERFORMANCE BAND =====
   const getPerformanceBand = (score: number) => {
     if (score >= 1.2) return { label: "Exceptional", color: "text-purple-600", bg: "bg-purple-50 border-purple-200", icon: Star };
     if (score >= 1.0) return { label: "Exceeds Expectations", color: "text-green-600", bg: "bg-green-50 border-green-200", icon: TrendingUp };
@@ -111,7 +108,6 @@ function EmployeePortal() {
     return { label: "Performance Improvement Plan", color: "text-red-600", bg: "bg-red-50 border-red-200", icon: AlertCircle };
   };
 
-  // ===== EFFECTS =====
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -142,7 +138,6 @@ function EmployeePortal() {
     fetchUser();
   }, [employees, navigate]);
 
-  // ===== LOAD DATA FOR SELECTED MONTH =====
   useEffect(() => {
     if (!employee || viewMode === 'year') {
       setSelectedSnapshot(null);
@@ -153,11 +148,9 @@ function EmployeePortal() {
     const snap = history.find(d => d.year === selectedYear && d.month === selectedMonth);
     setSelectedSnapshot(snap || null);
 
-    // Get the KPI structure from the employee's template
     const categories = employee.categories || [];
     
     if (snap) {
-      // Show the approved snapshot data (with its own proofs and comments)
       const actuals: Record<string, number> = {};
       const comments: Record<string, string> = {};
       const proofs: Record<string, any[]> = {};
@@ -173,7 +166,6 @@ function EmployeePortal() {
       setKpiComments(comments);
       setKpiProofs(proofs);
     } else {
-      // No snapshot exists - show EMPTY data (all zeros, no proofs, no comments)
       const emptyActuals: Record<string, number> = {};
       const emptyComments: Record<string, string> = {};
       const emptyProofs: Record<string, any[]> = {};
@@ -191,7 +183,6 @@ function EmployeePortal() {
     }
   }, [employee, selectedYear, selectedMonth, getMonthlyHistory, viewMode]);
 
-  // ===== LOADING STATE =====
   if (loading) {
     return <div className="p-8 text-center">Loading your profile...</div>;
   }
@@ -212,7 +203,6 @@ function EmployeePortal() {
     return <div className="p-8 text-center">No employee data found.</div>;
   }
 
-  // ===== HANDLERS =====
   const updateActual = (kpiId: string, value: number) => {
     setEditingActuals(prev => ({ ...prev, [kpiId]: value }));
   };
@@ -243,20 +233,18 @@ function EmployeePortal() {
         }
       }
       
-      // Update local state immediately
       setKpiProofs(prev => {
         const current = prev[kpiId] || [];
         return { ...prev, [kpiId]: [...current, ...uploadedFiles] };
       });
       
-      // Also save to store so it persists
       for (const fileData of uploadedFiles) {
         saveKPIProof(employee.id, kpiId, fileData);
       }
       
-      alert(`✅ ${uploadedFiles.length} file(s) uploaded successfully!`);
+      showToast.success(`Uploaded ${uploadedFiles.length} file(s)`, "Proof files uploaded successfully.");
     } catch (err) {
-      alert("❌ Failed to upload files. Please try again.");
+      showToast.error("Upload Failed", "Failed to upload files. Please try again.");
     } finally {
       setUploadingFiles(prev => ({ ...prev, [kpiId]: false }));
       if (fileInputRefs.current[kpiId]) {
@@ -266,13 +254,11 @@ function EmployeePortal() {
   };
 
   const removeProof = (kpiId: string, proofId: string) => {
-    // Remove from local state
     setKpiProofs(prev => ({
       ...prev,
       [kpiId]: (prev[kpiId] || []).filter((p: any) => p.id !== proofId),
     }));
     
-    // Also remove from employee data
     if (!employee) return;
     const updatedEmployees = employees.map(emp => {
       if (emp.id !== employee.id) return emp;
@@ -291,16 +277,14 @@ function EmployeePortal() {
     setEmployees(updatedEmployees);
   };
 
-  // ===== SUBMIT FOR APPRAISAL =====
   const handleSubmitForAppraisal = () => {
     if (!employee) return;
 
     if (!employee.categories || employee.categories.length === 0) {
-      alert("You don't have any KPIs to submit. Please contact HR.");
+      showToast.warning("No KPIs", "You don't have any KPIs to submit. Please contact HR.");
       return;
     }
 
-    // Save the current data (actuals, comments, proofs) to the employee object
     const updatedEmployees = employees.map(emp => {
       if (emp.id !== employee.id) return emp;
       const updatedCategories = (emp.categories || []).map(cat => ({
@@ -324,15 +308,14 @@ function EmployeePortal() {
     
     try {
       submitAppraisal(employee.id, period, selectedYear, selectedMonth);
-      alert(`✅ Appraisal submitted for ${period} (${selectedMonth}/${selectedYear})! Your manager will review it.`);
+      showToast.success("Appraisal Submitted!", `Submitted for ${period} (${selectedMonth}/${selectedYear}). Your manager will review it.`);
     } catch (error: any) {
-      alert(`❌ Failed to submit: ${error.message}`);
+      showToast.error("Submission Failed", error.message);
     } finally {
       setSubmittingAppraisal(false);
     }
   };
 
-  // ===== SCORE CALCULATION =====
   let displayCategories = employee.categories || [];
   let overallScore = 0;
   let overallPercent = 0;
@@ -378,7 +361,6 @@ function EmployeePortal() {
       overallPercent = overallScore * 100;
     }
   } else {
-    // For month view, use whatever data is currently in editingActuals
     const displayCats = employee.categories || [];
     displayCategories = displayCats;
     let totalWeightedScore = 0;
@@ -412,7 +394,6 @@ function EmployeePortal() {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">My KPI's</h1>
@@ -436,7 +417,6 @@ function EmployeePortal() {
         </div>
       </div>
 
-      {/* View Mode Toggle & Appraisal Submit */}
       <Card className="p-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Eye className="h-4 w-4 text-muted-foreground" />
@@ -463,10 +443,7 @@ function EmployeePortal() {
         <div className="flex items-center gap-3">
           {viewMode === 'month' && (
             <>
-              <Select
-                value={String(selectedYear)}
-                onValueChange={(v) => setSelectedYear(Number(v))}
-              >
+              <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Year" />
                 </SelectTrigger>
@@ -476,10 +453,7 @@ function EmployeePortal() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select
-                value={String(selectedMonth)}
-                onValueChange={(v) => setSelectedMonth(Number(v))}
-              >
+              <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Month" />
                 </SelectTrigger>
@@ -494,10 +468,7 @@ function EmployeePortal() {
             </>
           )}
           {viewMode === 'year' && (
-            <Select
-              value={String(selectedYear)}
-              onValueChange={(v) => setSelectedYear(Number(v))}
-            >
+            <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
               <SelectTrigger className="w-32">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
@@ -525,7 +496,6 @@ function EmployeePortal() {
         </Button>
       </Card>
 
-      {/* Info Banner */}
       <Card className="p-3 border-blue-200 bg-blue-50/50 text-blue-700 text-sm flex items-start gap-2">
         <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
         <div>
@@ -537,7 +507,6 @@ function EmployeePortal() {
         </div>
       </Card>
 
-      {/* Year View: Summary Cards */}
       {viewMode === 'year' && yearData.length > 0 && yearStats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card className="p-3 text-center">
@@ -559,7 +528,6 @@ function EmployeePortal() {
         </div>
       )}
 
-      {/* Year View: Monthly Breakdown */}
       {viewMode === 'year' && yearData.length > 0 && (
         <Card className="p-4">
           <h3 className="font-semibold mb-3">📊 Monthly Breakdown ({selectedYear})</h3>
@@ -581,7 +549,6 @@ function EmployeePortal() {
         </Card>
       )}
 
-      {/* Month View: Trend Chart */}
       {viewMode === 'month' && trendData.length > 1 && (
         <Card className="p-4">
           <div className="flex items-center justify-between mb-3">
@@ -620,7 +587,6 @@ function EmployeePortal() {
         </Card>
       )}
 
-      {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4 text-center">
           <div className="text-xs text-muted-foreground">
@@ -652,7 +618,6 @@ function EmployeePortal() {
         </Card>
       </div>
 
-      {/* Weighted Categories */}
       {displayCategories.length > 0 ? (
         <div className="space-y-4">
           <h2 className="font-semibold flex items-center gap-2">
@@ -726,7 +691,6 @@ function EmployeePortal() {
                     
                     return (
                       <div key={kIdx} className="border-b border-muted pb-3 last:border-0">
-                        {/* Row 1: KPI data + Actual input + Achievement */}
                         <div className="grid grid-cols-12 gap-2 text-xs items-center">
                           <div className="col-span-3 font-medium break-words whitespace-normal">
                             {kpi.description}
@@ -789,7 +753,6 @@ function EmployeePortal() {
                           </div>
                         </div>
 
-                        {/* Row 2: Comment input */}
                         <div className="grid grid-cols-12 gap-2 mt-1">
                           <div className="col-span-10">
                             <Input
@@ -807,7 +770,6 @@ function EmployeePortal() {
                           </div>
                         </div>
 
-                        {/* Row 3: Proof files preview (ONLY for this period) */}
                         {kpi.proof && kpi.proof.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {kpi.proof.map((p: any) => (
@@ -845,11 +807,10 @@ function EmployeePortal() {
         </Card>
       )}
 
-      {/* Footer */}
       <div className="flex items-center justify-between pt-4 border-t">
         <div className="text-sm text-muted-foreground flex items-center gap-2">
           <Info className="h-4 w-4 text-blue-500" />
-          <span>Data will only be saved and appear on the dashboard after your manager <strong>approves</strong> your submission. You can edit and resubmit at any time.</span>
+          <span>Data will only be saved and appear on the dashboard after your manager <strong>approves</strong> your submission.</span>
         </div>
         <Button 
           onClick={handleSubmitForAppraisal} 
@@ -860,9 +821,6 @@ function EmployeePortal() {
           {submittingAppraisal ? "Submitting..." : `Submit for Appraisal (${getCurrentPeriod()})`}
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground text-center -mt-2">
-        💡 Select any month/year to enter or update data. Each period starts empty.
-      </p>
     </div>
   );
 }
