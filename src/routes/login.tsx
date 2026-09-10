@@ -58,7 +58,16 @@ function LoginPage() {
             />
           </div>
           <div>
-            <Label>Password</Label>
+            <div className="flex items-center justify-between mb-1">
+              <Label>Password</Label>
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/forgot-password" })}
+                className="text-xs text-primary hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
             <Input
               type="password"
               placeholder="••••••••"

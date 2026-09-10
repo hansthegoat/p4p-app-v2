@@ -1,197 +1,237 @@
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  LayoutDashboard, Users, Settings2, FileText, LogOut, Menu, X, 
-  Calculator, Calendar, User, UserPlus 
-} from "lucide-react";
-import { useState, type ReactNode } from "react";
-import { logout } from "@/lib/p4p/auth";
-import { cn } from "@/lib/utils";
+import { type ReactNode, useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { useUser } from "@/lib/p4p/user-context";
+import { useP4P } from "@/lib/p4p/store";
+import { supabase, getCurrentUser } from "@/lib/supabase";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { LogoutConfirmModal } from "@/components/p4p/LogoutConfirmModal";
+import { showToast } from "@/lib/toast";
+import {
+  LayoutDashboard,
+  Users,
+  Target,
+  FileSpreadsheet,
+  FileText,
+  TrendingUp,
+  UserCheck,
+  ClipboardCheck,
+  LogOut,
+  Menu,
+  X,
+  Sparkles,
+  Calculator,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
-// ===== NAV DEFINITION =====
-const NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/employee", label: "My KPI's", icon: User },
-  { to: "/appraisals", label: "My Appraisals", icon: FileText },
-  { to: "/appraisals-review", label: "Review Appraisals", icon: Users },
-  { to: "/supervisors", label: "Supervisor Assignment", icon: UserPlus },
-  { to: "/employees", label: "Employees", icon: Users },
-  { to: "/grades", label: "Grade Points", icon: Settings2 },
-  { to: "/trace", label: "Calculation Trace", icon: FileText },
-  { to: "/monthly", label: "Monthly Performance", icon: Calendar },
-  { to: "/kpi-framework", label: "KPI Framework", icon: FileText },
-] as const;
-
-export function AppLayout({ children }: { children: ReactNode }) {
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const { location } = useRouterState();
-  const { role, loading, employee } = useUser();
-
-  const handleLogout = () => {
-    logout();
-    navigate({ to: "/login" });
-  };
-
-  // Determine what the user can see
-  const isAdmin = role === 'admin' || role === 'hr';
-  const isManager = employee?.isManager === true;
-
-  let allowedNav;
-  if (isAdmin) {
-    // Admin/HR see everything
-    allowedNav = NAV;
-  } else if (isManager) {
-    // Managers see: Dashboard, My KPI's, My Appraisals, Review Appraisals
-    allowedNav = NAV.filter(item => 
-      item.to === '/dashboard' || 
-      item.to === '/employee' || 
-      item.to === '/appraisals' ||
-      item.to === '/appraisals-review'
-    );
-  } else {
-    // Regular employees see: Dashboard, My KPI's, My Appraisals
-    allowedNav = NAV.filter(item => 
-      item.to === '/dashboard' || 
-      item.to === '/employee' || 
-      item.to === '/appraisals'
-    );
-  }
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  return (
-    <div className="min-h-screen bg-muted/30 flex">
-      <aside className="hidden md:flex w-64 shrink-0 flex-col border-r bg-card">
-        <SidebarContent
-          pathname={location.pathname}
-          onNav={() => {}}
-          onLogout={handleLogout}
-          navItems={allowedNav}
-        />
-      </aside>
-
-      <div className="md:hidden fixed top-0 inset-x-0 z-30 h-14 bg-card border-b flex items-center px-4 justify-between">
-        <button onClick={() => setOpen(true)} className="p-2 rounded-md hover:bg-accent">
-          <Menu className="h-5 w-5" />
-        </button>
-        <div className="flex items-center gap-2">
-          <Calculator className="h-4 w-4 text-primary" />
-          <span className="font-bold text-sm tracking-tight">P4P Calculator</span>
-        </div>
-        <div className="w-8" />
-      </div>
-
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setOpen(false)}
-              className="fixed inset-0 bg-black/50 z-40 md:hidden"
-            />
-            <motion.aside
-              initial={{ x: -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ type: "tween", duration: 0.25 }}
-              className="fixed left-0 top-0 bottom-0 w-64 bg-card z-50 md:hidden flex flex-col"
-            >
-              <div className="flex justify-end p-2">
-                <button onClick={() => setOpen(false)} className="p-2 rounded-md hover:bg-accent">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <SidebarContent
-                pathname={location.pathname}
-                onNav={() => setOpen(false)}
-                onLogout={() => { setOpen(false); handleLogout(); }}
-                navItems={allowedNav}
-              />
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
-
-      <main className="flex-1 min-w-0 pt-14 md:pt-0">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className="p-3 sm:p-5 md:p-8 max-w-7xl mx-auto"
-          >
-            {children}
-          </motion.div>
-        </AnimatePresence>
-      </main>
-    </div>
-  );
+interface AppLayoutProps {
+  children: ReactNode;
 }
 
-function SidebarContent({
-  pathname,
-  onNav,
-  onLogout,
-  navItems,
-}: {
-  pathname: string;
-  onNav: () => void;
-  onLogout: () => void;
-  navItems: typeof NAV;
-}) {
+interface NavItem {
+  label: string;
+  to: string;
+  icon: any;
+  roles: string[];
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard, roles: ["employee", "hr", "admin"] },
+  { label: "My Performance", to: "/employee", icon: Target, roles: ["employee", "hr", "admin"] },
+  { label: "My Calculation", to: "/my-calculation", icon: Calculator, roles: ["employee", "hr", "admin"] },
+  { label: "Appraisals", to: "/appraisals", icon: ClipboardCheck, roles: ["employee", "hr", "admin"] },
+  { label: "Review Appraisals", to: "/appraisals-review", icon: ClipboardCheck, roles: ["employee", "hr", "admin"] },
+  { label: "Employees", to: "/employees", icon: Users, roles: ["hr", "admin"] },
+  { label: "KPI Framework", to: "/kpi-framework", icon: FileSpreadsheet, roles: ["admin"] },
+  { label: "Monthly Performance", to: "/monthly", icon: TrendingUp, roles: ["hr", "admin"] },
+  { label: "Calculation Trace", to: "/trace", icon: FileText, roles: ["hr", "admin"] },
+  { label: "Supervisors", to: "/supervisors", icon: UserCheck, roles: ["admin"] },
+  { label: "Grade Points", to: "/grades", icon: Target, roles: ["hr", "admin"] },
+];
+
+export function AppLayout({ children }: AppLayoutProps) {
+  const { user, role: contextRole, logout } = useUser();
+  const { employees } = useP4P();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [detectedRole, setDetectedRole] = useState<string | null>(null);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+
+  // Auto-detect role
+  useEffect(() => {
+    const detectRole = async () => {
+      if (contextRole && ["employee", "hr", "admin"].includes(contextRole)) {
+        setDetectedRole(contextRole);
+        return;
+      }
+      try {
+        const currentUser = await getCurrentUser();
+        if (!currentUser) { setDetectedRole("employee"); return; }
+        const emp = employees.find((e) => e.email === currentUser.email);
+        if (emp) {
+          setDetectedRole(emp.roleType || "employee");
+        } else {
+          setDetectedRole("employee");
+        }
+      } catch {
+        setDetectedRole("employee");
+      }
+    };
+    detectRole();
+  }, [contextRole, employees]);
+
+  const role = detectedRole || contextRole || "employee";
+  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
+
+  const requestLogout = () => {
+    setLogoutModalOpen(true);
+  };
+
+  const handleLogout = async () => {
+    try {
+      setLogoutModalOpen(false);
+      await supabase.auth.signOut();
+      logout?.();
+      showToast.success("Logged Out", "You've been signed out safely.");
+      navigate({ to: "/login" });
+    } catch (err: any) {
+      console.error("Logout error:", err);
+      showToast.error("Logout Failed", err.message || "Something went wrong. Please try again.");
+    }
+  };
+
+  const isActive = (path: string) => {
+    return location.pathname === path || location.pathname.startsWith(path + "/");
+  };
+
   return (
-    <>
-      <div className="px-6 py-5 border-b flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-          <Calculator className="h-4.5 w-4.5" />
-        </div>
-        <div>
-          <div className="text-sm font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">
-            P4P Calculator
-          </div>
-          <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-            Distribution Engine
-          </div>
-        </div>
-      </div>
-      <nav className="flex-1 p-3 space-y-1">
-        {navItems.map(({ to, label, icon: Icon }) => {
-          const active = pathname.startsWith(to);
-          return (
-            <Link
-              key={to}
-              to={to}
-              onClick={onNav}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                active
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-accent text-foreground/80"
-              )}
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex h-14 items-center gap-4 px-4 lg:px-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden h-8 w-8"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </Button>
+
+          <Link to="/dashboard" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <span className="font-bold text-lg hidden sm:inline-block">P4P</span>
+          </Link>
+
+          <div className="flex-1" />
+
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+
+            {user && (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted">
+                <span className="text-sm font-medium truncate max-w-[150px]">
+                  {user.name || user.email}
+                </span>
+                {role && (
+                  <Badge variant="outline" className="text-[10px] capitalize">
+                    {role}
+                  </Badge>
+                )}
+              </div>
+            )}
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={requestLogout}
+              title="Logout"
             >
-              <Icon className="h-4 w-4" />
-              {label}
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="p-3 border-t">
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-accent text-foreground/80"
-        >
-          <LogOut className="h-4 w-4" />
-          Logout
-        </button>
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Body */}
+      <div className="flex items-start">
+        {/* Desktop Sidebar */}
+        <aside className="hidden lg:flex lg:flex-col w-64 border-r bg-background sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto">
+          <nav className="flex-1 p-3 space-y-1">
+            {visibleItems.length === 0 ? (
+              <p className="text-xs text-muted-foreground px-3 py-2">
+                No navigation available for this role.
+              </p>
+            ) : (
+              visibleItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.to);
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                );
+              })
+            )}
+          </nav>
+        </aside>
+
+        {/* Mobile Sidebar */}
+        {mobileMenuOpen && (
+          <>
+            <div
+              className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <aside className="fixed top-14 left-0 bottom-0 w-64 border-r bg-background z-40 overflow-y-auto lg:hidden">
+              <nav className="flex-1 p-3 space-y-1">
+                {visibleItems.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.to);
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-accent hover:text-accent-foreground"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </aside>
+          </>
+        )}
+
+        {/* Main Content */}
+        <main className="flex-1 p-4 lg:p-6 min-w-0">{children}</main>
       </div>
-    </>
+
+      {/* Logout Confirmation Modal */}
+      <LogoutConfirmModal
+        open={logoutModalOpen}
+        onClose={() => setLogoutModalOpen(false)}
+        onConfirm={handleLogout}
+      />
+    </div>
   );
 }

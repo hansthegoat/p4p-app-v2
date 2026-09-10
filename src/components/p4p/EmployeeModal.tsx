@@ -3,12 +3,14 @@ import { Plus, Trash2, X, FolderPlus, AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { getTemplateForJobGrade } from "@/lib/p4p/kpi-templates";
 import { useP4P } from "@/lib/p4p/store";
+import { showToast } from "@/lib/toast";
 import type { Employee, KPI, Category } from "@/lib/p4p/types";
 import { newId } from "@/lib/p4p/defaults";
 
@@ -56,14 +58,11 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
   const setField = <K extends keyof Employee>(k: K, v: Employee[K]) =>
     setData((d) => ({ ...d, [k]: v }));
 
-  // Auto-populate KPIs when job grade changes (only if no categories exist yet)
   useEffect(() => {
     if (!data.jobGrade || data.isAdjunct) return;
     if (data.categories && data.categories.length > 0) return;
-
     const template = getTemplateForJobGrade(data.jobGrade);
     if (!template) return;
-
     const categories = template.categories.map((cat) => ({
       id: newId(),
       name: cat.name,
@@ -74,19 +73,17 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
         metric: k.metric,
         target: k.target,
         actual: 0,
-        weight: 100,
+        weight: k.weight || 0,
         measurementSource: k.measurementSource || "",
       })),
     }));
-
     setData((prev) => ({ ...prev, categories }));
   }, [data.jobGrade, data.isAdjunct]);
 
-  // Load template manually
   const loadTemplate = () => {
     const template = getTemplateForJobGrade(data.jobGrade);
     if (!template) {
-      alert(`No KPI template found for job grade "${data.jobGrade}"`);
+      showToast.warning("No Template", `No KPI template found for job grade "${data.jobGrade}"`);
       return;
     }
     const categories = template.categories.map((cat) => ({
@@ -99,21 +96,29 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
         metric: k.metric,
         target: k.target,
         actual: 0,
-        weight: 100,
+        weight: k.weight || 0,
         measurementSource: k.measurementSource || "",
       })),
     }));
     setData((prev) => ({ ...prev, categories }));
+    showToast.success("Template Loaded", `${template.categories.length} categories loaded.`);
   };
 
-  // Calculate total weight and remaining
   const getWeightStats = (categories: Category[]) => {
     const total = categories.reduce((sum, c) => sum + c.weight, 0);
     const remaining = Math.max(0, 100 - total);
     return { total, remaining, isOver: total > 100, isComplete: total === 100 };
   };
 
-  // Category functions
+  const getKpiWeightStats = (category: Category) => {
+    const total = category.kpis.reduce((sum, k) => sum + (k.weight || 0), 0);
+    return {
+      total,
+      isComplete: Math.abs(total - 100) < 0.01,
+      isOver: total > 100,
+    };
+  };
+
   const addCategory = () => {
     const newCategory: Category = {
       id: newId(),
@@ -121,10 +126,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
       weight: 0,
       kpis: [],
     };
-    setData((d) => ({
-      ...d,
-      categories: [...(d.categories || []), newCategory],
-    }));
+    setData((d) => ({ ...d, categories: [...(d.categories || []), newCategory] }));
   };
 
   const removeCategory = (categoryId: string) => {
@@ -143,7 +145,6 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
     }));
   };
 
-  // KPI functions inside categories
   const addKPI = (categoryId: string) => {
     const newKPI: KPI = {
       id: newId(),
@@ -151,7 +152,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
       metric: "%",
       target: 0,
       actual: 0,
-      weight: 1,
+      weight: 0,
       measurementSource: "",
     };
     setData((d) => ({
@@ -166,9 +167,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
     setData((d) => ({
       ...d,
       categories: (d.categories || []).map((c) =>
-        c.id === categoryId
-          ? { ...c, kpis: c.kpis.filter((k) => k.id !== kpiId) }
-          : c
+        c.id === categoryId ? { ...c, kpis: c.kpis.filter((k) => k.id !== kpiId) } : c
       ),
     }));
   };
@@ -178,65 +177,50 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
       ...d,
       categories: (d.categories || []).map((c) =>
         c.id === categoryId
-          ? {
-              ...c,
-              kpis: c.kpis.map((k) => (k.id === kpiId ? { ...k, ...updates } : k)),
-            }
+          ? { ...c, kpis: c.kpis.map((k) => (k.id === kpiId ? { ...k, ...updates } : k)) }
           : c
       ),
     }));
   };
 
-  // Legacy KPI functions
-  const addLegacyKpi = () =>
-    setData((d) => ({
-      ...d,
-      kpis: [
-        ...d.kpis,
-        { id: newId(), description: "", metric: "%", target: 0, actual: 0, weight: 1, measurementSource: "" },
-      ],
-    }));
-
-  const updLegacyKpi = (id: string, patch: Partial<KPI>) =>
-    setData((d) => ({
-      ...d,
-      kpis: d.kpis.map((k) => (k.id === id ? { ...k, ...patch } : k)),
-    }));
-
-  const rmLegacyKpi = (id: string) =>
-    setData((d) => ({
-      ...d,
-      kpis: d.kpis.filter((k) => k.id !== id),
-    }));
-
   const save = () => {
-    if (!data.name.trim()) return;
-
-    const categories = data.categories || [];
-    const stats = getWeightStats(categories);
-
-    if (categories.length > 0 && !stats.isComplete) {
-      alert(`Category weights must sum to 100%. Currently: ${stats.total}%. Please adjust.`);
+    if (!data.name.trim()) {
+      showToast.warning("Name Required", "Please enter the employee's name.");
       return;
     }
-
-    // If supervisorId is set, find the supervisor name
-    let supervisorName = data.supervisorName || "";
-    if (data.supervisorId) {
-      const supervisor = employees.find(e => e.id === data.supervisorId);
-      if (supervisor) {
-        supervisorName = supervisor.name;
+    const categories = data.categories || [];
+    const stats = getWeightStats(categories);
+    if (categories.length > 0 && !stats.isComplete) {
+      showToast.error(
+        "Category Weights Invalid",
+        `Category weights must sum to 100%. Currently: ${stats.total}%.`
+      );
+      return;
+    }
+    for (const cat of categories) {
+      const kpiStats = getKpiWeightStats(cat);
+      if (cat.kpis.length > 0 && !kpiStats.isComplete) {
+        showToast.error(
+          "KPI Weights Invalid",
+          `In "${cat.name}", KPI weights must sum to 100%. Currently: ${kpiStats.total}%.`
+        );
+        return;
       }
     }
-
+    let supervisorName = data.supervisorName || "";
+    if (data.supervisorId) {
+      const supervisor = employees.find((e) => e.id === data.supervisorId);
+      if (supervisor) supervisorName = supervisor.name;
+    }
     upsertEmployee({
       ...data,
       email: data.email?.trim() || "",
-      supervisorName: supervisorName,
+      supervisorName,
       monthsWorked: Number(data.monthsWorked) || 0,
       kpis: data.isAdjunct ? [] : data.kpis,
       categories: data.isAdjunct ? [] : categories,
     });
+    showToast.success("Employee Saved", `${data.name} has been saved.`);
     onClose();
   };
 
@@ -244,9 +228,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
   const hasLegacyKPIs = data.kpis.length > 0;
   const weightStats = getWeightStats(data.categories || []);
   const hasTemplate = !!getTemplateForJobGrade(data.jobGrade);
-
-  // Get managers for supervisor dropdown
-  const managers = employees.filter(e => e.isManager === true && e.id !== data.id);
+  const managers = employees.filter((e) => e.isManager === true && e.id !== data.id);
 
   return (
     <AnimatePresence>
@@ -264,7 +246,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.3 }}
-            className="fixed right-0 top-0 bottom-0 w-full sm:w-[700px] bg-background z-50 shadow-2xl overflow-y-auto"
+            className="@container fixed right-0 top-0 bottom-0 w-full sm:w-[720px] lg:w-[900px] bg-background z-50 shadow-2xl overflow-y-auto"
           >
             <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-background z-10">
               <h2 className="text-lg font-semibold">
@@ -275,36 +257,21 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
-              {/* Basic Info */}
+            <div className="p-4 sm:p-5 space-y-4">
               <div>
                 <Label>Name</Label>
-                <Input
-                  value={data.name}
-                  onChange={(e) => setField("name", e.target.value)}
-                  placeholder="Full name"
-                />
+                <Input value={data.name} onChange={(e) => setField("name", e.target.value)} placeholder="Full name" />
               </div>
 
               <div>
                 <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={data.email || ""}
-                  onChange={(e) => setField("email", e.target.value)}
-                  placeholder="Email address"
-                />
+                <Input type="email" value={data.email || ""} onChange={(e) => setField("email", e.target.value)} placeholder="Email address" />
               </div>
 
               <div>
                 <Label>Job Grade</Label>
-                <Select
-                  value={data.jobGrade}
-                  onValueChange={(v) => setField("jobGrade", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={data.jobGrade} onValueChange={(v) => setField("jobGrade", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {grades.map((g) => (
                       <SelectItem key={g.code} value={g.code}>
@@ -317,23 +284,14 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
 
               <div>
                 <Label>Department</Label>
-                <Input
-                  value={data.department || ""}
-                  onChange={(e) => setField("department", e.target.value)}
-                  placeholder="Department"
-                />
+                <Input value={data.department || ""} onChange={(e) => setField("department", e.target.value)} placeholder="Department" />
               </div>
 
               <div>
                 <Label>Role</Label>
-                <Input
-                  value={data.role || ""}
-                  onChange={(e) => setField("role", e.target.value)}
-                  placeholder="Role (e.g., Senior Specialist)"
-                />
+                <Input value={data.role || ""} onChange={(e) => setField("role", e.target.value)} placeholder="Role (e.g., Senior Specialist)" />
               </div>
 
-              {/* Supervisor Dropdown - FIXED */}
               <div>
                 <Label>Supervisor/Manager</Label>
                 <Select
@@ -343,32 +301,22 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                       setField("supervisorId", "");
                       setField("supervisorName", "");
                     } else {
-                      const supervisor = employees.find(e => e.id === v);
+                      const sup = employees.find((e) => e.id === v);
                       setField("supervisorId", v);
-                      setField("supervisorName", supervisor?.name || "");
+                      setField("supervisorName", sup?.name || "");
                     }
                   }}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select supervisor (optional)" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select supervisor (optional)" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem key="none" value="none">None</SelectItem>
                     {managers.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name} ({m.department})
-                      </SelectItem>
+                      <SelectItem key={m.id} value={m.id}>{m.name} ({m.department})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {data.supervisorName && data.supervisorId && data.supervisorId !== "none" && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Supervisor: {data.supervisorName}
-                  </p>
-                )}
               </div>
 
-              {/* Manager Toggle */}
               <div className="flex items-center gap-2 pt-1">
                 <Checkbox
                   checked={data.isManager || false}
@@ -377,31 +325,21 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                 <Label className="text-sm cursor-pointer">This employee is a Manager/Supervisor</Label>
               </div>
 
-              <div className="flex gap-6">
+              <div className="flex flex-wrap gap-6">
                 <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={data.isAdjunct}
-                    onCheckedChange={(v) => setField("isAdjunct", !!v)}
-                  />
+                  <Checkbox checked={data.isAdjunct} onCheckedChange={(v) => setField("isAdjunct", !!v)} />
                   Is Adjunct?
                 </label>
                 <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={data.isSalesRole}
-                    onCheckedChange={(v) => setField("isSalesRole", !!v)}
-                  />
+                  <Checkbox checked={data.isSalesRole} onCheckedChange={(v) => setField("isSalesRole", !!v)} />
                   Is Sales Role?
                 </label>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Join Date</Label>
-                  <Input
-                    type="date"
-                    value={data.joinDate}
-                    onChange={(e) => setField("joinDate", e.target.value)}
-                  />
+                  <Input type="date" value={data.joinDate} onChange={(e) => setField("joinDate", e.target.value)} />
                 </div>
                 {globals.prorationOn && (
                   <div>
@@ -417,12 +355,11 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                 )}
               </div>
 
-              {/* Weighted Categories */}
               {!data.isAdjunct && (
                 <div className="pt-4 border-t">
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <h3 className="font-medium">Weighted Categories</h3>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {hasTemplate && (
                         <Button size="sm" variant="outline" onClick={loadTemplate}>
                           <FolderPlus className="h-4 w-4 mr-1" /> Load Template
@@ -434,32 +371,22 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                     </div>
                   </div>
 
-                  {/* Weight Status Banner */}
                   {hasCategories && (
                     <div
                       className={`rounded-md p-3 mb-3 text-sm flex items-center gap-2 ${
                         weightStats.isOver
-                          ? "bg-red-50 border border-red-200 text-red-700"
+                          ? "bg-red-50 border border-red-200 text-red-700 dark:bg-red-950/30 dark:text-red-400"
                           : weightStats.isComplete
-                          ? "bg-green-50 border border-green-200 text-green-700"
-                          : "bg-blue-50 border border-blue-200 text-blue-700"
+                          ? "bg-green-50 border border-green-200 text-green-700 dark:bg-green-950/30 dark:text-green-400"
+                          : "bg-blue-50 border border-blue-200 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400"
                       }`}
                     >
                       <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                      <span>
-                        {weightStats.isOver ? (
-                          <strong>⚠️ Over 100%!</strong>
-                        ) : weightStats.isComplete ? (
-                          <strong>✅ Perfect!</strong>
-                        ) : (
-                          <strong>📊 Assign weights</strong>
-                        )}{" "}
-                        Total: <strong>{weightStats.total}%</strong>
+                      <span className="text-xs sm:text-sm">
+                        {weightStats.isOver ? "⚠️ Over 100%! " : weightStats.isComplete ? "✅ Perfect! " : "📊 "}
+                        Category Total: <strong>{weightStats.total}%</strong>
                         {!weightStats.isOver && !weightStats.isComplete && (
                           <> · Remaining: <strong>{weightStats.remaining}%</strong></>
-                        )}
-                        {weightStats.isOver && (
-                          <> · Reduce by <strong>{Math.abs(weightStats.remaining)}%</strong></>
                         )}
                       </span>
                     </div>
@@ -467,152 +394,184 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
 
                   {hasCategories ? (
                     <div className="space-y-4">
-                      {(data.categories || []).map((category) => (
-                        <Card key={category.id} className="p-4 border">
-                          <div className="flex gap-3 mb-3">
-                            <Input
-                              value={category.name}
-                              onChange={(e) =>
-                                updateCategory(category.id, { name: e.target.value })
-                              }
-                              placeholder="Category name"
-                              className="flex-1"
-                            />
-                            <div className="relative w-24">
+                      {(data.categories || []).map((category) => {
+                        const kpiStats = getKpiWeightStats(category);
+                        return (
+                          <Card key={category.id} className="p-3 sm:p-4 border">
+                            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-3">
                               <Input
-                                type="number"
-                                value={category.weight}
-                                onChange={(e) => {
-                                  const newWeight = Number(e.target.value);
-                                  if (newWeight < 0) return;
-                                  const otherCategories = (data.categories || []).filter(
-                                    (c) => c.id !== category.id
-                                  );
-                                  const otherTotal = otherCategories.reduce(
-                                    (sum, c) => sum + c.weight,
-                                    0
-                                  );
-                                  const maxAllowed = 100 - otherTotal;
-                                  if (newWeight <= maxAllowed) {
-                                    updateCategory(category.id, { weight: newWeight });
-                                  } else {
-                                    alert(
-                                      `Cannot set weight to ${newWeight}%. Only ${maxAllowed}% remaining.`
-                                    );
-                                  }
-                                }}
-                                placeholder="Weight %"
-                                className="pr-6"
-                                min={0}
-                                max={100}
+                                value={category.name}
+                                onChange={(e) => updateCategory(category.id, { name: e.target.value })}
+                                placeholder="Category name"
+                                className="flex-1"
                               />
-                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                                %
-                              </span>
-                            </div>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => removeCategory(category.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <div className="text-xs text-muted-foreground mb-2">
-                            {category.kpis.length} KPI(s) - All equally weighted
-                          </div>
-
-                          <div className="pl-4 space-y-2">
-                            <div className="grid grid-cols-11 gap-2 text-xs font-medium text-muted-foreground">
-                              <div className="col-span-3">KPI Description</div>
-                              <div className="col-span-2">Metric</div>
-                              <div className="col-span-2">Target</div>
-                              <div className="col-span-2">Actual</div>
-                              <div className="col-span-1">Source</div>
-                              <div className="col-span-1">Action</div>
-                            </div>
-
-                            {category.kpis.map((kpi) => (
-                              <div key={kpi.id} className="grid grid-cols-11 gap-2">
-                                <Input
-                                  value={kpi.description}
-                                  onChange={(e) =>
-                                    updateKPI(category.id, kpi.id, {
-                                      description: e.target.value,
-                                    })
-                                  }
-                                  placeholder="KPI name"
-                                  className="col-span-3"
-                                />
-                                <Select
-                                  value={kpi.metric}
-                                  onValueChange={(v) =>
-                                    updateKPI(category.id, kpi.id, { metric: v })
-                                  }
-                                >
-                                  <SelectTrigger className="col-span-2">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="%">%</SelectItem>
-                                    <SelectItem value="GHS">GHS</SelectItem>
-                                    <SelectItem value="#">#</SelectItem>
-                                    <SelectItem value="hrs">hrs</SelectItem>
-                                    <SelectItem value="days">days</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <Input
-                                  type="number"
-                                  value={kpi.target}
-                                  onChange={(e) =>
-                                    updateKPI(category.id, kpi.id, {
-                                      target: Number(e.target.value),
-                                    })
-                                  }
-                                  className="col-span-2"
-                                />
-                                <Input
-                                  type="number"
-                                  value={kpi.actual}
-                                  onChange={(e) =>
-                                    updateKPI(category.id, kpi.id, {
-                                      actual: Number(e.target.value),
-                                    })
-                                  }
-                                  className="col-span-2"
-                                />
-                                <Input
-                                  value={kpi.measurementSource || ""}
-                                  onChange={(e) =>
-                                    updateKPI(category.id, kpi.id, {
-                                      measurementSource: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Source"
-                                  className="col-span-1"
-                                />
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeKPI(category.id, kpi.id)}
-                                  className="col-span-1 px-0"
-                                >
+                              <div className="flex gap-2">
+                                <div className="relative flex-1 sm:w-24">
+                                  <Input
+                                    type="number"
+                                    value={category.weight}
+                                    onChange={(e) => {
+                                      const nw = Number(e.target.value);
+                                      if (nw < 0) return;
+                                      const others = (data.categories || []).filter((c) => c.id !== category.id);
+                                      const otherTotal = others.reduce((s, c) => s + c.weight, 0);
+                                      const maxAllowed = 100 - otherTotal;
+                                      if (nw <= maxAllowed) {
+                                        updateCategory(category.id, { weight: nw });
+                                      } else {
+                                        showToast.warning(
+                                          "Weight Too High",
+                                          `Only ${maxAllowed}% remaining.`
+                                        );
+                                      }
+                                    }}
+                                    placeholder="Weight %"
+                                    className="pr-6"
+                                    min={0}
+                                    max={100}
+                                  />
+                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                                </div>
+                                <Button variant="destructive" size="sm" onClick={() => removeCategory(category.id)}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
-                            ))}
+                            </div>
 
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => addKPI(category.id)}
-                              className="mt-2"
-                            >
-                              <Plus className="h-4 w-4 mr-1" /> Add KPI
-                            </Button>
-                          </div>
-                        </Card>
-                      ))}
+                            {category.kpis.length > 0 && (
+                              <div
+                                className={`rounded-md px-3 py-2 mb-3 text-xs flex items-center gap-2 ${
+                                  kpiStats.isOver
+                                    ? "bg-red-50 border border-red-200 text-red-700 dark:bg-red-950/30 dark:text-red-400"
+                                    : kpiStats.isComplete
+                                    ? "bg-green-50 border border-green-200 text-green-700 dark:bg-green-950/30 dark:text-green-400"
+                                    : "bg-amber-50 border border-amber-200 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                                }`}
+                              >
+                                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span>
+                                  {kpiStats.isOver ? "⚠️ KPI weights over 100%! " : kpiStats.isComplete ? "✅ KPI weights perfect! " : "📊 "}
+                                  KPI Total: <strong>{kpiStats.total}%</strong>
+                                  {!kpiStats.isOver && !kpiStats.isComplete && (
+                                    <> · Need <strong>{100 - kpiStats.total}%</strong> more</>
+                                  )}
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="space-y-3">
+                              {category.kpis.map((kpi) => (
+                                <div
+                                  key={kpi.id}
+                                  className="p-3 rounded-lg border border-border/60 bg-muted/20 space-y-2"
+                                >
+                                  <div className="flex gap-2 items-start">
+                                    <div className="flex-1 min-w-0">
+                                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                                        KPI Description
+                                      </Label>
+                                      <Textarea
+                                        value={kpi.description}
+                                        onChange={(e) => {
+                                          updateKPI(category.id, kpi.id, { description: e.target.value });
+                                          e.target.style.height = "auto";
+                                          e.target.style.height = e.target.scrollHeight + "px";
+                                        }}
+                                        placeholder="e.g., 100% of quarterly sales target from enterprise accounts"
+                                        rows={2}
+                                        className="min-h-[60px] resize-none text-sm overflow-hidden"
+                                      />
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeKPI(category.id, kpi.id)}
+                                      className="mt-5 h-9 w-9 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10 shrink-0"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 @sm:grid-cols-2 @md:grid-cols-5 gap-2">
+                                    <div className="min-w-0">
+                                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                                        Metric
+                                      </Label>
+                                      <Select value={kpi.metric} onValueChange={(v) => updateKPI(category.id, kpi.id, { metric: v })}>
+                                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem key="%" value="%">%</SelectItem>
+                                          <SelectItem key="GHS" value="GHS">GHS</SelectItem>
+                                          <SelectItem key="#" value="#">#</SelectItem>
+                                          <SelectItem key="hrs" value="hrs">hrs</SelectItem>
+                                          <SelectItem key="days" value="days">days</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+
+                                    <div className="min-w-0">
+                                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                                        Weight %
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        value={kpi.weight || 0}
+                                        onChange={(e) => updateKPI(category.id, kpi.id, { weight: Number(e.target.value) })}
+                                        placeholder="0"
+                                        className="h-9 font-mono"
+                                      />
+                                    </div>
+
+                                    <div className="min-w-0">
+                                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                                        Target
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        value={kpi.target}
+                                        onChange={(e) => updateKPI(category.id, kpi.id, { target: Number(e.target.value) })}
+                                        placeholder="Target"
+                                        className="h-9"
+                                      />
+                                    </div>
+
+                                    <div className="min-w-0">
+                                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                                        Actual
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        value={kpi.actual}
+                                        onChange={(e) => updateKPI(category.id, kpi.id, { actual: Number(e.target.value) })}
+                                        placeholder="Actual"
+                                        className="h-9"
+                                      />
+                                    </div>
+
+                                    <div className="min-w-0">
+                                      <Label className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1 block">
+                                        Source
+                                      </Label>
+                                      <Input
+                                        value={kpi.measurementSource || ""}
+                                        onChange={(e) => updateKPI(category.id, kpi.id, { measurementSource: e.target.value })}
+                                        placeholder="e.g., CRM"
+                                        className="h-9"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+
+                              <Button size="sm" variant="outline" onClick={() => addKPI(category.id)} className="mt-2">
+                                <Plus className="h-4 w-4 mr-1" /> Add KPI
+                              </Button>
+                            </div>
+                          </Card>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-sm text-muted-foreground p-4 bg-muted/40 rounded-md text-center">
@@ -622,17 +581,33 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                 </div>
               )}
 
-              {/* Legacy KPIs */}
               {!data.isAdjunct && (
                 <div className="pt-4 border-t">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-medium text-sm text-muted-foreground">
-                      Legacy KPIs (Simple List - optional)
-                      <span className="ml-2 text-xs font-normal">
-                        (only used if no categories)
-                      </span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <h3 className="text-sm font-medium text-muted-foreground">
+                      Legacy KPIs (Simple List — optional)
                     </h3>
-                    <Button size="sm" variant="outline" onClick={addLegacyKpi}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setData((d) => ({
+                          ...d,
+                          kpis: [
+                            ...d.kpis,
+                            {
+                              id: newId(),
+                              description: "",
+                              metric: "%",
+                              target: 0,
+                              actual: 0,
+                              weight: 100,
+                              measurementSource: "",
+                            },
+                          ],
+                        }))
+                      }
+                    >
                       <Plus className="h-4 w-4 mr-1" /> Add Legacy KPI
                     </Button>
                   </div>
@@ -642,36 +617,43 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                       {data.kpis.map((k) => (
                         <div key={k.id} className="p-3 border rounded-md space-y-2 bg-card">
                           <div className="flex gap-2 items-start">
-                            <Input
-                              className="flex-1"
+                            <Textarea
+                              className="flex-1 min-h-[60px] resize-none text-sm"
+                              rows={2}
                               placeholder="Description"
                               value={k.description}
                               onChange={(e) =>
-                                updLegacyKpi(k.id, { description: e.target.value })
+                                setData((d) => ({
+                                  ...d,
+                                  kpis: d.kpis.map((x) => (x.id === k.id ? { ...x, description: e.target.value } : x)),
+                                }))
                               }
                             />
                             <button
-                              onClick={() => rmLegacyKpi(k.id)}
+                              onClick={() =>
+                                setData((d) => ({ ...d, kpis: d.kpis.filter((x) => x.id !== k.id) }))
+                              }
                               className="p-2 hover:text-destructive"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                             <div>
                               <Label className="text-xs">Metric</Label>
                               <Select
                                 value={k.metric}
-                                onValueChange={(v) => updLegacyKpi(k.id, { metric: v })}
+                                onValueChange={(v) =>
+                                  setData((d) => ({
+                                    ...d,
+                                    kpis: d.kpis.map((x) => (x.id === k.id ? { ...x, metric: v } : x)),
+                                  }))
+                                }
                               >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   {["%", "GHS", "#", "hrs", "days"].map((m) => (
-                                    <SelectItem key={m} value={m}>
-                                      {m}
-                                    </SelectItem>
+                                    <SelectItem key={m} value={m}>{m}</SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
@@ -682,7 +664,10 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                                 type="number"
                                 value={k.target}
                                 onChange={(e) =>
-                                  updLegacyKpi(k.id, { target: Number(e.target.value) })
+                                  setData((d) => ({
+                                    ...d,
+                                    kpis: d.kpis.map((x) => (x.id === k.id ? { ...x, target: Number(e.target.value) } : x)),
+                                  }))
                                 }
                               />
                             </div>
@@ -692,7 +677,10 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                                 type="number"
                                 value={k.actual}
                                 onChange={(e) =>
-                                  updLegacyKpi(k.id, { actual: Number(e.target.value) })
+                                  setData((d) => ({
+                                    ...d,
+                                    kpis: d.kpis.map((x) => (x.id === k.id ? { ...x, actual: Number(e.target.value) } : x)),
+                                  }))
                                 }
                               />
                             </div>
@@ -701,7 +689,12 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                               <Input
                                 value={k.measurementSource || ""}
                                 onChange={(e) =>
-                                  updLegacyKpi(k.id, { measurementSource: e.target.value })
+                                  setData((d) => ({
+                                    ...d,
+                                    kpis: d.kpis.map((x) =>
+                                      x.id === k.id ? { ...x, measurementSource: e.target.value } : x
+                                    ),
+                                  }))
                                 }
                                 placeholder="Measurement source"
                               />
@@ -719,22 +712,13 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
               )}
 
               <div className="flex gap-2 pt-4 sticky bottom-0 bg-background pb-2 border-t">
-                <Button
-                  onClick={save}
-                  className="flex-1"
-                  disabled={hasCategories && !weightStats.isComplete}
-                >
+                <Button onClick={save} className="flex-1" disabled={hasCategories && !weightStats.isComplete}>
                   Save
                 </Button>
                 <Button variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
               </div>
-              {hasCategories && !weightStats.isComplete && (
-                <p className="text-xs text-red-500 -mt-2">
-                  Please adjust weights to sum to 100% before saving.
-                </p>
-              )}
             </div>
           </motion.div>
         </>

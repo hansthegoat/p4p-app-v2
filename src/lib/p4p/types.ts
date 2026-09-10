@@ -180,6 +180,15 @@ export interface KPIItem {
   maxScore?: number;
   measurementSource?: string;
 }
+export interface KPIItem {
+  id: string;
+  description: string;
+  metric: string;
+  target: number;
+  weight?: number;      // ← NEW: weight % within category
+  maxScore?: number;
+  measurementSource?: string;
+}
 
 export interface CategoryTemplate {
   id: string;

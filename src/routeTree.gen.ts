@@ -9,12 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VerifyOtpRouteImport } from './routes/verify-otp'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppTraceRouteImport } from './routes/_app.trace'
 import { Route as AppSupervisorsRouteImport } from './routes/_app.supervisors'
+import { Route as AppMyCalculationRouteImport } from './routes/_app.my-calculation'
 import { Route as AppMonthlyRouteImport } from './routes/_app.monthly'
 import { Route as AppKpiFrameworkRouteImport } from './routes/_app.kpi-framework'
 import { Route as AppGradesRouteImport } from './routes/_app.grades'
@@ -24,6 +28,16 @@ import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppAppraisalsReviewRouteImport } from './routes/_app.appraisals-review'
 import { Route as AppAppraisalsRouteImport } from './routes/_app.appraisals'
 
+const VerifyOtpRoute = VerifyOtpRouteImport.update({
+  id: '/verify-otp',
+  path: '/verify-otp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
@@ -32,6 +46,11 @@ const RegisterRoute = RegisterRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -51,6 +70,11 @@ const AppTraceRoute = AppTraceRouteImport.update({
 const AppSupervisorsRoute = AppSupervisorsRouteImport.update({
   id: '/supervisors',
   path: '/supervisors',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMyCalculationRoute = AppMyCalculationRouteImport.update({
+  id: '/my-calculation',
+  path: '/my-calculation',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMonthlyRoute = AppMonthlyRouteImport.update({
@@ -96,8 +120,11 @@ const AppAppraisalsRoute = AppAppraisalsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/verify-otp': typeof VerifyOtpRoute
   '/appraisals': typeof AppAppraisalsRoute
   '/appraisals-review': typeof AppAppraisalsReviewRoute
   '/dashboard': typeof AppDashboardRoute
@@ -106,13 +133,17 @@ export interface FileRoutesByFullPath {
   '/grades': typeof AppGradesRoute
   '/kpi-framework': typeof AppKpiFrameworkRoute
   '/monthly': typeof AppMonthlyRoute
+  '/my-calculation': typeof AppMyCalculationRoute
   '/supervisors': typeof AppSupervisorsRoute
   '/trace': typeof AppTraceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/verify-otp': typeof VerifyOtpRoute
   '/appraisals': typeof AppAppraisalsRoute
   '/appraisals-review': typeof AppAppraisalsReviewRoute
   '/dashboard': typeof AppDashboardRoute
@@ -121,6 +152,7 @@ export interface FileRoutesByTo {
   '/grades': typeof AppGradesRoute
   '/kpi-framework': typeof AppKpiFrameworkRoute
   '/monthly': typeof AppMonthlyRoute
+  '/my-calculation': typeof AppMyCalculationRoute
   '/supervisors': typeof AppSupervisorsRoute
   '/trace': typeof AppTraceRoute
 }
@@ -128,8 +160,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/verify-otp': typeof VerifyOtpRoute
   '/_app/appraisals': typeof AppAppraisalsRoute
   '/_app/appraisals-review': typeof AppAppraisalsReviewRoute
   '/_app/dashboard': typeof AppDashboardRoute
@@ -138,6 +173,7 @@ export interface FileRoutesById {
   '/_app/grades': typeof AppGradesRoute
   '/_app/kpi-framework': typeof AppKpiFrameworkRoute
   '/_app/monthly': typeof AppMonthlyRoute
+  '/_app/my-calculation': typeof AppMyCalculationRoute
   '/_app/supervisors': typeof AppSupervisorsRoute
   '/_app/trace': typeof AppTraceRoute
 }
@@ -145,8 +181,11 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/forgot-password'
     | '/login'
     | '/register'
+    | '/reset-password'
+    | '/verify-otp'
     | '/appraisals'
     | '/appraisals-review'
     | '/dashboard'
@@ -155,13 +194,17 @@ export interface FileRouteTypes {
     | '/grades'
     | '/kpi-framework'
     | '/monthly'
+    | '/my-calculation'
     | '/supervisors'
     | '/trace'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/forgot-password'
     | '/login'
     | '/register'
+    | '/reset-password'
+    | '/verify-otp'
     | '/appraisals'
     | '/appraisals-review'
     | '/dashboard'
@@ -170,14 +213,18 @@ export interface FileRouteTypes {
     | '/grades'
     | '/kpi-framework'
     | '/monthly'
+    | '/my-calculation'
     | '/supervisors'
     | '/trace'
   id:
     | '__root__'
     | '/'
     | '/_app'
+    | '/forgot-password'
     | '/login'
     | '/register'
+    | '/reset-password'
+    | '/verify-otp'
     | '/_app/appraisals'
     | '/_app/appraisals-review'
     | '/_app/dashboard'
@@ -186,6 +233,7 @@ export interface FileRouteTypes {
     | '/_app/grades'
     | '/_app/kpi-framework'
     | '/_app/monthly'
+    | '/_app/my-calculation'
     | '/_app/supervisors'
     | '/_app/trace'
   fileRoutesById: FileRoutesById
@@ -193,12 +241,29 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  VerifyOtpRoute: typeof VerifyOtpRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/verify-otp': {
+      id: '/verify-otp'
+      path: '/verify-otp'
+      fullPath: '/verify-otp'
+      preLoaderRoute: typeof VerifyOtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register': {
       id: '/register'
       path: '/register'
@@ -211,6 +276,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -239,6 +311,13 @@ declare module '@tanstack/react-router' {
       path: '/supervisors'
       fullPath: '/supervisors'
       preLoaderRoute: typeof AppSupervisorsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/my-calculation': {
+      id: '/_app/my-calculation'
+      path: '/my-calculation'
+      fullPath: '/my-calculation'
+      preLoaderRoute: typeof AppMyCalculationRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/monthly': {
@@ -309,6 +388,7 @@ interface AppRouteChildren {
   AppGradesRoute: typeof AppGradesRoute
   AppKpiFrameworkRoute: typeof AppKpiFrameworkRoute
   AppMonthlyRoute: typeof AppMonthlyRoute
+  AppMyCalculationRoute: typeof AppMyCalculationRoute
   AppSupervisorsRoute: typeof AppSupervisorsRoute
   AppTraceRoute: typeof AppTraceRoute
 }
@@ -322,6 +402,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppGradesRoute: AppGradesRoute,
   AppKpiFrameworkRoute: AppKpiFrameworkRoute,
   AppMonthlyRoute: AppMonthlyRoute,
+  AppMyCalculationRoute: AppMyCalculationRoute,
   AppSupervisorsRoute: AppSupervisorsRoute,
   AppTraceRoute: AppTraceRoute,
 }
@@ -331,8 +412,11 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  VerifyOtpRoute: VerifyOtpRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

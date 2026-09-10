@@ -1,15 +1,16 @@
-import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
+import { z } from "zod";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { P4PProvider, useP4P } from "@/lib/p4p/store";
-import { register, login } from "@/lib/p4p/auth";
-import { getDepartments, getRolesForDepartment, getTemplateByDepartmentAndRole } from "@/lib/p4p/kpi-templates";
-import { newId } from "@/lib/p4p/defaults";
+import { register } from "@/lib/p4p/auth";
+import { getDepartments, getRolesForDepartment } from "@/lib/p4p/kpi-templates";
 import { supabase } from "@/lib/supabase";
+import { showToast } from "@/lib/toast";
 
 // Manager roles that should be auto-marked as supervisors
 const MANAGER_ROLES = [
@@ -19,9 +20,13 @@ const MANAGER_ROLES = [
   "Vice President",
   "Head of Department",
   "Deputy Head of Department",
-  "Line Manager/SBU Head",
+  "Line Manager",
   "Team Lead",
 ];
+
+const searchSchema = z.object({
+  email: z.string().optional(),
+});
 
 function RegisterForm() {
   const navigate = useNavigate();
@@ -51,62 +56,103 @@ function RegisterForm() {
     setError("");
 
     try {
-      // Register the user
-      await register(email, password);
+// Try to find a KPI template — but don't block registration if missing
+const template = getTemplate(department, role);
+const hasTemplate = !!template;
 
-      // Get the current user to get their authUserId
-      const { data: { user } } = await supabase.auth.getUser();
-      const authUserId = user?.id || "";
+if (!hasTemplate) {
+  // Just warn — don't block
+  console.warn(`No KPI template for ${department} / ${role}. Employee will be created with empty KPIs.`);
+}
 
-      const template = getTemplateByDepartmentAndRole(department, role);
-      if (!template) {
-        setError(`No KPI framework defined for ${department} / ${role}. Please contact HR.`);
-        setLoading(false);
-        return;
+      // Sign up with Supabase Auth (sends OTP email)
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            department,
+            role,
+          },
+        },
+      });
+
+      if (authError) throw authError;
+
+      if (!authData.user) {
+        throw new Error("Failed to create user account");
       }
 
-      // Check if this role should be a manager
-      const isManager = MANAGER_ROLES.some(r => 
-        r.toLowerCase() === role.toLowerCase()
-      );
+      // Check if user needs email confirmation
+      // Supabase sets `session` to null when email confirmation is required
+      const needsVerification = !authData.session;
 
-      const newEmployee = {
-        id: newId(),
+      // Store pending registration data to finish after OTP verification
+      const pendingRegistration = {
+        authUserId: authData.user.id,
         name,
         email,
-        authUserId, // ← NEW: Supabase Auth user ID added here
         department,
         role,
-        jobGrade: template.jobGrade || "4",
-        isAdjunct: false,
-        isSalesRole: false,
-        joinDate: new Date().toISOString().slice(0, 10),
-        monthsWorked: 12,
-        kpis: [],
-        categories: template.categories.map(cat => ({
-          id: newId(),
-          name: cat.name,
-          weight: cat.weight,
-          kpis: cat.kpis.map(k => ({
-            id: newId(),
-            description: k.description,
-            metric: k.metric,
-            target: k.target,
-            actual: 0,
-            weight: 100,
-            measurementSource: k.measurementSource || "",
-          })),
-        })),
-        roleType: "employee",
-        isManager: isManager,
-        supervisorId: "",
-        supervisorName: "",
       };
+      localStorage.setItem("p4p_pending_registration", JSON.stringify(pendingRegistration));
 
-      upsertEmployee(newEmployee);
-      await login(email, password);
-      navigate({ to: "/dashboard" });
+      if (needsVerification) {
+        // Redirect to OTP verification page
+        showToast.success("Verification Code Sent", `Check ${email} for your 6-digit code.`);
+        navigate({
+          to: "/verify-otp",
+          search: { email },
+        });
+      } else {
+        // No verification needed (email confirmation is off) — create employee directly
+        const isManager = MANAGER_ROLES.some((r) => r.toLowerCase() === role.toLowerCase());
+
+const newEmployee = {
+  id: authData.user.id,
+  name,
+  email,
+  authUserId: authData.user.id,
+  department,
+  role,
+  jobGrade: template?.jobGrade || "4",
+  isAdjunct: false,
+  isSalesRole: false,
+  joinDate: new Date().toISOString().slice(0, 10),
+  monthsWorked: 12,
+  kpis: [],
+  categories: template
+    ? template.categories.map((cat: any) => ({
+        id: `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        name: cat.name,
+        weight: cat.weight,
+        kpis: cat.kpis.map((k: any) => ({
+          id: `kpi_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          description: k.description,
+          metric: k.metric,
+          target: k.target,
+          actual: 0,
+          weight: 100,
+          measurementSource: k.measurementSource || "",
+        })),
+      }))
+    : [], // ← Empty categories if no template
+  roleType: "employee" as const,
+  isManager,
+  supervisorId: "",
+  supervisorName: "",
+  needsKpiSetup: !hasTemplate, // ← Flag for HR
+};
+
+        upsertEmployee(newEmployee);
+        localStorage.removeItem("p4p_pending_registration");
+
+        showToast.success("Account Created!", "You're now logged in.");
+        navigate({ to: "/dashboard" });
+      }
     } catch (err: any) {
+      console.error("Registration error:", err);
       setError(err.message || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
@@ -122,7 +168,7 @@ function RegisterForm() {
         </p>
 
         {error && (
-          <div className="text-sm text-red-600 bg-red-50 p-2 rounded mb-4">
+          <div className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400 p-3 rounded mb-4">
             {error}
           </div>
         )}
@@ -136,6 +182,7 @@ function RegisterForm() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
 
@@ -147,6 +194,7 @@ function RegisterForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
 
@@ -159,18 +207,21 @@ function RegisterForm() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
+              disabled={loading}
             />
           </div>
 
           <div>
             <Label>Department</Label>
-            <Select value={department} onValueChange={setDepartment}>
+            <Select value={department} onValueChange={setDepartment} disabled={loading}>
               <SelectTrigger>
                 <SelectValue placeholder="Select your department" />
               </SelectTrigger>
               <SelectContent>
                 {departments.map((dept) => (
-                  <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  <SelectItem key={dept} value={dept}>
+                    {dept}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -178,19 +229,27 @@ function RegisterForm() {
 
           <div>
             <Label>Role</Label>
-            <Select value={role} onValueChange={setRole} disabled={!department}>
+            <Select value={role} onValueChange={setRole} disabled={!department || loading}>
               <SelectTrigger>
-                <SelectValue placeholder={department ? "Select your role" : "Select department first"} />
+                <SelectValue
+                  placeholder={department ? "Select your role" : "Select department first"}
+                />
               </SelectTrigger>
               <SelectContent>
                 {roles.map((r) => (
-                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading || !department || !role}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading || !department || !role}
+          >
             {loading ? "Creating Account..." : "Register"}
           </Button>
         </form>
@@ -210,6 +269,7 @@ function RegisterForm() {
 }
 
 export const Route = createFileRoute("/register")({
+  validateSearch: searchSchema,
   component: () => (
     <P4PProvider>
       <RegisterForm />

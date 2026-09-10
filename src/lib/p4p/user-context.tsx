@@ -72,3 +72,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 };
 
 export const useUser = () => useContext(UserContext);
+// In src/lib/p4p/user-context.tsx
+interface UserContextValue {
+  user: any | null;
+  role: string | null;
+  logout?: () => void;
+  // ... other fields
+}

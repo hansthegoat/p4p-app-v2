@@ -1,35 +1,38 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { useP4P } from "@/lib/p4p/store";
 import { fmtGHS, fmtNum } from "@/lib/p4p/calc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Search, UserPlus, Trash2, Edit2, 
-  Upload, FileSpreadsheet, X
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { showToast } from "@/lib/toast";
+import { staggerContainer, fadeUp } from "@/lib/motion";
+import {
+  Search, UserPlus, Trash2, Edit2, Upload, FileSpreadsheet,
+  X, Users, Award, TrendingUp, AlertTriangle, Mail, Building2,
+  AlertCircle,
 } from "lucide-react";
 import { EmployeeModal } from "@/components/p4p/EmployeeModal";
 import { DeleteConfirmModal } from "@/components/p4p/DeleteConfirmModal";
 import { deleteSupabaseUser, findUserByEmail } from "@/lib/supabase";
-import { showToast } from "@/lib/toast";
 
 export const Route = createFileRoute("/_app/employees")({
   component: EmployeesPage,
 });
 
 function EmployeesPage() {
-  const { 
-    employees, 
-    calc, 
-    removeEmployee, 
-    clearEmployees, 
-    loadDemo, 
+  const {
+    employees,
+    calc,
+    clearEmployees,
+    loadDemo,
     hardDeleteEmployee,
-    getPerformanceTrend 
   } = useP4P();
 
   const [search, setSearch] = useState("");
@@ -37,70 +40,50 @@ function EmployeesPage() {
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<"company" | "individual">("company");
 
-  const filteredEmployees = employees.filter(emp => {
-    if (emp.isAdjunct) return false;
-    const searchLower = search.toLowerCase();
+  const filteredEmployees = employees.filter((emp) => {
+    const s = search.toLowerCase();
     return (
-      emp.name.toLowerCase().includes(searchLower) ||
-      emp.department.toLowerCase().includes(searchLower) ||
-      emp.role.toLowerCase().includes(searchLower)
+      emp.name.toLowerCase().includes(s) ||
+      emp.department.toLowerCase().includes(s) ||
+      emp.role.toLowerCase().includes(s) ||
+      (emp.email || "").toLowerCase().includes(s)
     );
   });
 
   const sortedEmployees = [...filteredEmployees].sort((a, b) => {
-    const aCalc = calc.perEmployee[a.id];
-    const bCalc = calc.perEmployee[b.id];
-    const aScore = aCalc?.performanceMultiplier || 0;
-    const bScore = bCalc?.performanceMultiplier || 0;
+    const aScore = calc.perEmployee[a.id]?.performanceMultiplier || 0;
+    const bScore = calc.perEmployee[b.id]?.performanceMultiplier || 0;
     return bScore - aScore;
   });
 
-  // ===== HANDLE DELETE =====
   const handleDeleteEmployee = async () => {
     if (!employeeToDelete) return;
-    
     try {
       if (!employeeToDelete.authUserId) {
-        console.log("No authUserId found, trying to find by email:", employeeToDelete.email);
-        
-        try {
-          const foundUser = await findUserByEmail(employeeToDelete.email);
-          
-          if (foundUser) {
-            const { success, error } = await deleteSupabaseUser(foundUser.id);
-            if (!success) {
-              console.error("Error deleting user:", error);
-              hardDeleteEmployee(employeeToDelete.id);
-              showToast.warning("Partial Deletion", `${employeeToDelete.name} removed from app, but could not delete from Supabase Auth. Please manually delete them.`);
-              return;
-            }
+        const foundUser = await findUserByEmail(employeeToDelete.email);
+        if (foundUser) {
+          const { success, error } = await deleteSupabaseUser(foundUser.id);
+          if (!success) {
             hardDeleteEmployee(employeeToDelete.id);
-            showToast.success("Employee Deleted", `${employeeToDelete.name} has been permanently deleted.`);
-            return;
-          } else {
-            hardDeleteEmployee(employeeToDelete.id);
-            showToast.success("Employee Removed", `${employeeToDelete.name} removed from app (no Supabase Auth account found).`);
+            showToast.warning("Partial Deletion", `${employeeToDelete.name} removed from app, but could not delete from Supabase Auth.`);
             return;
           }
-        } catch (err) {
-          console.error("Error finding user:", err);
           hardDeleteEmployee(employeeToDelete.id);
-          showToast.warning("Partial Deletion", `${employeeToDelete.name} removed from app, but could not delete from Supabase Auth. Please manually delete them.`);
+          showToast.success("Employee Deleted", `${employeeToDelete.name} has been permanently deleted.`);
+          return;
+        } else {
+          hardDeleteEmployee(employeeToDelete.id);
+          showToast.success("Employee Removed", `${employeeToDelete.name} removed from app.`);
           return;
         }
       }
-
       const { success, error } = await deleteSupabaseUser(employeeToDelete.authUserId);
-      
       if (!success) {
-        console.error("Failed to delete from Supabase Auth:", error);
         hardDeleteEmployee(employeeToDelete.id);
-        showToast.warning("Partial Deletion", `${employeeToDelete.name} removed from app but could not delete from Supabase Auth: ${error}.`);
+        showToast.warning("Partial Deletion", `${employeeToDelete.name} removed from app but could not delete from Supabase Auth.`);
         return;
       }
-      
       hardDeleteEmployee(employeeToDelete.id);
       showToast.success("Employee Deleted", `${employeeToDelete.name} has been permanently deleted.`);
     } catch (err: any) {
@@ -108,7 +91,6 @@ function EmployeesPage() {
     }
   };
 
-  // ===== HANDLE CLEAR ALL =====
   const handleClearAll = () => {
     if (confirm("⚠️ Delete ALL employees? This cannot be undone.")) {
       clearEmployees();
@@ -116,228 +98,314 @@ function EmployeesPage() {
     }
   };
 
-  // ===== HANDLE LOAD DEMO =====
   const handleLoadDemo = () => {
-    if (employees.length > 0) {
-      if (!confirm("This will replace all current employees. Continue?")) {
-        return;
-      }
-    }
+    if (employees.length > 0 && !confirm("This will replace all current employees. Continue?")) return;
     loadDemo();
     showToast.success("Demo Loaded", "Demo employees have been loaded.");
   };
 
   const getMultiplierColor = (mult: number) => {
-    if (mult >= 1.0) return "text-green-600";
-    if (mult >= 0.8) return "text-blue-600";
-    if (mult >= 0.6) return "text-yellow-600";
-    return "text-red-600";
+    if (mult >= 1.0) return "text-emerald-600 dark:text-emerald-400";
+    if (mult >= 0.8) return "text-blue-600 dark:text-blue-400";
+    if (mult >= 0.6) return "text-amber-600 dark:text-amber-400";
+    return "text-red-600 dark:text-red-400";
   };
 
+  const coreCount = employees.filter((e) => !e.isAdjunct).length;
+  const adjunctCount = employees.filter((e) => e.isAdjunct).length;
+  const managerCount = employees.filter((e) => e.isManager).length;
+  const needsKpiCount = employees.filter((e) => e.needsKpiSetup).length;
+  const avgMult =
+    coreCount > 0
+      ? employees
+          .filter((e) => !e.isAdjunct)
+          .reduce((s, e) => s + (calc.perEmployee[e.id]?.performanceMultiplier || 0), 0) / coreCount
+      : 0;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">👥 Employees</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            Manage employees with weighted category KPIs.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={() => {
-              setEditingEmployee(null);
-              setModalOpen(true);
-            }}
-            className="flex items-center gap-1"
-          >
-            <UserPlus className="h-4 w-4" /> Add
-          </Button>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={() => {
-              setEditingEmployee(null);
-              setModalOpen(true);
-            }}
-            className="flex items-center gap-1"
-          >
-            <FileSpreadsheet className="h-4 w-4" /> Template
-          </Button>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            className="flex items-center gap-1"
-          >
-            <Upload className="h-4 w-4" /> Upload CSV
-          </Button>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={handleLoadDemo}
-            className="flex items-center gap-1"
-          >
-            Demo
-          </Button>
-          <Button 
-            size="sm" 
-            variant="destructive" 
-            onClick={handleClearAll}
-            className="flex items-center gap-1"
-          >
-            <X className="h-4 w-4" /> Clear
-          </Button>
-        </div>
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={staggerContainer}
+      className="space-y-6"
+    >
+      <PageHeader
+        title="Employees"
+        description="Manage employee records, KPIs, supervisors, and performance data."
+        icon={<Users className="h-6 w-6" />}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingEmployee(null);
+                setModalOpen(true);
+              }}
+              className="gap-2"
+            >
+              <UserPlus className="h-4 w-4" /> Add Employee
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleLoadDemo} className="gap-2">
+              <FileSpreadsheet className="h-4 w-4" /> Demo
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleClearAll} className="gap-2 text-red-600 hover:text-red-700 border-red-500/30 hover:bg-red-500/10">
+              <X className="h-4 w-4" /> Clear All
+            </Button>
+          </div>
+        }
+      />
+
+      {/* Alert banner for missing KPIs */}
+      {needsKpiCount > 0 && (
+        <motion.div variants={fadeUp}>
+          <Card className="p-4 bg-amber-500/5 border-amber-500/20 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <AlertTriangle className="h-4 w-4" />
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                {needsKpiCount} employee{needsKpiCount > 1 ? "s" : ""} need{needsKpiCount === 1 ? "s" : ""} KPIs assigned
+              </div>
+              <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                Open the employee, load a KPI template, and save.
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          icon={<Users className="h-4 w-4" />}
+          label="Total Employees"
+          value={employees.length}
+          sub={`${coreCount} core · ${adjunctCount} adjunct`}
+          accent="primary"
+          size="large"
+        />
+        <StatCard
+          icon={<Award className="h-4 w-4" />}
+          label="Managers"
+          value={managerCount}
+          accent="purple"
+          size="large"
+        />
+        <StatCard
+          icon={<TrendingUp className="h-4 w-4" />}
+          label="Avg Multiplier"
+          value={fmtNum(avgMult, 2)}
+          accent="success"
+          size="large"
+        />
+        <StatCard
+          icon={<AlertTriangle className="h-4 w-4" />}
+          label="Needs KPIs"
+          value={needsKpiCount}
+          accent={needsKpiCount > 0 ? "warning" : "default"}
+          size="large"
+          pulse={needsKpiCount > 0 ? "amber" : "none"}
+        />
       </div>
 
       {/* Search */}
-      <Card className="p-4">
-        <div className="flex flex-wrap gap-3">
-          <div className="flex-1 min-w-[200px]">
-            <Label className="text-xs">Search</Label>
-            <div className="relative">
-              <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, department, or role..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8"
-              />
-            </div>
+      <motion.div variants={fadeUp}>
+        <Card className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, email, department, or role..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-10"
+            />
           </div>
-          <div className="flex items-end">
-            <div className="flex gap-1 bg-muted p-1 rounded-md">
-              <Button
-                size="sm"
-                variant={viewMode === 'company' ? 'default' : 'ghost'}
-                onClick={() => setViewMode('company')}
-                className="text-xs h-7 px-3"
-              >
-                Company Mode
-              </Button>
-              <Button
-                size="sm"
-                variant={viewMode === 'individual' ? 'default' : 'ghost'}
-                onClick={() => setViewMode('individual')}
-                className="text-xs h-7 px-3"
-              >
-                Individual Mode
-              </Button>
-            </div>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      </motion.div>
 
-      {/* Employee Table */}
-      <Card className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Grade</TableHead>
-              <TableHead>Points</TableHead>
-              <TableHead>Sales</TableHead>
-              <TableHead>Multiplier</TableHead>
-              <TableHead>Months</TableHead>
-              <TableHead>Final Bonus</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedEmployees.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                  No employees found. Add one or load demo data.
-                </TableCell>
-              </TableRow>
-            ) : (
-              sortedEmployees.map((emp) => {
-                const empCalc = calc.perEmployee[emp.id];
-                const trend = getPerformanceTrend(emp.id);
-                
-                return (
-                  <TableRow key={emp.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {emp.name}
-                        {emp.isSalesRole && (
-                          <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-[10px]">
-                            Sales
-                          </Badge>
-                        )}
-                        {emp.isAdjunct && (
-                          <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-[10px]">
-                            Adjunct
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{emp.jobGrade || '-'}</TableCell>
-                    <TableCell>
-                      {emp.isAdjunct ? '6' : empCalc?.gradePoints?.toFixed(1) || '-'}
-                    </TableCell>
-                    <TableCell>
-                      {emp.isSalesRole ? (
-                        <Badge className="bg-green-100 text-green-700 border-green-200">Yes</Badge>
-                      ) : (
-                        '—'
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {emp.isAdjunct ? (
-                        '—'
-                      ) : (
-                        <span className={`font-bold ${getMultiplierColor(empCalc?.performanceMultiplier || 0)}`}>
-                          {fmtNum(empCalc?.performanceMultiplier || 0, 2)}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {emp.isAdjunct ? '—' : (emp.monthsWorked || 12)}
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-bold text-blue-600">
-                        {fmtGHS(empCalc?.bonus || 0)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={() => {
-                            setEditingEmployee(emp);
-                            setModalOpen(true);
-                          }}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => {
-                            setEmployeeToDelete(emp);
-                            setDeleteModalOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+      {/* Table */}
+      <motion.div variants={fadeUp}>
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="font-semibold">Employee</TableHead>
+                  <TableHead className="font-semibold">Department</TableHead>
+                  <TableHead className="font-semibold">Role</TableHead>
+                  <TableHead className="font-semibold text-center">Grade</TableHead>
+                  <TableHead className="font-semibold text-center">Multiplier</TableHead>
+                  <TableHead className="font-semibold text-center">Months</TableHead>
+                  <TableHead className="font-semibold text-right">Bonus</TableHead>
+                  <TableHead className="font-semibold text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedEmployees.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="p-0">
+                      <EmptyState
+                        icon={<Users className="h-6 w-6" />}
+                        title={search ? "No matches found" : "No employees yet"}
+                        description={
+                          search
+                            ? "Try a different search term."
+                            : "Add your first employee or load demo data to get started."
+                        }
+                        action={
+                          !search && (
+                            <Button
+                              onClick={() => {
+                                setEditingEmployee(null);
+                                setModalOpen(true);
+                              }}
+                              className="gap-2"
+                            >
+                              <UserPlus className="h-4 w-4" /> Add Employee
+                            </Button>
+                          )
+                        }
+                      />
                     </TableCell>
                   </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+                ) : (
+                  sortedEmployees.map((emp, idx) => {
+                    const empCalc = calc.perEmployee[emp.id];
+                    const mult = empCalc?.performanceMultiplier || 0;
+                    const bonus = empCalc?.bonus || 0;
 
-      {/* Employee Modal (Add/Edit) */}
+                    return (
+                      <motion.tr
+                        key={emp.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: Math.min(idx * 0.02, 0.3) }}
+                        className="group hover:bg-accent/40 transition-colors border-b border-border/50"
+                      >
+                        {/* Employee */}
+                        <TableCell className="py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
+                              {emp.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-sm truncate">{emp.name}</span>
+                                {emp.isSalesRole && (
+                                  <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20">
+                                    Sales
+                                  </Badge>
+                                )}
+                                {emp.isAdjunct && (
+                                  <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20">
+                                    Adjunct
+                                  </Badge>
+                                )}
+                                {emp.isManager && (
+                                  <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20">
+                                    Manager
+                                  </Badge>
+                                )}
+                                {emp.needsKpiSetup && (
+                                  <Badge variant="outline" className="text-[10px] bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30 gap-1">
+                                    <AlertCircle className="h-2.5 w-2.5" />
+                                    Needs KPIs
+                                  </Badge>
+                                )}
+                              </div>
+                              {emp.email && (
+                                <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                  <Mail className="h-3 w-3" />
+                                  <span className="truncate max-w-[180px]">{emp.email}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        {/* Department */}
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                            <Building2 className="h-3.5 w-3.5" />
+                            {emp.department || "—"}
+                          </span>
+                        </TableCell>
+
+                        {/* Role */}
+                        <TableCell>
+                          <span className="text-sm">{emp.role || "—"}</span>
+                        </TableCell>
+
+                        {/* Grade */}
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className="font-mono text-xs">
+                            {emp.jobGrade || "—"}
+                          </Badge>
+                        </TableCell>
+
+                        {/* Multiplier */}
+                        <TableCell className="text-center">
+                          {emp.isAdjunct ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span className={`font-bold text-sm ${getMultiplierColor(mult)}`}>
+                              {fmtNum(mult, 2)}
+                            </span>
+                          )}
+                        </TableCell>
+
+                        {/* Months */}
+                        <TableCell className="text-center">
+                          <span className="text-sm">{emp.isAdjunct ? "—" : emp.monthsWorked || 12}</span>
+                        </TableCell>
+
+                        {/* Bonus */}
+                        <TableCell className="text-right">
+                          <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">
+                            {fmtGHS(bonus)}
+                          </span>
+                        </TableCell>
+
+                        {/* Actions */}
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={() => {
+                                setEditingEmployee(emp);
+                                setModalOpen(true);
+                              }}
+                              title="Edit"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
+                              onClick={() => {
+                                setEmployeeToDelete(emp);
+                                setDeleteModalOpen(true);
+                              }}
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </motion.tr>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      </motion.div>
+
+      {/* Modals */}
       <EmployeeModal
         open={modalOpen}
         onClose={() => {
@@ -347,7 +415,6 @@ function EmployeesPage() {
         employee={editingEmployee}
       />
 
-      {/* Delete Confirmation Modal */}
       {deleteModalOpen && employeeToDelete && (
         <DeleteConfirmModal
           open={deleteModalOpen}
@@ -357,9 +424,9 @@ function EmployeesPage() {
           }}
           onConfirm={handleDeleteEmployee}
           employeeName={employeeToDelete.name}
-          employeeEmail={employeeToDelete.email || 'No email'}
+          employeeEmail={employeeToDelete.email || "No email"}
         />
       )}
-    </div>
+    </motion.div>
   );
 }

@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { P4PProvider } from "@/lib/p4p/store";
 import { UserProvider } from "@/lib/p4p/user-context";
+import { ThemeProvider, useTheme } from "@/components/theme-provider";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -36,10 +37,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "stylesheet", href: appCss },
     ],
   }),
   shellComponent: RootShell,
@@ -50,9 +48,28 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('p4p-theme') || 'system';
+                  var root = document.documentElement;
+                  root.classList.remove('light', 'dark');
+                  if (theme === 'system') {
+                    var systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                    root.classList.add(systemTheme);
+                  } else {
+                    root.classList.add(theme);
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
       </head>
       <body>
         {children}
@@ -62,18 +79,42 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+// ✅ New component — sits INSIDE ThemeProvider so it can read the current theme
+function ThemedToaster() {
+  const { theme } = useTheme();
+
+  // Resolve "system" to the actual current theme
+  const resolvedTheme =
+    theme === "system"
+      ? typeof window !== "undefined" &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light"
+      : theme;
+
+  return (
+    <Toaster
+      position="top-right"
+      richColors
+      closeButton
+      theme={resolvedTheme}
+    />
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* ✅ P4PProvider MUST come first because UserProvider uses useP4P() */}
-      <P4PProvider>
-        <UserProvider>
-          <Outlet />
-          <Toaster position="top-right" richColors closeButton />
-        </UserProvider>
-      </P4PProvider>
+      <ThemeProvider defaultTheme="system" storageKey="p4p-theme">
+        <P4PProvider>
+          <UserProvider>
+            <Outlet />
+            <ThemedToaster />
+          </UserProvider>
+        </P4PProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

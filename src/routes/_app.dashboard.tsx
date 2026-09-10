@@ -1,29 +1,32 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useP4P } from "@/lib/p4p/store";
-import { fmtGHS, fmtGHSFull, fmtCompact, fmtNum } from "@/lib/p4p/calc";
+import { fmtGHS, fmtNum } from "@/lib/p4p/calc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { motion } from "framer-motion";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
+import { SectionCard } from "@/components/ui/section-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getCurrentUser } from "@/lib/supabase";
+import { useUser } from "@/lib/p4p/user-context";
+import { staggerContainer, fadeUp } from "@/lib/motion";
 import {
   TrendingUp, Wallet, Users, UserCheck, DollarSign,
   Sparkles, Target, Calendar, Award, AlertTriangle,
   Settings, Save, RefreshCw, Activity, PieChart,
-  BarChart3, CheckCircle, Clock, Star, Eye, Zap,
-  ArrowUpRight, ArrowDownRight, Info, AlertCircle
+  BarChart3, CheckCircle, Clock, Star, Zap, Info, AlertCircle,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, BarChart, Bar,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  Radar, PieChart as RePieChart, Pie, Cell, Legend
+  PieChart as RePieChart, Pie, Cell,
 } from "recharts";
-import { useUser } from "@/lib/p4p/user-context";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
@@ -31,77 +34,40 @@ export const Route = createFileRoute("/_app/dashboard")({
 
 const COLORS = {
   primary: "hsl(221 70% 50%)",
-  accent: "hsl(250 50% 58%)",
   success: "hsl(152 55% 42%)",
   warning: "hsl(38 75% 52%)",
   danger: "hsl(0 65% 55%)",
-  slate: "hsl(215 25% 55%)",
-  cyan: "hsl(189 70% 42%)",
   purple: "hsl(270 70% 55%)",
+  cyan: "hsl(189 70% 42%)",
   pink: "hsl(330 70% 55%)",
-  orange: "hsl(25 80% 55%)",
-  teal: "hsl(170 70% 45%)",
 };
 
 const CHART_COLORS = [
-  COLORS.primary,
   COLORS.success,
+  COLORS.primary,
   COLORS.warning,
   COLORS.danger,
-  COLORS.purple,
-  COLORS.cyan,
-  COLORS.pink,
-  COLORS.orange,
-  COLORS.teal,
 ];
 
-const chartTooltipStyle = {
-  borderRadius: 8,
-  border: "1px solid #e2e8f0",
-  background: "#ffffff",
-  color: "#0f172a",
+const tooltipStyle = {
+  borderRadius: 12,
+  border: "1px solid hsl(var(--border))",
+  background: "hsl(var(--popover))",
+  color: "hsl(var(--popover-foreground))",
   fontSize: 12,
-  boxShadow: "0 4px 16px rgba(0,0,0,.10)",
+  boxShadow: "0 8px 24px rgba(0,0,0,.08)",
+  padding: "8px 12px",
 };
-
-function StatCard({ icon, label, value, accentColor, sub }: any) {
-  return (
-    <motion.div
-      className="h-full"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
-      transition={{ type: "spring", stiffness: 240, damping: 24 }}
-    >
-      <Card className="relative overflow-hidden border flex items-stretch h-full">
-        <div className="w-1 shrink-0 rounded-l-xl" style={{ background: accentColor }} />
-        <div className="flex flex-col flex-1 p-4 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <span className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground truncate">
-              {label}
-            </span>
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-white" style={{ background: accentColor + "cc" }}>
-              {icon}
-            </div>
-          </div>
-          <div className="font-bold tracking-tight leading-none truncate mt-auto" style={{ fontSize: "clamp(0.9rem, 1.8vw, 1.25rem)" }} title={value}>
-            {value}
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-1 truncate min-h-[1rem]">
-            {sub ?? ""}
-          </div>
-        </div>
-      </Card>
-    </motion.div>
-  );
-}
 
 function Dashboard() {
   const navigate = useNavigate();
-  const { globals, setGlobals, calc, employees, monthlyData, getAllTrends, getMonthlyStats, getMonthlyHistory } = useP4P();
+  const {
+    globals, setGlobals, calc, employees, monthlyData,
+    getAllTrends, getMonthlyStats, getMonthlyHistory,
+  } = useP4P();
   const { role } = useUser();
-  const isAdmin = role === 'admin' || role === 'hr';
-  
+  const isAdmin = role === "admin" || role === "hr";
+
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
@@ -120,44 +86,35 @@ function Dashboard() {
   const trends = getAllTrends();
   const stats = getMonthlyStats();
 
-  // Fetch current user for employee dashboard
   useEffect(() => {
     const fetchUser = async () => {
       try {
         const user = await getCurrentUser();
-        if (!user) {
-          navigate({ to: "/login" });
-          return;
-        }
-        const emp = employees.find(e => e.email === user.email);
+        if (!user) { navigate({ to: "/login" }); return; }
+        const emp = employees.find((e) => e.email === user.email);
         setEmployee(emp || null);
         setLoading(false);
-      } catch (err) {
-        console.error("Error fetching user:", err);
+      } catch {
         setLoading(false);
       }
     };
     fetchUser();
   }, [employees, navigate]);
 
-  // Monthly trend data (admin)
+  // ============ ADMIN: Monthly trend ============
   const monthlyTrendData = useMemo(() => {
     const months = monthlyData
-      .filter(d => !employees.find(e => e.id === d.employeeId)?.isAdjunct)
-      .sort((a, b) => {
-        if (a.year !== b.year) return a.year - b.year;
-        return a.month - b.month;
-      });
-
-    const grouped: Record<string, { month: string; avg: number; count: number; total: number }> = {};
+      .filter((d) => !employees.find((e) => e.id === d.employeeId)?.isAdjunct)
+      .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month));
+    const grouped: Record<string, { month: string; total: number; count: number }> = {};
     for (const d of months) {
-      const key = `${d.year}-${String(d.month).padStart(2, '0')}`;
-      const label = `${new Date(d.year, d.month - 1, 1).toLocaleString('default', { month: 'short' })} ${d.year}`;
-      if (!grouped[key]) grouped[key] = { month: label, avg: 0, count: 0, total: 0 };
+      const key = `${d.year}-${String(d.month).padStart(2, "0")}`;
+      const label = `${new Date(d.year, d.month - 1, 1).toLocaleString("default", { month: "short" })} ${d.year}`;
+      if (!grouped[key]) grouped[key] = { month: label, total: 0, count: 0 };
       grouped[key].total += d.performanceMultiplier;
       grouped[key].count++;
     }
-    return Object.values(grouped).map(g => ({
+    return Object.values(grouped).map((g) => ({
       month: g.month,
       avgMultiplier: g.total / g.count,
     }));
@@ -165,130 +122,110 @@ function Dashboard() {
 
   const handleSaveGlobals = () => {
     setSaving(true);
-    setGlobals({
-      totalRevenue: localGlobals.totalRevenue,
-      p4pPercent: localGlobals.p4pPercent,
-      adjunctPercent: localGlobals.adjunctPercent,
-      floor: localGlobals.floor,
-      cap: localGlobals.cap,
-      prorationOn: localGlobals.prorationOn,
-      salesMultiplier: localGlobals.salesMultiplier,
-    });
+    setGlobals(localGlobals);
     setTimeout(() => setSaving(false), 500);
   };
 
   const disabled = globals.totalRevenue <= 0;
 
-  // ===== EMPLOYEE-SPECIFIC DATA =====
+  // ============ EMPLOYEE DATA ============
   const employeeHistory = useMemo(() => {
     if (!employee) return [];
     return getMonthlyHistory(employee.id);
   }, [employee, getMonthlyHistory]);
 
-  const employeeTrend = useMemo(() => {
-    if (!employee) return null;
-    const history = getMonthlyHistory(employee.id);
-    if (history.length === 0) return null;
-    return history;
-  }, [employee, getMonthlyHistory]);
-
-  // Calculate category scores for the employee
+  // Category scores — weighted by KPI weights within each category
   const categoryScores = useMemo(() => {
-    if (!employee || !employee.categories) return [];
-    const categories = employee.categories || [];
-    const scores: any[] = [];
-    
-    for (const cat of categories) {
-      let catSum = 0;
-      let catCount = 0;
+    if (!employee?.categories) return [];
+    return employee.categories.map((cat: any) => {
+      let weightedSum = 0;
+      let totalKpiWeight = 0;
+      let kpiCount = 0;
       for (const kpi of cat.kpis) {
         const target = kpi.target || 1;
         const actual = kpi.actual || 0;
         const ratio = target > 0 ? actual / target : 0;
-        catSum += ratio;
-        catCount++;
+        const weight = kpi.weight || 0;
+        weightedSum += ratio * weight;
+        totalKpiWeight += weight;
+        kpiCount++;
       }
-      const catScore = catCount > 0 ? (catSum / catCount) * 100 : 0;
-      scores.push({
+      const score = totalKpiWeight > 0 ? (weightedSum / totalKpiWeight) * 100 : 0;
+      return {
         name: cat.name,
-        score: catScore,
+        score,
         weight: cat.weight,
-        kpiCount: cat.kpis.length,
-      });
-    }
-    return scores;
+        kpiCount,
+        kpis: cat.kpis.map((k: any) => ({
+          description: k.description,
+          weight: k.weight || 0,
+          metric: k.metric,
+          target: k.target,
+          actual: k.actual,
+        })),
+      };
+    });
   }, [employee]);
 
-  // Current month score
+  // Current overall score — weighted by category weights
   const currentMonthScore = useMemo(() => {
-    if (!employee) return 0;
-    if (!employee.categories) return 0;
+    if (!employee?.categories) return 0;
     let totalWeightedScore = 0;
-    let totalWeight = 0;
+    let totalCategoryWeight = 0;
     for (const cat of employee.categories) {
-      let catSum = 0;
-      let catCount = 0;
+      let weightedSum = 0;
+      let totalKpiWeight = 0;
       for (const kpi of cat.kpis) {
         const target = kpi.target || 1;
         const actual = kpi.actual || 0;
         const ratio = target > 0 ? actual / target : 0;
-        catSum += ratio;
-        catCount++;
+        const weight = kpi.weight || 0;
+        weightedSum += ratio * weight;
+        totalKpiWeight += weight;
       }
-      const catScore = catCount > 0 ? catSum / catCount : 0;
-      const weight = cat.weight / 100;
-      totalWeightedScore += catScore * weight;
-      totalWeight += weight;
+      const catScore = totalKpiWeight > 0 ? weightedSum / totalKpiWeight : 0;
+      const categoryWeight = cat.weight / 100;
+      totalWeightedScore += catScore * categoryWeight;
+      totalCategoryWeight += categoryWeight;
     }
-    return totalWeight > 0 ? (totalWeightedScore / totalWeight) * 100 : 0;
+    return totalCategoryWeight > 0 ? (totalWeightedScore / totalCategoryWeight) * 100 : 0;
   }, [employee]);
 
-  // Bonus projection
   const estimatedBonus = useMemo(() => {
     if (!employee) return 0;
-    const empCalc = calc.perEmployee[employee.id];
-    if (!empCalc) return 0;
-    return empCalc.bonus || 0;
+    return calc.perEmployee[employee.id]?.bonus || 0;
   }, [employee, calc]);
 
-  // Month-over-month change
   const monthOverMonthChange = useMemo(() => {
     if (employeeHistory.length < 2) return null;
-    const sorted = [...employeeHistory].sort((a, b) => {
-      if (a.year !== b.year) return a.year - b.year;
-      return a.month - b.month;
-    });
+    const sorted = [...employeeHistory].sort((a, b) =>
+      a.year !== b.year ? a.year - b.year : a.month - b.month
+    );
     const last = sorted[sorted.length - 1];
     const prev = sorted[sorted.length - 2];
-    if (!last || !prev) return null;
-    const change = ((last.performanceMultiplier - prev.performanceMultiplier) / prev.performanceMultiplier) * 100;
-    return change;
+    if (!last || !prev || prev.performanceMultiplier === 0) return null;
+    return ((last.performanceMultiplier - prev.performanceMultiplier) / prev.performanceMultiplier) * 100;
   }, [employeeHistory]);
 
-  // Year-to-date average
   const ytdAverage = useMemo(() => {
     if (employeeHistory.length === 0) return 0;
-    const sum = employeeHistory.reduce((acc, d) => acc + d.performanceMultiplier, 0);
-    return (sum / employeeHistory.length) * 100;
+    return (employeeHistory.reduce((s, d) => s + d.performanceMultiplier, 0) / employeeHistory.length) * 100;
   }, [employeeHistory]);
 
-  // Timeline data for employee chart
   const timelineData = useMemo(() => {
     if (employeeHistory.length === 0) return [];
-    const sorted = [...employeeHistory].sort((a, b) => {
-      if (a.year !== b.year) return a.year - b.year;
-      return a.month - b.month;
-    });
-    return sorted.slice(-12).map(d => ({
-      month: `${new Date(d.year, d.month - 1, 1).toLocaleString('default', { month: 'short' })} ${d.year}`,
-      score: d.performanceMultiplier * 100,
-      multiplier: d.performanceMultiplier,
-    }));
+    return [...employeeHistory]
+      .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month))
+      .slice(-12)
+      .map((d) => ({
+        month: `${new Date(d.year, d.month - 1, 1).toLocaleString("default", { month: "short" })} ${d.year}`,
+        score: d.performanceMultiplier * 100,
+      }));
   }, [employeeHistory]);
 
-  // KPI achievement breakdown
+  // KPI achievement data — weighted properly
   const kpiAchievementData = useMemo(() => {
-    if (!employee || !employee.categories) return [];
+    if (!employee?.categories) return [];
     const data: any[] = [];
     for (const cat of employee.categories) {
       for (const kpi of cat.kpis) {
@@ -298,652 +235,407 @@ function Dashboard() {
         const achievement = Math.min(100, ratio * 100);
         data.push({
           name: kpi.description,
-          achievement: achievement,
+          achievement,
           target: kpi.target,
           actual: kpi.actual,
           metric: kpi.metric,
+          weight: kpi.weight || 0,
           category: cat.name,
-          status: achievement >= 100 ? 'Exceeded' : achievement >= 70 ? 'On Track' : achievement >= 50 ? 'At Risk' : 'Missed',
+          status: achievement >= 100 ? "Exceeded" : achievement >= 70 ? "On Track" : achievement >= 50 ? "At Risk" : "Missed",
         });
       }
     }
     return data;
   }, [employee]);
 
-  // KPI status pie data
   const kpiStatusData = useMemo(() => {
-    const statuses = { Exceeded: 0, 'On Track': 0, 'At Risk': 0, Missed: 0 };
-    for (const kpi of kpiAchievementData) {
-      if (kpi.status === 'Exceeded') statuses.Exceeded++;
-      else if (kpi.status === 'On Track') statuses['On Track']++;
-      else if (kpi.status === 'At Risk') statuses['At Risk']++;
+    const statuses = { Exceeded: 0, "On Track": 0, "At Risk": 0, Missed: 0 };
+    for (const k of kpiAchievementData) {
+      if (k.status === "Exceeded") statuses.Exceeded++;
+      else if (k.status === "On Track") statuses["On Track"]++;
+      else if (k.status === "At Risk") statuses["At Risk"]++;
       else statuses.Missed++;
     }
-    return Object.entries(statuses).map(([name, value]) => ({ name, value }));
+    return Object.entries(statuses)
+      .filter(([_, v]) => v > 0)
+      .map(([name, value]) => ({ name, value }));
   }, [kpiAchievementData]);
 
-  // Get performance band
   const getBand = (score: number) => {
-    if (score >= 120) return { label: "Exceptional", color: "text-purple-600", bg: "bg-purple-50 border-purple-200", icon: Star };
-    if (score >= 100) return { label: "Exceeds Expectations", color: "text-green-600", bg: "bg-green-50 border-green-200", icon: TrendingUp };
-    if (score >= 80) return { label: "Meets Expectations", color: "text-blue-600", bg: "bg-blue-50 border-blue-200", icon: Target };
-    if (score >= 60) return { label: "Needs Improvement", color: "text-yellow-600", bg: "bg-yellow-50 border-yellow-200", icon: Clock };
-    return { label: "Performance Improvement Plan", color: "text-red-600", bg: "bg-red-50 border-red-200", icon: AlertCircle };
+    if (score >= 120) return { label: "Exceptional", color: "text-purple-600 dark:text-purple-400", icon: Star };
+    if (score >= 100) return { label: "Exceeds Expectations", color: "text-emerald-600 dark:text-emerald-400", icon: TrendingUp };
+    if (score >= 80) return { label: "Meets Expectations", color: "text-blue-600 dark:text-blue-400", icon: Target };
+    if (score >= 60) return { label: "Needs Improvement", color: "text-amber-600 dark:text-amber-400", icon: Clock };
+    return { label: "Performance Improvement Plan", color: "text-red-600 dark:text-red-400", icon: AlertCircle };
   };
 
   const band = getBand(currentMonthScore);
-  const BandIcon = band.icon;
 
-  // ===== EMPLOYEE LOADING =====
   if (loading) {
-    return <div className="p-8 text-center">Loading dashboard...</div>;
+    return (
+      <div className="flex items-center justify-center py-24">
+        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
-  // ===== ADMIN DASHBOARD =====
+  // ============ ADMIN DASHBOARD ============
   if (isAdmin) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-end justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" /> 
-              P4P Dashboard
-            </h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
-              Live overview of pools, payouts, performance signals, and monthly trends.
-            </p>
-          </div>
-          <div className="text-xs px-3 py-1.5 rounded-full bg-muted text-muted-foreground font-medium border flex items-center gap-2">
-            <Calendar className="h-3 w-3" />
-            {monthlyData.length > 0 ? `${monthlyData.length} data points` : 'No monthly data yet'}
-          </div>
-        </div>
-
-        {/* ===== GLOBAL CONTROLS ===== */}
-        <Card className="p-5 border-2 border-dashed border-primary/30 bg-primary/5">
-          <div className="flex items-center gap-2 mb-4">
-            <Settings className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold text-sm">Global P4P Settings</h3>
-            <span className="text-xs text-muted-foreground ml-auto">Controls revenue, pool allocation, and thresholds</span>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
-            <div>
-              <Label className="text-xs">Revenue (GHS)</Label>
-              <Input
-                type="number"
-                className="h-8 text-sm"
-                value={localGlobals.totalRevenue}
-                onChange={(e) => setLocalGlobals(prev => ({ ...prev, totalRevenue: Number(e.target.value) }))}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">P4P %</Label>
-              <Input
-                type="number"
-                className="h-8 text-sm"
-                value={localGlobals.p4pPercent}
-                onChange={(e) => setLocalGlobals(prev => ({ ...prev, p4pPercent: Number(e.target.value) }))}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Adjunct %</Label>
-              <Input
-                type="number"
-                className="h-8 text-sm"
-                value={localGlobals.adjunctPercent}
-                onChange={(e) => setLocalGlobals(prev => ({ ...prev, adjunctPercent: Number(e.target.value) }))}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Floor</Label>
-              <Input
-                type="number"
-                step="0.01"
-                className="h-8 text-sm"
-                value={localGlobals.floor}
-                onChange={(e) => setLocalGlobals(prev => ({ ...prev, floor: Number(e.target.value) }))}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Cap</Label>
-              <Input
-                type="number"
-                step="0.01"
-                className="h-8 text-sm"
-                value={localGlobals.cap}
-                onChange={(e) => setLocalGlobals(prev => ({ ...prev, cap: Number(e.target.value) }))}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Sales Multiplier</Label>
-              <Input
-                type="number"
-                step="0.01"
-                className="h-8 text-sm"
-                value={localGlobals.salesMultiplier}
-                onChange={(e) => setLocalGlobals(prev => ({ ...prev, salesMultiplier: Number(e.target.value) }))}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button 
-                size="sm" 
-                className="w-full h-8 flex items-center gap-1"
-                onClick={handleSaveGlobals}
-                disabled={saving}
-              >
-                {saving ? (
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Save className="h-3.5 w-3.5" />
-                )}
-                Save
-              </Button>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-            <label className="flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={localGlobals.prorationOn}
-                onChange={(e) => setLocalGlobals(prev => ({ ...prev, prorationOn: e.target.checked }))}
-                className="h-3.5 w-3.5"
-              />
-              Proration On
-            </label>
-            <span>P4P Pool: <strong className="text-primary">{fmtGHS(calc.totalPool)}</strong></span>
-            <span>Employee Pool: <strong className="text-primary">{fmtGHS(calc.employeePool)}</strong></span>
-          </div>
-        </Card>
-
-        {/* ===== STATS CARDS ===== */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 items-stretch">
-          <StatCard
-            icon={<DollarSign className="h-3.5 w-3.5" />}
-            label="Revenue"
-            value={fmtGHS(globals.totalRevenue)}
-            accentColor={COLORS.primary}
-            sub={`${globals.p4pPercent}% to P4P`}
-          />
-          <StatCard
-            icon={<Wallet className="h-3.5 w-3.5" />}
-            label="Total Pool"
-            value={fmtGHS(calc.totalPool)}
-            accentColor={COLORS.accent}
-          />
-          <StatCard
-            icon={<TrendingUp className="h-3.5 w-3.5" />}
-            label="Adjunct Pool"
-            value={fmtGHS(calc.adjunctPool)}
-            accentColor={COLORS.warning}
-            sub={`${globals.adjunctPercent}% share`}
-          />
-          <StatCard
-            icon={<Wallet className="h-3.5 w-3.5" />}
-            label="Employee Pool"
-            value={fmtGHS(calc.employeePool)}
-            accentColor={COLORS.success}
-          />
-          <StatCard
-            icon={<Users className="h-3.5 w-3.5" />}
-            label="Headcount"
-            value={`${calc.adjunctCount + calc.nonAdjunctCount}`}
-            accentColor={COLORS.cyan}
-            sub={`${calc.nonAdjunctCount} core / ${calc.adjunctCount} adjunct`}
-          />
-          <StatCard
-            icon={<UserCheck className="h-3.5 w-3.5" />}
-            label="Avg Bonus"
-            value={fmtGHS(calc.avgBonus)}
-            accentColor={COLORS.slate}
-          />
-        </div>
-
-        {/* ===== ADMIN CHARTS ===== */}
-        <div className="grid lg:grid-cols-2 gap-4">
-          <Card className="p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <h3 className="font-semibold text-sm">Monthly Performance Trend</h3>
-              <span className="text-xs text-muted-foreground ml-auto">{monthlyTrendData.length} months</span>
-            </div>
-            <div className="h-44 sm:h-56">
-              <ResponsiveContainer>
-                <AreaChart data={monthlyTrendData} margin={{ left: 8 }}>
-                  <defs>
-                    <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={COLORS.primary} stopOpacity={0.35} />
-                      <stop offset="100%" stopColor={COLORS.primary} stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
-                  <XAxis dataKey="month" fontSize={10} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 2]} fontSize={10} axisLine={false} tickLine={false} width={28} />
-                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => [fmtNum(v, 2), "Avg Multiplier"]} />
-                  <Area type="monotone" dataKey="avgMultiplier" stroke={COLORS.primary} strokeWidth={2} fill="url(#trendFill)" dot={{ r: 3 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Card className="p-4 text-center flex flex-col justify-center">
-              <div className="text-3xl font-bold text-primary">{trends.length}</div>
-              <div className="text-xs text-muted-foreground">Tracked Employees</div>
-            </Card>
-            <Card className="p-4 text-center flex flex-col justify-center border-green-200 bg-green-50/50">
-              <div className="text-3xl font-bold text-green-600">{fmtNum(stats.avgMultiplier, 2)}</div>
-              <div className="text-xs text-green-600">Average Multiplier</div>
-            </Card>
-          </div>
-        </div>
-
-        {/* ===== ADMIN - Top Performers & Rising Stars ===== */}
-        <div className="grid lg:grid-cols-3 gap-4">
-          <Card className="p-5 lg:col-span-1">
-            <div className="flex items-center gap-2 mb-3">
-              <Target className="h-4 w-4 text-primary" />
-              <h3 className="font-semibold text-sm">P4P % of Revenue</h3>
-            </div>
-            <div className="h-44 sm:h-56 relative flex items-center justify-center">
-              <div className="text-4xl font-bold text-primary">{globals.p4pPercent}%</div>
-              <div className="absolute bottom-4 text-xs text-muted-foreground">of revenue</div>
-            </div>
-          </Card>
-          <Card className="p-5 lg:col-span-2">
-            <div className="flex items-center gap-2 mb-3">
-              <Award className="h-4 w-4 text-primary" />
-              <h3 className="font-semibold text-sm">Top Performers</h3>
-            </div>
-            <div className="space-y-2">
-              {trends
-                .sort((a, b) => b.currentScore - a.currentScore)
-                .slice(0, 5)
-                .map((t, i) => (
-                  <div key={i} className="flex items-center justify-between p-2 border rounded-md">
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-muted-foreground">#{i + 1}</span>
-                      <span className="font-medium">{t.name}</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm text-muted-foreground">{t.months.length} months</span>
-                      <span className="font-bold text-blue-600">{fmtNum(t.currentScore, 2)}</span>
-                    </div>
-                  </div>
-                ))}
-              {trends.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No performance data yet.</p>
-              )}
-            </div>
-          </Card>
-        </div>
-
-        {/* ===== ADMIN - Rising Stars & Underachievers ===== */}
-        <div className="grid md:grid-cols-2 gap-4">
-          {stats.risingStars.length > 0 && (
-            <Card className="p-4 border-green-200 bg-green-50/50">
-              <div className="flex items-center gap-2 mb-3">
-                <Award className="h-4 w-4 text-green-600" />
-                <h3 className="font-semibold text-sm text-green-800">🌟 Rising Stars</h3>
-                <span className="text-xs bg-green-200 text-green-700 px-2 py-0.5 rounded-full ml-auto">
-                  {stats.risingStars.length} employees
-                </span>
-              </div>
-              <div className="space-y-2">
-                {stats.risingStars.slice(0, 5).map((name, i) => (
-                  <div key={i} className="flex items-center p-2 bg-white rounded-md border border-green-200">
-                    <span className="text-sm font-medium">{name}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-          {stats.underachievers.length > 0 && (
-            <Card className="p-4 border-red-200 bg-red-50/50">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-                <h3 className="font-semibold text-sm text-red-800">⚠️ Underachievers</h3>
-                <span className="text-xs bg-red-200 text-red-700 px-2 py-0.5 rounded-full ml-auto">
-                  {stats.underachievers.length} employees
-                </span>
-              </div>
-              <div className="space-y-2">
-                {stats.underachievers.slice(0, 5).map((name, i) => (
-                  <div key={i} className="flex items-center p-2 bg-white rounded-md border border-red-200">
-                    <span className="text-sm font-medium">{name}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-        </div>
-
-        {disabled && (
-          <div className="p-4 rounded-md bg-destructive/10 text-destructive text-sm">
-            Total revenue is 0 — set a revenue value to enable calculations.
-          </div>
-        )}
-        {calc.warnings.length > 0 && (
-          <div className="p-4 rounded-md bg-yellow-50 border border-yellow-200 text-yellow-900 text-sm dark:bg-yellow-900/10 dark:border-yellow-800 dark:text-yellow-300">
-            <div className="font-medium flex items-center gap-2">⚠️ Warnings</div>
-            <ul className="list-disc list-inside">
-              {calc.warnings.map((w, i) => <li key={i}>{w}</li>)}
-            </ul>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // ===== EMPLOYEE DASHBOARD (Personalised) =====
-  if (!employee) {
-    return (
-      <div className="p-8 text-center">
-        <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <h3 className="text-lg font-semibold">No Employee Record</h3>
-        <p className="text-muted-foreground text-sm mt-1">
-          Your profile is not linked to an employee record. Please contact HR.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Employee Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Award className="h-5 w-5 text-primary" /> 
-            My Performance Dashboard
-          </h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            {employee.name} · {employee.department} · {employee.role}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <div className="text-xs text-muted-foreground">Current Score</div>
-            <div className={`text-2xl font-bold ${band.color}`}>
-              {fmtNum(currentMonthScore, 1)}%
-            </div>
-          </div>
-          <div className={`px-3 py-1.5 rounded-full text-sm font-medium ${band.bg} ${band.color} border flex items-center gap-1.5`}>
-            <BandIcon className="h-4 w-4" />
-            {band.label}
-          </div>
-        </div>
-      </div>
-
-      {/* Employee Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard
-          icon={<Target className="h-3.5 w-3.5" />}
-          label="Current Score"
-          value={`${fmtNum(currentMonthScore, 1)}%`}
-          accentColor={COLORS.primary}
-          sub={monthOverMonthChange !== null ? `${monthOverMonthChange >= 0 ? '↑' : '↓'} ${Math.abs(monthOverMonthChange).toFixed(1)}% from last month` : 'No previous data'}
+      <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
+        <PageHeader
+          title="P4P Dashboard"
+          description="Live overview of pools, payouts, performance signals, and monthly trends."
+          icon={<Sparkles className="h-6 w-6" />}
+          badge={<Badge variant="outline" className="gap-1.5"><Calendar className="h-3 w-3" />{monthlyData.length} data points</Badge>}
         />
-        <StatCard
-          icon={<TrendingUp className="h-3.5 w-3.5" />}
-          label="YTD Average"
-          value={`${fmtNum(ytdAverage, 1)}%`}
-          accentColor={COLORS.success}
-          sub={`${employeeHistory.length} months tracked`}
-        />
-        <StatCard
-          icon={<Wallet className="h-3.5 w-3.5" />}
-          label="Est. Bonus"
-          value={fmtGHS(estimatedBonus)}
-          accentColor={COLORS.cyan}
-          sub={`Based on current performance`}
-        />
-        <StatCard
-          icon={<Calendar className="h-3.5 w-3.5" />}
-          label="Months Tracked"
-          value={`${employeeHistory.length}`}
-          accentColor={COLORS.purple}
-          sub={employeeHistory.length > 0 ? `${new Date().getFullYear()} - ${new Date().getMonth() + 1}` : 'Start your first submission'}
-        />
-      </div>
 
-      {/* Employee Tabs */}
-      <Tabs defaultValue="overview" onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview" className="flex items-center gap-1">
-            <BarChart3 className="h-4 w-4" /> Overview
-          </TabsTrigger>
-          <TabsTrigger value="categories" className="flex items-center gap-1">
-            <PieChart className="h-4 w-4" /> Categories
-          </TabsTrigger>
-          <TabsTrigger value="insights" className="flex items-center gap-1">
-            <Zap className="h-4 w-4" /> Insights
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="mt-4 space-y-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Activity className="h-4 w-4 text-primary" />
-                Performance Trend (Last 12 Months)
-              </h3>
-              <Badge variant="outline" className="text-xs">
-                {timelineData.length} months
-              </Badge>
-            </div>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={timelineData}>
-                  <defs>
-                    <linearGradient id="empTrendFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={COLORS.primary} stopOpacity={0.3} />
-                      <stop offset="100%" stopColor={COLORS.primary} stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
-                  <XAxis dataKey="month" fontSize={10} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 150]} fontSize={10} axisLine={false} tickLine={false} width={28} />
-                  <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
-                  <Area type="monotone" dataKey="score" stroke={COLORS.primary} strokeWidth={2.5} fill="url(#empTrendFill)" dot={{ r: 3, fill: COLORS.primary, strokeWidth: 0 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <Card className="p-4">
-              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                <PieChart className="h-4 w-4 text-primary" />
-                Category Performance
-              </h3>
-              <div className="h-44">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoryScores} layout="vertical" margin={{ left: 0 }}>
-                    <XAxis type="number" domain={[0, 100]} fontSize={10} tickLine={false} axisLine={false} />
-                    <YAxis type="category" dataKey="name" fontSize={10} tickLine={false} axisLine={false} width={80} />
-                    <Tooltip formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
-                    <Bar dataKey="score" fill={COLORS.primary} radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-primary" />
-                KPI Status Breakdown
-              </h3>
-              <div className="h-44 flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RePieChart>
-                    <Pie
-                      data={kpiStatusData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={60}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {kpiStatusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </RePieChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Categories Tab */}
-        <TabsContent value="categories" className="mt-4 space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            {categoryScores.map((cat, idx) => {
-              const status = cat.score >= 100 ? 'Exceeded' : cat.score >= 70 ? 'On Track' : cat.score >= 50 ? 'At Risk' : 'Missed';
-              const color = status === 'Exceeded' ? COLORS.success : status === 'On Track' ? COLORS.primary : status === 'At Risk' ? COLORS.warning : COLORS.danger;
-              
-              return (
-                <Card key={idx} className="p-4 border-l-4" style={{ borderLeftColor: color }}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">{cat.name}</h4>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {cat.kpiCount} KPIs · Weight: {cat.weight}%
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xl font-bold" style={{ color }}>
-                        {fmtNum(cat.score, 1)}%
-                      </div>
-                      <Badge className="text-[10px]" variant={status === 'Exceeded' || status === 'On Track' ? 'default' : 'destructive'}>
-                        {status}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
-                    <div
-                      className="h-1.5 rounded-full transition-all"
-                      style={{ width: `${Math.min(100, cat.score)}%`, background: color }}
-                    />
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </TabsContent>
-
-        {/* Insights Tab */}
-        <TabsContent value="insights" className="mt-4 space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            {/* Strengths */}
-            <Card className="p-4 border-green-200 bg-green-50/50">
-              <h3 className="font-semibold text-sm text-green-800 flex items-center gap-2 mb-3">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                Strengths
-              </h3>
-              <div className="space-y-2">
-                {kpiAchievementData
-                  .filter(k => k.achievement >= 100)
-                  .slice(0, 5)
-                  .map((k, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm bg-white p-2 rounded-md border border-green-200">
-                      <span className="truncate">{k.name}</span>
-                      <span className="font-bold text-green-600">{fmtNum(k.achievement, 0)}%</span>
-                    </div>
-                  ))}
-                {kpiAchievementData.filter(k => k.achievement >= 100).length === 0 && (
-                  <p className="text-sm text-muted-foreground">No exceeded KPIs yet. Keep pushing!</p>
-                )}
-              </div>
-            </Card>
-
-            {/* Areas for Improvement */}
-            <Card className="p-4 border-red-200 bg-red-50/50">
-              <h3 className="font-semibold text-sm text-red-800 flex items-center gap-2 mb-3">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-                Areas for Improvement
-              </h3>
-              <div className="space-y-2">
-                {kpiAchievementData
-                  .filter(k => k.achievement < 70)
-                  .sort((a, b) => a.achievement - b.achievement)
-                  .slice(0, 5)
-                  .map((k, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm bg-white p-2 rounded-md border border-red-200">
-                      <span className="truncate">{k.name}</span>
-                      <span className="font-bold text-red-600">{fmtNum(k.achievement, 0)}%</span>
-                    </div>
-                  ))}
-                {kpiAchievementData.filter(k => k.achievement < 70).length === 0 && (
-                  <p className="text-sm text-muted-foreground">All KPIs are on track! Great job! 🎉</p>
-                )}
-              </div>
-            </Card>
-
-            {/* Performance Summary */}
-            <Card className="p-4 border-blue-200 bg-blue-50/50 md:col-span-2">
-              <h3 className="font-semibold text-sm text-blue-800 flex items-center gap-2 mb-3">
-                <Info className="h-4 w-4 text-blue-600" />
-                Performance Summary
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="bg-white p-3 rounded-md border border-blue-200">
-                  <div className="text-xs text-muted-foreground">Overall Status</div>
-                  <div className="text-lg font-bold" style={{ color: band.color }}>
-                    {band.label}
-                  </div>
-                </div>
-                <div className="bg-white p-3 rounded-md border border-blue-200">
-                  <div className="text-xs text-muted-foreground">KPIs on Target</div>
-                  <div className="text-lg font-bold">
-                    {kpiAchievementData.filter(k => k.achievement >= 70).length} / {kpiAchievementData.length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {kpiAchievementData.length > 0 ? ((kpiAchievementData.filter(k => k.achievement >= 70).length / kpiAchievementData.length) * 100).toFixed(0) : 0}% success rate
-                  </div>
-                </div>
-                <div className="bg-white p-3 rounded-md border border-blue-200">
-                  <div className="text-xs text-muted-foreground">Est. Bonus</div>
-                  <div className="text-lg font-bold">{fmtGHS(estimatedBonus)}</div>
-                  <div className="text-xs text-muted-foreground">Based on current performance</div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Recent Activity */}
-      {employeeHistory.length > 0 && (
-        <Card className="p-4">
-          <h3 className="font-semibold text-sm flex items-center gap-2 mb-3">
-            <Calendar className="h-4 w-4 text-primary" />
-            Recent Activity
-          </h3>
-          <div className="space-y-2">
-            {employeeHistory.slice(-5).reverse().map((h, idx) => (
-              <div key={idx} className="flex items-center justify-between text-sm border-b border-muted pb-2 last:border-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">
-                    {new Date(h.year, h.month - 1, 1).toLocaleString('default', { month: 'long' })} {h.year}
-                  </span>
-                  <Badge variant="outline" className="text-[10px] bg-green-50 border-green-200 text-green-700">
-                    ✅ Approved
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-muted-foreground">Multiplier: {fmtNum(h.performanceMultiplier, 2)}</span>
-                  <span className="font-bold">{fmtNum(h.performanceMultiplier * 100, 1)}%</span>
-                </div>
+        <SectionCard title="Global P4P Settings" description="Controls revenue, pool allocation, and thresholds" icon={<Settings className="h-4 w-4" />}
+          action={<Button size="sm" onClick={handleSaveGlobals} disabled={saving} className="gap-1.5">{saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}Save</Button>}
+        >
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
+              { key: "totalRevenue", label: "Revenue (GHS)", step: undefined },
+              { key: "p4pPercent", label: "P4P %", step: undefined },
+              { key: "adjunctPercent", label: "Adjunct %", step: undefined },
+              { key: "floor", label: "Floor", step: "0.01" },
+              { key: "cap", label: "Cap", step: "0.01" },
+              { key: "salesMultiplier", label: "Sales Mult.", step: "0.01" },
+            ].map((f) => (
+              <div key={f.key}>
+                <Label className="text-xs text-muted-foreground">{f.label}</Label>
+                <Input type="number" step={f.step} className="mt-1 h-9" value={(localGlobals as any)[f.key]} onChange={(e) => setLocalGlobals((prev) => ({ ...prev, [f.key]: Number(e.target.value) }))} />
               </div>
             ))}
           </div>
-        </Card>
-      )}
-    </div>
+          <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-border/50 text-xs text-muted-foreground">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={localGlobals.prorationOn} onChange={(e) => setLocalGlobals((prev) => ({ ...prev, prorationOn: e.target.checked }))} className="h-3.5 w-3.5 rounded accent-primary" />
+              Proration On
+            </label>
+            <span className="ml-auto flex items-center gap-4">
+              <span>P4P Pool: <strong className="text-foreground">{fmtGHS(calc.totalPool)}</strong></span>
+              <span>Employee Pool: <strong className="text-foreground">{fmtGHS(calc.employeePool)}</strong></span>
+            </span>
+          </div>
+        </SectionCard>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <StatCard icon={<DollarSign className="h-4 w-4" />} label="Revenue" value={fmtGHS(globals.totalRevenue)} sub={`${globals.p4pPercent}% to P4P`} accent="primary" />
+          <StatCard icon={<Wallet className="h-4 w-4" />} label="Total Pool" value={fmtGHS(calc.totalPool)} accent="purple" />
+          <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Adjunct Pool" value={fmtGHS(calc.adjunctPool)} sub={`${globals.adjunctPercent}% share`} accent="warning" />
+          <StatCard icon={<Wallet className="h-4 w-4" />} label="Employee Pool" value={fmtGHS(calc.employeePool)} accent="success" />
+          <StatCard icon={<Users className="h-4 w-4" />} label="Headcount" value={calc.adjunctCount + calc.nonAdjunctCount} sub={`${calc.nonAdjunctCount} core · ${calc.adjunctCount} adjunct`} accent="info" />
+          <StatCard icon={<UserCheck className="h-4 w-4" />} label="Avg Bonus" value={fmtGHS(calc.avgBonus)} accent="default" />
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
+            <SectionCard title="Monthly Performance Trend" description={`${monthlyTrendData.length} months tracked`} icon={<Activity className="h-4 w-4" />} noPadding>
+              <div className="p-4 h-72">
+                {monthlyTrendData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={monthlyTrendData}>
+                      <defs><linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COLORS.primary} stopOpacity={0.35} /><stop offset="100%" stopColor={COLORS.primary} stopOpacity={0.02} /></linearGradient></defs>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.1} vertical={false} />
+                      <XAxis dataKey="month" fontSize={11} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 2]} fontSize={11} axisLine={false} tickLine={false} width={30} />
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [fmtNum(v, 2), "Avg Multiplier"]} />
+                      <Area type="monotone" dataKey="avgMultiplier" stroke={COLORS.primary} strokeWidth={2.5} fill="url(#trendFill)" dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 6 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState icon={<Activity className="h-6 w-6" />} title="No monthly data yet" description="Upload monthly performance data to see trends." />
+                )}
+              </div>
+            </SectionCard>
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            <StatCard icon={<Users className="h-4 w-4" />} label="Tracked Employees" value={trends.length} accent="primary" />
+            <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Avg Multiplier" value={fmtNum(stats.avgMultiplier, 2)} accent="success" />
+          </div>
+        </div>
+
+        <SectionCard title="Top Performers" description="Highest current performance multipliers" icon={<Award className="h-4 w-4" />}>
+          {trends.length > 0 ? (
+            <div className="space-y-2">
+              {[...trends].sort((a, b) => b.currentScore - a.currentScore).slice(0, 5).map((t, i) => (
+                <motion.div key={t.employeeId} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-accent/50 transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">#{i + 1}</div>
+                    <span className="font-medium text-sm truncate">{t.name}</span>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <span className="text-xs text-muted-foreground">{t.months.length} months</span>
+                    <span className="font-bold text-blue-600 dark:text-blue-400">{fmtNum(t.currentScore, 2)}</span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon={<Award className="h-6 w-6" />} title="No performers yet" description="Performance data will appear here once employees submit." />
+          )}
+        </SectionCard>
+
+        {(stats.risingStars.length > 0 || stats.underachievers.length > 0) && (
+          <div className="grid md:grid-cols-2 gap-4">
+            {stats.risingStars.length > 0 && (
+              <SectionCard title="Rising Stars" icon={<Award className="h-4 w-4 text-emerald-600" />} action={<Badge variant="outline" className="text-emerald-600 border-emerald-500/30">{stats.risingStars.length}</Badge>}>
+                <div className="flex flex-wrap gap-2">
+                  {stats.risingStars.slice(0, 8).map((name, i) => (
+                    <motion.div key={i} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}>
+                      <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20">{name}</Badge>
+                    </motion.div>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+            {stats.underachievers.length > 0 && (
+              <SectionCard title="Underachievers" icon={<AlertTriangle className="h-4 w-4 text-red-600" />} action={<Badge variant="outline" className="text-red-600 border-red-500/30">{stats.underachievers.length}</Badge>}>
+                <div className="flex flex-wrap gap-2">
+                  {stats.underachievers.slice(0, 8).map((name, i) => (
+                    <motion.div key={i} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}>
+                      <Badge variant="secondary" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20">{name}</Badge>
+                    </motion.div>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+          </div>
+        )}
+
+        {calc.warnings.length > 0 && (
+          <Card className="p-4 bg-amber-500/5 border-amber-500/30">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-sm font-semibold text-amber-900 dark:text-amber-300">Warnings</div>
+                <ul className="mt-1.5 space-y-1 text-xs text-amber-800 dark:text-amber-400">
+                  {calc.warnings.map((w, i) => <li key={i}>• {w}</li>)}
+                </ul>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {disabled && (
+          <Card className="p-4 bg-red-500/5 border-red-500/30">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600" />
+              <span className="text-sm text-red-900 dark:text-red-300">Total revenue is 0 — set a revenue value to enable calculations.</span>
+            </div>
+          </Card>
+        )}
+      </motion.div>
+    );
+  }
+
+  // ============ EMPLOYEE DASHBOARD ============
+  if (!employee) {
+    return <EmptyState icon={<AlertCircle className="h-6 w-6" />} title="No Employee Record" description="Your profile is not linked to an employee record. Please contact HR." />;
+  }
+
+  return (
+    <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
+      <PageHeader
+        title="My Performance"
+        description={`${employee.name} · ${employee.department} · ${employee.role}`}
+        icon={<Award className="h-6 w-6" />}
+        actions={
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">Current Score</div>
+              <div className={`text-xl font-bold ${band.color}`}>{fmtNum(currentMonthScore, 1)}%</div>
+            </div>
+            <Badge variant="outline" className={`px-3 py-1.5 ${band.color} border-current/30`}>
+              <band.icon className="h-3.5 w-3.5 mr-1.5" />
+              {band.label}
+            </Badge>
+          </div>
+        }
+      />
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard icon={<Target className="h-4 w-4" />} label="Current Score" value={`${fmtNum(currentMonthScore, 1)}%`} sub={monthOverMonthChange !== null ? `${Math.abs(monthOverMonthChange).toFixed(1)}% from last month` : "No previous data"} trend={monthOverMonthChange ?? undefined} accent="primary" />
+        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="YTD Average" value={`${fmtNum(ytdAverage, 1)}%`} sub={`${employeeHistory.length} months tracked`} accent="success" />
+        <StatCard icon={<Wallet className="h-4 w-4" />} label="Est. Bonus" value={fmtGHS(estimatedBonus)} sub="Based on current performance" accent="info" />
+        <StatCard icon={<Calendar className="h-4 w-4" />} label="Months Tracked" value={employeeHistory.length} sub={employeeHistory.length > 0 ? `${new Date().getFullYear()}` : "Start your first submission"} accent="purple" />
+      </div>
+
+      <Tabs defaultValue="overview" onValueChange={setActiveTab}>
+        <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsTrigger value="overview" className="gap-2"><BarChart3 className="h-4 w-4" /> Overview</TabsTrigger>
+          <TabsTrigger value="categories" className="gap-2"><PieChart className="h-4 w-4" /> Categories</TabsTrigger>
+          <TabsTrigger value="insights" className="gap-2"><Zap className="h-4 w-4" /> Insights</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-4 space-y-4">
+          <SectionCard title="Performance Trend" description="Last 12 months" icon={<Activity className="h-4 w-4" />} noPadding>
+            <div className="p-4 h-72">
+              {timelineData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={timelineData}>
+                    <defs><linearGradient id="empTrend" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COLORS.primary} stopOpacity={0.3} /><stop offset="100%" stopColor={COLORS.primary} stopOpacity={0.02} /></linearGradient></defs>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} vertical={false} />
+                    <XAxis dataKey="month" fontSize={11} axisLine={false} tickLine={false} />
+                    <YAxis domain={[0, 150]} fontSize={11} axisLine={false} tickLine={false} width={30} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
+                    <Area type="monotone" dataKey="score" stroke={COLORS.primary} strokeWidth={2.5} fill="url(#empTrend)" dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 6 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <EmptyState icon={<Activity className="h-6 w-6" />} title="No data yet" description="Submit your first appraisal to see your performance trend." />
+              )}
+            </div>
+          </SectionCard>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <SectionCard title="Category Performance" description="Weighted scores" icon={<PieChart className="h-4 w-4" />} noPadding>
+              <div className="p-4 h-64">
+                {categoryScores.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={categoryScores} layout="vertical" margin={{ left: 8, right: 16 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.1} horizontal={false} />
+                      <XAxis type="number" domain={[0, 100]} fontSize={11} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="name" fontSize={11} axisLine={false} tickLine={false} width={90} />
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
+                      <Bar dataKey="score" fill={COLORS.primary} radius={[0, 6, 6, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories" />
+                )}
+              </div>
+            </SectionCard>
+
+            <SectionCard title="KPI Status Breakdown" icon={<Target className="h-4 w-4" />} noPadding>
+              <div className="p-4 h-64">
+                {kpiStatusData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RePieChart>
+                      <Pie data={kpiStatusData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={4} dataKey="value" label={(entry: any) => `${entry.name} ${entry.value}`} labelLine={false}>
+                        {kpiStatusData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={0} />)}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle} />
+                    </RePieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState icon={<Target className="h-6 w-6" />} title="No KPIs" />
+                )}
+              </div>
+            </SectionCard>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="categories" className="mt-4">
+          {categoryScores.length > 0 ? (
+            <div className="grid md:grid-cols-2 gap-4">
+              {categoryScores.map((cat, i) => {
+                const status = cat.score >= 100 ? "Exceeded" : cat.score >= 70 ? "On Track" : cat.score >= 50 ? "At Risk" : "Missed";
+                const color = status === "Exceeded" ? "emerald" : status === "On Track" ? "blue" : status === "At Risk" ? "amber" : "red";
+                const totalKpiWeight = cat.kpis.reduce((s: number, k: any) => s + (k.weight || 0), 0);
+                return (
+                  <motion.div key={i} variants={fadeUp}>
+                    <Card className={`p-5 border-l-4 border-l-${color}-500`}>
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-sm truncate">{cat.name}</h4>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {cat.kpiCount} KPIs · Category weight {cat.weight}%
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className={`text-2xl font-bold text-${color}-600 dark:text-${color}-400`}>{fmtNum(cat.score, 1)}%</div>
+                          <Badge variant="outline" className={`text-[10px] mt-1 text-${color}-600 border-${color}-500/30`}>{status}</Badge>
+                        </div>
+                      </div>
+
+                      {/* KPI weights breakdown */}
+                      <div className="space-y-1.5 mt-3 pt-3 border-t border-border/40">
+                        <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2 flex items-center justify-between">
+                          <span>KPIs (weight within category)</span>
+                          <span className={totalKpiWeight === 100 ? "text-emerald-600" : "text-amber-600"}>{totalKpiWeight}% total</span>
+                        </div>
+                        {cat.kpis.map((kpi: any, kIdx: number) => (
+                          <div key={kIdx} className="flex items-center justify-between text-xs gap-2">
+                            <span className="truncate text-muted-foreground">{kpi.description}</span>
+                            <span className="font-mono font-semibold shrink-0 ml-2">{kpi.weight}%</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden mt-3">
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, cat.score)}%` }} transition={{ duration: 0.8, delay: i * 0.1 }} className={`h-full rounded-full bg-${color}-500`} />
+                      </div>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories yet" description="Categories will appear once you have KPIs assigned." />
+          )}
+        </TabsContent>
+
+        <TabsContent value="insights" className="mt-4 space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <SectionCard title="Strengths" description="KPIs you've exceeded" icon={<CheckCircle className="h-4 w-4 text-emerald-600" />}>
+              <div className="space-y-2">
+                {kpiAchievementData.filter((k) => k.achievement >= 100).slice(0, 5).map((k, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{k.name}</div>
+                      <div className="text-[10px] text-muted-foreground">Weight {k.weight}%</div>
+                    </div>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">{fmtNum(k.achievement, 0)}%</span>
+                  </div>
+                ))}
+                {kpiAchievementData.filter((k) => k.achievement >= 100).length === 0 && (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No exceeded KPIs yet. Keep pushing!</p>
+                )}
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Areas for Improvement" description="KPIs needing attention" icon={<AlertTriangle className="h-4 w-4 text-red-600" />}>
+              <div className="space-y-2">
+                {kpiAchievementData.filter((k) => k.achievement < 70).sort((a, b) => a.achievement - b.achievement).slice(0, 5).map((k, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm p-2.5 rounded-lg bg-red-500/5 border border-red-500/20 gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{k.name}</div>
+                      <div className="text-[10px] text-muted-foreground">Weight {k.weight}%</div>
+                    </div>
+                    <span className="font-bold text-red-600 dark:text-red-400 shrink-0">{fmtNum(k.achievement, 0)}%</span>
+                  </div>
+                ))}
+                {kpiAchievementData.filter((k) => k.achievement < 70).length === 0 && (
+                  <p className="text-sm text-muted-foreground py-4 text-center">All KPIs are on track! 🎉</p>
+                )}
+              </div>
+            </SectionCard>
+          </div>
+
+          <SectionCard title="Performance Summary" icon={<Info className="h-4 w-4" />}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Card className="p-4 bg-muted/30 border-border/50">
+                <div className="text-xs text-muted-foreground mb-1">Overall Status</div>
+                <div className={`text-lg font-bold ${band.color}`}>{band.label}</div>
+              </Card>
+              <Card className="p-4 bg-muted/30 border-border/50">
+                <div className="text-xs text-muted-foreground mb-1">KPIs on Target</div>
+                <div className="text-lg font-bold">{kpiAchievementData.filter((k) => k.achievement >= 70).length} / {kpiAchievementData.length}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {kpiAchievementData.length > 0 ? Math.round((kpiAchievementData.filter((k) => k.achievement >= 70).length / kpiAchievementData.length) * 100) : 0}% success rate
+                </div>
+              </Card>
+              <Card className="p-4 bg-muted/30 border-border/50">
+                <div className="text-xs text-muted-foreground mb-1">Est. Bonus</div>
+                <div className="text-lg font-bold">{fmtGHS(estimatedBonus)}</div>
+                <div className="text-xs text-muted-foreground mt-1">Based on current performance</div>
+              </Card>
+            </div>
+          </SectionCard>
+        </TabsContent>
+      </Tabs>
+    </motion.div>
   );
 }
