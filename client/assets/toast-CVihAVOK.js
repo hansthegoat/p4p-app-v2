@@ -1,0 +1,1 @@
+import{x as s}from"./index-BfVc09Pg.js";const i={success:(o,r)=>{s.success(o,{description:r,duration:4e3})},error:(o,r)=>{s.error(o,{description:r,duration:5e3})},warning:(o,r)=>{s.warning(o,{description:r,duration:4e3})},info:(o,r)=>{s.info(o,{description:r,duration:3e3})},promise:(o,r)=>s.promise(o,{loading:r.loading,success:r.success,error:r.error})};export{i as s};
