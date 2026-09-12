@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { showToast } from "@/lib/toast";
 import { supabase } from "@/lib/supabase";
@@ -12,7 +11,6 @@ import {
   AlertCircle, Loader2, Sparkles, KeyRound,
 } from "lucide-react";
 
-// Manager roles (mirrors register.tsx)
 const MANAGER_ROLES = [
   "President",
   "Executive President",
@@ -24,7 +22,7 @@ const MANAGER_ROLES = [
   "Team Lead",
 ];
 
-const OTP_TTL_SECONDS = 5 * 60; // 5 minutes
+const OTP_TTL_SECONDS = 5 * 60;
 
 export const Route = createFileRoute("/verify-otp")({
   component: VerifyOtpPage,
@@ -46,19 +44,16 @@ function VerifyOtpPage() {
 
   const expired = secondsLeft <= 0;
 
-  // Auto-focus first input
   useEffect(() => {
     if (inputs.current[0]) inputs.current[0]?.focus();
   }, []);
 
-  // Resend cooldown counter
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
-  // OTP expiry countdown
   useEffect(() => {
     if (expired || success) return;
     const t = setInterval(() => {
@@ -67,7 +62,6 @@ function VerifyOtpPage() {
     return () => clearInterval(t);
   }, [expired, success]);
 
-  // If no email, kick back to register
   useEffect(() => {
     if (!email) navigate({ to: "/register" });
   }, [email, navigate]);
@@ -78,12 +72,11 @@ function VerifyOtpPage() {
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
-  const timerTone =
-    expired
-      ? "text-red-600 dark:text-red-400 border-red-500/30 bg-red-500/5"
-      : secondsLeft <= 120
-      ? "text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/5"
-      : "text-muted-foreground border-border bg-muted/40";
+  const timerTone = expired
+    ? "text-red-600 dark:text-red-400 border-red-500/30 bg-red-500/5"
+    : secondsLeft <= 120
+    ? "text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/5"
+    : "text-muted-foreground border-border bg-muted/40";
 
   const handleChange = (index: number, value: string) => {
     const digit = value.replace(/\D/g, "").slice(-1);
@@ -142,7 +135,7 @@ function VerifyOtpPage() {
       if (verifyError) throw verifyError;
       if (!data.user) throw new Error("Verification failed");
 
-      // Finalize pending registration
+      // ─── Finalize pending registration ───
       const pendingRaw = localStorage.getItem("p4p_pending_registration");
       if (pendingRaw) {
         try {
@@ -152,54 +145,96 @@ function VerifyOtpPage() {
           const template = getTemplateByDepartmentAndRole(pending.department, pending.role);
           const hasTemplate = !!template;
 
-          const existingState = localStorage.getItem("p4p_state_v1");
-          const state = existingState ? JSON.parse(existingState) : { employees: [] };
-          if (!Array.isArray(state.employees)) state.employees = [];
+          const isManager = MANAGER_ROLES.some(
+            (r) => r.toLowerCase() === (pending.role || "").toLowerCase()
+          );
 
-          const alreadyExists = state.employees.some((e: any) => e.email === pending.email);
-          if (!alreadyExists) {
-            const isManager = MANAGER_ROLES.some(
-              (r) => r.toLowerCase() === (pending.role || "").toLowerCase()
-            );
+          // ⭐ Write directly to Supabase with SNAKE_CASE keys
+          const dbRow = {
+            id: data.user.id,
+            auth_id: data.user.id,
+            name: pending.name,
+            email: pending.email,
+            department: pending.department,
+            role: pending.role,
+            job_grade: template?.jobGrade || "4",
+            is_adjunct: false,
+            is_sales_role: false,
+            is_manager: isManager,
+            supervisor_id: null,
+            supervisor_name: null,
+            join_date: new Date().toISOString().slice(0, 10),
+            months_worked: 12,
+            role_type: "employee",
+            categories: template
+              ? template.categories.map((cat: any) => ({
+                  id: cat.id || `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                  name: cat.name,
+                  weight: cat.weight,
+                  kpis: cat.kpis.map((k: any) => ({
+                    id: k.id || `kpi_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                    description: k.description,
+                    metric: k.metric,
+                    target: k.target,
+                    actual: 0,
+                    weight: k.weight || 0,
+                    measurementSource: k.measurementSource || "",
+                  })),
+                }))
+              : [],
+            kpis: [],
+            needs_kpi_setup: !hasTemplate,
+          };
 
-            const newEmployee = {
+          console.log("💾 Writing employee to Supabase:", dbRow);
+
+          const { error: dbError } = await supabase
+            .from("employees")
+            .upsert(dbRow, { onConflict: "id" });
+
+          if (dbError) {
+            console.error("❌ Failed to save employee to Supabase:", dbError);
+            showToast.error("Profile sync failed", dbError.message || "Unknown error");
+          } else {
+            console.log("✅ Employee saved to Supabase");
+          }
+
+          // Mirror to localStorage cache (camelCase for in-memory use)
+          try {
+            const newEmployeeCache = {
               id: data.user.id,
+              authUserId: data.user.id,
               name: pending.name,
               email: pending.email,
-              authUserId: data.user.id,
               department: pending.department,
               role: pending.role,
               jobGrade: template?.jobGrade || "4",
               isAdjunct: false,
               isSalesRole: false,
-              joinDate: new Date().toISOString().slice(0, 10),
-              monthsWorked: 12,
-              kpis: [],
-              categories: template
-                ? template.categories.map((cat: any) => ({
-                    id: `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                    name: cat.name,
-                    weight: cat.weight,
-                    kpis: cat.kpis.map((k: any) => ({
-                      id: `kpi_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                      description: k.description,
-                      metric: k.metric,
-                      target: k.target,
-                      actual: 0,
-                      weight: 100,
-                      measurementSource: k.measurementSource || "",
-                    })),
-                  }))
-                : [],
-              roleType: "employee" as const,
               isManager,
               supervisorId: "",
               supervisorName: "",
+              joinDate: new Date().toISOString().slice(0, 10),
+              monthsWorked: 12,
+              roleType: "employee",
+              categories: dbRow.categories,
+              kpis: [],
               needsKpiSetup: !hasTemplate,
             };
 
-            state.employees.push(newEmployee);
-            localStorage.setItem("p4p_state_v1", JSON.stringify(state));
+            const existingState = localStorage.getItem("p4p_state_v1");
+            const state = existingState ? JSON.parse(existingState) : { employees: [] };
+            if (!Array.isArray(state.employees)) state.employees = [];
+
+            const alreadyInCache = state.employees.some(
+              (e: any) => e.id === data.user.id || e.email === pending.email
+            );
+            if (!alreadyInCache) {
+              state.employees.push(newEmployeeCache);
+              localStorage.setItem("p4p_state_v1", JSON.stringify(state));
+            }
+          } catch (cacheErr) {
+            console.warn("Could not update localStorage cache:", cacheErr);
           }
 
           localStorage.removeItem("p4p_pending_registration");
@@ -234,7 +269,6 @@ function VerifyOtpPage() {
       });
       if (resendError) throw resendError;
 
-      // Reset the expiry countdown
       setSecondsLeft(OTP_TTL_SECONDS);
       setOtp(["", "", "", "", "", ""]);
       inputs.current[0]?.focus();
@@ -253,7 +287,6 @@ function VerifyOtpPage() {
     handleVerify(otp.join(""));
   };
 
-  // ─── Orbital animation state ─────────────────────────────
   const orbitState: "idle" | "loading" | "error" = loading
     ? "loading"
     : error
@@ -281,7 +314,6 @@ function VerifyOtpPage() {
       ? "bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400"
       : "bg-primary/10 border-primary/20 text-primary";
 
-  // ─── Success view ────────────────────────────────────────
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
@@ -307,7 +339,6 @@ function VerifyOtpPage() {
     );
   }
 
-  // ─── Main view ───────────────────────────────────────────
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <motion.div
@@ -316,10 +347,8 @@ function VerifyOtpPage() {
         className="w-full max-w-md"
       >
         <Card className="p-6">
-          {/* Header with orbital animation */}
           <div className="text-center mb-6">
             <div className="relative w-24 h-24 mx-auto mb-4">
-              {/* Dashed orbit ring */}
               <svg className="absolute inset-0 w-full h-full" viewBox="0 0 96 96">
                 <circle
                   cx="48"
@@ -334,9 +363,9 @@ function VerifyOtpPage() {
                 />
               </svg>
 
-              {/* Orbiting dot */}
               <motion.div
                 className="absolute inset-0"
+                initial={{ rotate: 0 }}
                 animate={{ rotate: 360 }}
                 transition={{
                   duration: loading ? 1.2 : 3.5,
@@ -346,11 +375,10 @@ function VerifyOtpPage() {
                 style={{ transformOrigin: "center" }}
               >
                 <div
-                  className={`absolute top-[6px] left-1/2 -translate-x-1/2 w-2 h-2 rounded-full ${dotFill}`}
+                  className={`absolute top-[6px] left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full ${dotFill} shadow-sm`}
                 />
               </motion.div>
 
-              {/* Center hub */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div
                   className={`w-14 h-14 rounded-full border flex items-center justify-center transition-colors ${hubClass}`}
@@ -365,16 +393,13 @@ function VerifyOtpPage() {
             </div>
 
             <h1 className="text-2xl font-bold mb-2">Verify Your Email</h1>
-            <p className="text-sm text-muted-foreground">
-              We sent a 6-digit code to
-            </p>
+            <p className="text-sm text-muted-foreground">We sent a 6-digit code to</p>
             <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
               <Mail className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-sm font-medium">{email}</span>
             </div>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <Label className="text-xs text-muted-foreground flex items-center gap-1.5 mb-3 justify-center">
@@ -401,7 +426,6 @@ function VerifyOtpPage() {
                 ))}
               </div>
 
-              {/* Countdown */}
               <div className="flex justify-center mt-3">
                 <span
                   className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md border transition-colors ${timerTone}`}
@@ -451,7 +475,6 @@ function VerifyOtpPage() {
             </Button>
           </form>
 
-          {/* Resend */}
           <div className="mt-5 text-center">
             <p className="text-xs text-muted-foreground mb-2">
               {expired ? "Code expired." : "Didn't receive the code?"}
@@ -473,7 +496,6 @@ function VerifyOtpPage() {
             </Button>
           </div>
 
-          {/* Back */}
           <div className="mt-4 pt-4 border-t border-border/50 text-center">
             <button
               onClick={() => navigate({ to: "/register" })}
@@ -484,7 +506,6 @@ function VerifyOtpPage() {
             </button>
           </div>
 
-          {/* Info */}
           <div className="mt-5 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
             <div className="flex items-start gap-2">
               <Sparkles className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />

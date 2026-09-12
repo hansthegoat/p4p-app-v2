@@ -20,6 +20,7 @@ import {
   X,
   Sparkles,
   Calculator,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ interface NavItem {
   to: string;
   icon: any;
   roles: string[];
+  showOnlyIfPending?: boolean;  // ⭐ NEW — hides the item when nothing's pending
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -40,6 +42,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: "My Performance", to: "/employee", icon: Target, roles: ["employee", "hr", "admin"] },
   { label: "My Calculation", to: "/my-calculation", icon: Calculator, roles: ["employee", "hr", "admin"] },
   { label: "Appraisals", to: "/appraisals", icon: ClipboardCheck, roles: ["employee", "hr", "admin"] },
+  // ⭐ NEW — only appears when there are pending KPI changes
+  { label: "KPI Updates", to: "/kpi-updates", icon: RefreshCw, roles: ["employee", "hr", "admin"], showOnlyIfPending: true },
   { label: "Review Appraisals", to: "/appraisals-review", icon: ClipboardCheck, roles: ["employee", "hr", "admin"] },
   { label: "Employees", to: "/employees", icon: Users, roles: ["hr", "admin"] },
   { label: "KPI Framework", to: "/kpi-framework", icon: FileSpreadsheet, roles: ["admin"] },
@@ -51,23 +55,31 @@ const NAV_ITEMS: NavItem[] = [
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { user, role: contextRole, logout } = useUser();
-  const { employees } = useP4P();
+  const { employees, kpiUpdateRequests } = useP4P();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [detectedRole, setDetectedRole] = useState<string | null>(null);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
 
-  // Auto-detect role
+  // Auto-detect role + capture current auth user id
   useEffect(() => {
     const detectRole = async () => {
       if (contextRole && ["employee", "hr", "admin"].includes(contextRole)) {
         setDetectedRole(contextRole);
-        return;
       }
       try {
         const currentUser = await getCurrentUser();
-        if (!currentUser) { setDetectedRole("employee"); return; }
+        if (!currentUser) {
+          if (!contextRole) setDetectedRole("employee");
+          return;
+        }
+        setAuthUserId(currentUser.id);
+
+        if (contextRole && ["employee", "hr", "admin"].includes(contextRole)) {
+          return;
+        }
         const emp = employees.find((e) => e.email === currentUser.email);
         if (emp) {
           setDetectedRole(emp.roleType || "employee");
@@ -75,14 +87,29 @@ export function AppLayout({ children }: AppLayoutProps) {
           setDetectedRole("employee");
         }
       } catch {
-        setDetectedRole("employee");
+        if (!contextRole) setDetectedRole("employee");
       }
     };
     detectRole();
   }, [contextRole, employees]);
 
   const role = detectedRole || contextRole || "employee";
-  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
+
+  // ⭐ Compute pending KPI updates for the current user
+  const me = employees.find(
+    (e) => e.authUserId === authUserId || (user?.email && e.email === user.email)
+  );
+  const pendingKpiUpdates = me
+    ? kpiUpdateRequests.filter(
+        (r) => r.employeeId === me.id && r.status === "unacknowledged"
+      ).length
+    : 0;
+
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    if (!item.roles.includes(role)) return false;
+    if (item.showOnlyIfPending && pendingKpiUpdates === 0) return false;
+    return true;
+  });
 
   const requestLogout = () => {
     setLogoutModalOpen(true);
@@ -103,6 +130,34 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + "/");
+  };
+
+  // ⭐ Helper: render the nav link with optional badge
+  const renderNavLink = (item: NavItem, onClick?: () => void) => {
+    const Icon = item.icon;
+    const active = isActive(item.to);
+    const showBadge = item.to === "/kpi-updates" && pendingKpiUpdates > 0;
+
+    return (
+      <Link
+        key={item.to}
+        to={item.to}
+        onClick={onClick}
+        className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+          active
+            ? "bg-primary text-primary-foreground"
+            : "hover:bg-accent hover:text-accent-foreground"
+        }`}
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="truncate">{item.label}</span>
+        {showBadge && (
+          <span className="ml-auto bg-amber-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
+            {pendingKpiUpdates}
+          </span>
+        )}
+      </Link>
+    );
   };
 
   return (
@@ -167,24 +222,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 No navigation available for this role.
               </p>
             ) : (
-              visibleItems.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.to);
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      active
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-accent hover:text-accent-foreground"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                );
-              })
+              visibleItems.map((item) => renderNavLink(item))
             )}
           </nav>
         </aside>
@@ -196,27 +234,11 @@ export function AppLayout({ children }: AppLayoutProps) {
               className="fixed inset-0 bg-black/50 z-30 lg:hidden"
               onClick={() => setMobileMenuOpen(false)}
             />
-            <aside className="fixed top-14 left-0 bottom-0 w-64 border-r bg-background z-40 overflow-y-auto lg:hidden">
+            <aside className="fixed top-14 left-0 bottom-0 w-[min(16rem,calc(100vw-1rem))] border-r bg-background z-40 overflow-y-auto lg:hidden">
               <nav className="flex-1 p-3 space-y-1">
-                {visibleItems.map((item) => {
-                  const Icon = item.icon;
-                  const active = isActive(item.to);
-                  return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        active
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-accent hover:text-accent-foreground"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </Link>
-                  );
-                })}
+                {visibleItems.map((item) =>
+                  renderNavLink(item, () => setMobileMenuOpen(false))
+                )}
               </nav>
             </aside>
           </>

@@ -310,3 +310,51 @@ export interface Employee {
   supervisorName?: string;
   isManager?: boolean;
 }
+
+// ============================================
+// KPI UPDATE REQUESTS (Phase 1)
+// ============================================
+
+export type DiffKind =
+  | "category_added"
+  | "category_removed"
+  | "category_weight_changed"
+  | "kpi_added"
+  | "kpi_removed"
+  | "kpi_target_changed"
+  | "kpi_metric_changed"
+  | "kpi_weight_changed";
+
+export interface KpiDiffItem {
+  kind: DiffKind;
+  categoryName: string;
+  kpiDescription?: string;
+  before?: unknown;
+  after?: unknown;
+}
+
+export interface KpiUpdateRequest {
+  id: string;
+  employeeId: string;
+  department: string;
+  role: string;
+  templateVersion: number;
+  diffs: KpiDiffItem[];
+  proposedCategories: Category[];
+  beforeScore: number;
+  afterScore: number;
+  status: "unacknowledged" | "acknowledged";
+  employeeComment?: string;
+  createdAt: string;
+  acknowledgedAt?: string;
+  commentedAt?: string;
+}
+
+// Also — patch the Employee type to declare the field we use everywhere
+// (It's missing from your current types.ts; TS was silently allowing it via `as any` in some places)
+declare module "./types" {
+  interface Employee {
+    needsKpiSetup?: boolean;
+    authUserId?: string;
+  }
+}

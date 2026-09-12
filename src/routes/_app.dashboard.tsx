@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { getCurrentUser } from "@/lib/supabase";
 import { useUser } from "@/lib/p4p/user-context";
 import { staggerContainer, fadeUp } from "@/lib/motion";
+import { KpiUpdatesBanner } from "@/components/p4p/KpiUpdatesBanner";
 import {
   TrendingUp, Wallet, Users, UserCheck, DollarSign,
   Sparkles, Target, Calendar, Award, AlertTriangle,
@@ -134,7 +135,6 @@ function Dashboard() {
     return getMonthlyHistory(employee.id);
   }, [employee, getMonthlyHistory]);
 
-  // Category scores — weighted by KPI weights within each category
   const categoryScores = useMemo(() => {
     if (!employee?.categories) return [];
     return employee.categories.map((cat: any) => {
@@ -167,7 +167,6 @@ function Dashboard() {
     });
   }, [employee]);
 
-  // Current overall score — weighted by category weights
   const currentMonthScore = useMemo(() => {
     if (!employee?.categories) return 0;
     let totalWeightedScore = 0;
@@ -223,7 +222,6 @@ function Dashboard() {
       }));
   }, [employeeHistory]);
 
-  // KPI achievement data — weighted properly
   const kpiAchievementData = useMemo(() => {
     if (!employee?.categories) return [];
     const data: any[] = [];
@@ -283,6 +281,9 @@ function Dashboard() {
   if (isAdmin) {
     return (
       <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
+        {/* ⭐ NEW — KPI updates banner (renders nothing if no pending) */}
+        <KpiUpdatesBanner />
+
         <PageHeader
           title="P4P Dashboard"
           description="Live overview of pools, payouts, performance signals, and monthly trends."
@@ -437,6 +438,9 @@ function Dashboard() {
 
   return (
     <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
+      {/* ⭐ NEW — KPI updates banner (renders nothing if no pending) */}
+      <KpiUpdatesBanner />
+
       <PageHeader
         title="My Performance"
         description={`${employee.name} · ${employee.department} · ${employee.role}`}
@@ -550,7 +554,6 @@ function Dashboard() {
                         </div>
                       </div>
 
-                      {/* KPI weights breakdown */}
                       <div className="space-y-1.5 mt-3 pt-3 border-t border-border/40">
                         <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2 flex items-center justify-between">
                           <span>KPIs (weight within category)</span>

@@ -237,7 +237,6 @@ export async function fetchAllAppraisals(): Promise<AppraisalRequest[]> {
     return [];
   }
 
-  // Fetch comments for each appraisal
   const appraisals: AppraisalRequest[] = [];
   for (const row of data || []) {
     const comments = await fetchCommentsForAppraisal(row.id);
@@ -417,9 +416,8 @@ function mapEmployeeFromDB(row: any): Employee {
 function mapEmployeeToDB(emp: Employee): any {
   return {
     id: emp.id,
-    // ⚠️ TEMPORARILY set to null to bypass FK constraint during migration
-    // We'll link real auth_ids manually after migration
-    auth_id: null,
+    // ⭐ FIXED: was hard-coded null — this is what broke cross-device login
+    auth_id: emp.authUserId || null,
     name: emp.name,
     email: emp.email,
     department: emp.department,
@@ -507,4 +505,90 @@ function mapAppraisalToDB(a: AppraisalRequest): any {
 
 export async function generateEmployeeId(): Promise<string> {
   return newId();
+}
+// ============================================
+// KPI UPDATE REQUESTS (Phase 1)
+// ============================================
+
+import type { KpiUpdateRequest } from "./types";
+
+export async function fetchAllKpiUpdateRequests(): Promise<KpiUpdateRequest[]> {
+  const { data, error } = await supabase
+    .from("kpi_update_requests")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("fetchAllKpiUpdateRequests error:", error);
+    return [];
+  }
+
+  return (data || []).map(mapKpiUpdateFromDB);
+}
+
+export async function fetchKpiUpdateRequestsForEmployee(
+  employeeId: string
+): Promise<KpiUpdateRequest[]> {
+  const { data, error } = await supabase
+    .from("kpi_update_requests")
+    .select("*")
+    .eq("employee_id", employeeId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("fetchKpiUpdateRequestsForEmployee error:", error);
+    return [];
+  }
+
+  return (data || []).map(mapKpiUpdateFromDB);
+}
+
+export async function upsertKpiUpdateRequest(
+  req: KpiUpdateRequest
+): Promise<void> {
+  const row = mapKpiUpdateToDB(req);
+  const { error } = await supabase
+    .from("kpi_update_requests")
+    .upsert(row, { onConflict: "id" });
+
+  if (error) {
+    console.error("upsertKpiUpdateRequest error:", error);
+    throw error;
+  }
+}
+
+function mapKpiUpdateFromDB(row: any): KpiUpdateRequest {
+  return {
+    id: row.id,
+    employeeId: row.employee_id,
+    department: row.department,
+    role: row.role,
+    templateVersion: row.template_version ?? 1,
+    diffs: row.diffs || [],
+    proposedCategories: row.proposed_categories || [],
+    beforeScore: Number(row.before_score ?? 0),
+    afterScore: Number(row.after_score ?? 0),
+    status: row.status,
+    employeeComment: row.employee_comment || undefined,
+    createdAt: row.created_at,
+    resolvedAt: row.resolved_at || undefined,
+  };
+}
+
+function mapKpiUpdateToDB(req: KpiUpdateRequest): any {
+  return {
+    id: req.id,
+    employee_id: req.employeeId,
+    department: req.department,
+    role: req.role,
+    template_version: req.templateVersion,
+    diffs: req.diffs,
+    proposed_categories: req.proposedCategories,
+    before_score: req.beforeScore,
+    after_score: req.afterScore,
+    status: req.status,
+    employee_comment: req.employeeComment || null,
+    created_at: req.createdAt,
+    resolved_at: req.resolvedAt || null,
+  };
 }

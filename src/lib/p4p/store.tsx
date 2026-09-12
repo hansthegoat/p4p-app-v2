@@ -17,6 +17,9 @@ import type {
   Notification,
   AppraisalComment,
   Category,
+  KPI,
+  KpiUpdateRequest,
+  KpiDiffItem,
 } from "./types";
 import { newId } from "./defaults";
 import { sendEmail } from "@/lib/email";
@@ -42,6 +45,8 @@ import {
   insertAppraisalComment,
   insertNotification,
   markNotificationReadDB,
+  fetchAllKpiUpdateRequests,
+  upsertKpiUpdateRequest,
 } from "./supabase-data";
 
 const LS_KEY = "p4p_state_v1";
@@ -49,10 +54,11 @@ const MONTHLY_KEY = "p4p_monthly_data";
 const TEMPLATES_KEY = "p4p_kpi_templates";
 const APPRAISALS_KEY = "p4p_appraisals";
 const NOTIFICATIONS_KEY = "p4p_notifications";
+const KPI_UPDATES_KEY = "p4p_kpi_update_requests";
 const SYNC_FLAG_KEY = "p4p_synced_to_supabase";
 
 // ============================================
-// LOCALSTORAGE HELPERS (as cache)
+// LOCALSTORAGE HELPERS
 // ============================================
 
 function loadMonthlyData(): MonthlyPerformance[] {
@@ -111,6 +117,20 @@ function saveNotifications(data: Notification[]) {
   try { localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(data)); } catch {}
 }
 
+function loadKpiUpdateRequests(): KpiUpdateRequest[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(KPI_UPDATES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
+
+function saveKpiUpdateRequests(data: KpiUpdateRequest[]) {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(KPI_UPDATES_KEY, JSON.stringify(data)); } catch {}
+}
+
 // ============================================
 // STATE TYPES
 // ============================================
@@ -123,13 +143,13 @@ interface State {
   kpiTemplates: Record<string, KPITemplate>;
   appraisals: AppraisalRequest[];
   notifications: Notification[];
+  kpiUpdateRequests: KpiUpdateRequest[];
 }
 
 interface Ctx extends State {
   isCloudSynced: boolean;
   isSyncing: boolean;
 
-  // Basics
   setGlobals: (g: Partial<Globals>) => void;
   setGrades: (g: GradePoint[]) => void;
   resetGrades: () => void;
@@ -141,7 +161,6 @@ interface Ctx extends State {
 
   calc: CalcResult;
 
-  // Monthly
   saveMonthlySnapshot: (employeeId: string, year: number, month: number) => void;
   getMonthlyHistory: (employeeId: string) => MonthlyPerformance[];
   getPerformanceTrend: (employeeId: string) => PerformanceTrend | null;
@@ -150,20 +169,16 @@ interface Ctx extends State {
   getMonthData: (year: number, month: number) => MonthlyPerformance[];
   getMonthlyStats: () => MonthlyStats;
 
-  // Triggers
   detectTriggers: () => TriggerSummary;
   getTriggersForEmployee: (employeeId: string) => PerformanceTrigger[];
 
-  // Templates
   saveTemplate: (template: KPITemplate) => void;
   getTemplate: (department: string, role: string) => KPITemplate | undefined;
   getAllTemplates: () => Record<string, KPITemplate>;
   applyTemplateToEmployees: (department: string, role: string, template: KPITemplate) => number;
 
-  // Delete
   hardDeleteEmployee: (id: string) => void;
 
-  // Appraisals
   submitAppraisal: (employeeId: string, period: string, year: number, month: number) => void;
   approveAppraisal: (id: string, reviewerId: string, reviewerName: string) => void;
   rejectAppraisal: (id: string, reviewerId: string, reviewerName: string, reason: string) => void;
@@ -172,16 +187,20 @@ interface Ctx extends State {
   getPendingAppraisals: () => AppraisalRequest[];
   addAppraisalComment: (appraisalId: string, authorId: string, authorName: string, text: string) => void;
 
-  // Notifications
   getNotifications: (userId: string) => Notification[];
   markNotificationRead: (id: string) => void;
 
-  // KPI Helpers
   saveKPIProof: (employeeId: string, kpiId: string, fileData: { id: string; fileName: string; fileUrl: string; fileType: string; fileSize?: number }) => void;
   saveKPIComment: (employeeId: string, kpiId: string, comment: string) => void;
   triggerAfterApproval: (employeeId: string) => void;
 
-  // Sync
+  previewTemplateDiff: (department: string, role: string, template: KPITemplate) => Record<string, KpiDiffItem[]>;
+  pushTemplateToEmployees: (department: string, role: string, template: KPITemplate) => Promise<{ affected: number; created: number }>;
+  getKpiUpdateRequests: (employeeId: string) => KpiUpdateRequest[];
+  getUnacknowledgedKpiUpdates: () => KpiUpdateRequest[];
+  acknowledgeKpiUpdate: (id: string) => Promise<void>;
+  commentKpiUpdate: (id: string, comment: string) => Promise<void>;
+
   syncToCloud: () => Promise<void>;
 }
 
@@ -198,9 +217,10 @@ function loadInitial(): State {
       grades: DEFAULT_GRADES,
       employees: DEMO_EMPLOYEES,
       monthlyData: [],
-      kpiTemplates: loadTemplates(),
-      appraisals: loadAppraisals(),
-      notifications: loadNotifications(),
+      kpiTemplates: {},
+      appraisals: [],
+      notifications: [],
+      kpiUpdateRequests: [],
     };
   }
   try {
@@ -215,6 +235,7 @@ function loadInitial(): State {
         kpiTemplates: loadTemplates(),
         appraisals: loadAppraisals(),
         notifications: loadNotifications(),
+        kpiUpdateRequests: loadKpiUpdateRequests(),
       };
     }
   } catch {}
@@ -226,6 +247,7 @@ function loadInitial(): State {
     kpiTemplates: loadTemplates(),
     appraisals: loadAppraisals(),
     notifications: loadNotifications(),
+    kpiUpdateRequests: loadKpiUpdateRequests(),
   };
 }
 
@@ -239,13 +261,44 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
 
   // ============================================
-  // INITIAL CLOUD FETCH
+  // CLOUD FETCH + AUTH-STATE REFETCH
   // ============================================
   useEffect(() => {
     let cancelled = false;
 
+    const refetchFromCloud = async () => {
+      setIsSyncing(true);
+      try {
+        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates] =
+          await Promise.all([
+            fetchAllEmployees(),
+            fetchAllTemplates(),
+            fetchAllMonthly(),
+            fetchAllAppraisals(),
+            fetchAllKpiUpdateRequests(),
+          ]);
+
+        if (cancelled) return;
+
+        setState((s) => ({
+          ...s,
+          employees: cloudEmployees.length > 0 ? cloudEmployees : s.employees,
+          kpiTemplates:
+            Object.keys(cloudTemplates).length > 0 ? cloudTemplates : s.kpiTemplates,
+          monthlyData: cloudMonthly.length > 0 ? cloudMonthly : s.monthlyData,
+          appraisals: cloudAppraisals.length > 0 ? cloudAppraisals : s.appraisals,
+          kpiUpdateRequests: cloudKpiUpdates,
+        }));
+
+        setIsCloudSynced(true);
+      } catch (err) {
+        console.error("Cloud refetch failed:", err);
+      } finally {
+        if (!cancelled) setIsSyncing(false);
+      }
+    };
+
     const initFromCloud = async () => {
-      // Only fetch when logged in
       try {
         const { getCurrentUser } = await import("@/lib/supabase");
         const user = await getCurrentUser();
@@ -260,12 +313,13 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
       setIsSyncing(true);
       try {
-        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals] =
+        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates] =
           await Promise.all([
             fetchAllEmployees(),
             fetchAllTemplates(),
             fetchAllMonthly(),
             fetchAllAppraisals(),
+            fetchAllKpiUpdateRequests(),
           ]);
 
         if (cancelled) return;
@@ -299,9 +353,11 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         setState((s) => ({
           ...s,
           employees: cloudHasData ? cloudEmployees : s.employees,
-          kpiTemplates: Object.keys(cloudTemplates).length > 0 ? cloudTemplates : s.kpiTemplates,
+          kpiTemplates:
+            Object.keys(cloudTemplates).length > 0 ? cloudTemplates : s.kpiTemplates,
           monthlyData: cloudMonthly.length > 0 ? cloudMonthly : s.monthlyData,
           appraisals: cloudAppraisals.length > 0 ? cloudAppraisals : s.appraisals,
+          kpiUpdateRequests: cloudKpiUpdates,
         }));
 
         setIsCloudSynced(true);
@@ -313,12 +369,32 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     };
 
     initFromCloud();
-    return () => { cancelled = true; };
+
+    let subscription: { unsubscribe: () => void } | null = null;
+    (async () => {
+      const { supabase } = await import("@/lib/supabase");
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === "SIGNED_IN" && session?.user) {
+          console.log("🔐 Signed in — refetching from cloud");
+          refetchFromCloud();
+        } else if (event === "SIGNED_OUT") {
+          setIsCloudSynced(false);
+        } else if (event === "TOKEN_REFRESHED" && session?.user) {
+          refetchFromCloud();
+        }
+      });
+      subscription = data.subscription;
+    })();
+
+    return () => {
+      cancelled = true;
+      if (subscription) subscription.unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ============================================
-  // LOCALSTORAGE CACHE WRITES
+  // CACHE WRITES
   // ============================================
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -336,6 +412,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     saveTemplates(state.kpiTemplates);
     saveAppraisals(state.appraisals);
     saveNotifications(state.notifications);
+    saveKpiUpdateRequests(state.kpiUpdateRequests);
   }, [state]);
 
   // ============================================
@@ -387,6 +464,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       kpiTemplates: {},
       appraisals: [],
       notifications: [],
+      kpiUpdateRequests: [],
     });
   }, []);
 
@@ -404,6 +482,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       monthlyData: s.monthlyData.filter((d) => d.employeeId !== id),
       appraisals: s.appraisals.filter((a) => a.employeeId !== id),
       notifications: s.notifications.filter((n) => n.userId !== id),
+      kpiUpdateRequests: s.kpiUpdateRequests.filter((r) => r.employeeId !== id),
     }));
     deleteEmployeeDB(id).catch((err) => console.error("Cloud hard delete failed:", err));
   }, []);
@@ -710,11 +789,11 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       const updatedEmployees = state.employees.map((emp) => {
         if (emp.department === department && emp.role === role && !emp.isAdjunct) {
           const newCategories = template.categories.map((cat) => ({
-            id: newId(),
+            id: cat.id || newId(),
             name: cat.name,
             weight: cat.weight,
             kpis: cat.kpis.map((k) => ({
-              id: newId(),
+              id: k.id || newId(),
               description: k.description,
               metric: k.metric,
               target: k.target,
@@ -1008,7 +1087,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      // Send styled email to HR/Admin
       const employee = state.employees.find((e) => e.id === employeeId);
       if (employee) {
         const hrAdmins = state.employees
@@ -1067,7 +1145,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
       if (!employeeId || !year || !month || !categories?.length) return;
 
-      // Weighted snapshot
       let totalWeightedScore = 0;
       let totalWeight = 0;
       for (const cat of categories) {
@@ -1269,7 +1346,334 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ============================================
-  // MANUAL SYNC
+  // KPI UPDATE REQUESTS
+  // ============================================
+
+  const computeScore = (categories: Category[]): number => {
+    let totalWeighted = 0;
+    let totalWeight = 0;
+    for (const cat of categories) {
+      let catSum = 0;
+      let kpiWeightTotal = 0;
+      for (const kpi of cat.kpis) {
+        const target = kpi.target || 1;
+        const actual = kpi.actual || 0;
+        const ratio = target > 0 ? actual / target : 0;
+        const w = kpi.weight || 1;
+        catSum += ratio * w;
+        kpiWeightTotal += w;
+      }
+      const catScore = kpiWeightTotal > 0 ? catSum / kpiWeightTotal : 0;
+      const w = (cat.weight || 0) / 100;
+      totalWeighted += catScore * w;
+      totalWeight += w;
+    }
+    return totalWeight > 0 ? totalWeighted / totalWeight : 0;
+  };
+
+  const computeDiff = (
+    existing: Category[],
+    template: KPITemplate
+  ): { diffs: KpiDiffItem[]; merged: Category[] } => {
+    const diffs: KpiDiffItem[] = [];
+
+    const existingByCatId = new Map(existing.map((c) => [c.id, c]));
+    const existingByCatName = new Map(existing.map((c) => [c.name, c]));
+
+    const mergedCategories: Category[] = [];
+    const templateCatNames = new Set(template.categories.map((c) => c.name));
+
+    for (const tCat of template.categories) {
+      const existingCat =
+        existingByCatId.get(tCat.id) || existingByCatName.get(tCat.name);
+
+      if (!existingCat) {
+        diffs.push({
+          kind: "category_added",
+          categoryName: tCat.name,
+          after: tCat.weight,
+        });
+      } else if (existingCat.weight !== tCat.weight) {
+        diffs.push({
+          kind: "category_weight_changed",
+          categoryName: tCat.name,
+          before: existingCat.weight,
+          after: tCat.weight,
+        });
+      }
+
+      const existingKpisById = new Map(
+        (existingCat?.kpis || []).map((k) => [k.id, k])
+      );
+      const existingKpisByDesc = new Map(
+        (existingCat?.kpis || []).map((k) => [k.description, k])
+      );
+
+      const mergedKpis: KPI[] = [];
+      const templateKpiDescs = new Set(tCat.kpis.map((k) => k.description));
+
+      for (const tKpi of tCat.kpis) {
+        const existingKpi =
+          existingKpisById.get(tKpi.id) || existingKpisByDesc.get(tKpi.description);
+
+        if (!existingKpi) {
+          diffs.push({
+            kind: "kpi_added",
+            categoryName: tCat.name,
+            kpiDescription: tKpi.description,
+            after: tKpi.target,
+          });
+          mergedKpis.push({
+            id: tKpi.id,
+            description: tKpi.description,
+            metric: tKpi.metric,
+            target: tKpi.target,
+            actual: 0,
+            weight: tKpi.weight ?? 0,
+            measurementSource: tKpi.measurementSource || "",
+          });
+          continue;
+        }
+
+        if (existingKpi.target !== tKpi.target) {
+          diffs.push({
+            kind: "kpi_target_changed",
+            categoryName: tCat.name,
+            kpiDescription: tKpi.description,
+            before: existingKpi.target,
+            after: tKpi.target,
+          });
+        }
+        if (existingKpi.metric !== tKpi.metric) {
+          diffs.push({
+            kind: "kpi_metric_changed",
+            categoryName: tCat.name,
+            kpiDescription: tKpi.description,
+            before: existingKpi.metric,
+            after: tKpi.metric,
+          });
+        }
+        if ((existingKpi.weight ?? 0) !== (tKpi.weight ?? 0)) {
+          diffs.push({
+            kind: "kpi_weight_changed",
+            categoryName: tCat.name,
+            kpiDescription: tKpi.description,
+            before: existingKpi.weight ?? 0,
+            after: tKpi.weight ?? 0,
+          });
+        }
+
+        mergedKpis.push({
+          ...existingKpi,
+          id: tKpi.id,
+          description: tKpi.description,
+          metric: tKpi.metric,
+          target: tKpi.target,
+          weight: tKpi.weight ?? existingKpi.weight ?? 0,
+          measurementSource: tKpi.measurementSource || existingKpi.measurementSource,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      for (const oldKpi of existingCat?.kpis || []) {
+        if (!templateKpiDescs.has(oldKpi.description)) {
+          diffs.push({
+            kind: "kpi_removed",
+            categoryName: tCat.name,
+            kpiDescription: oldKpi.description,
+            before: oldKpi.target,
+          });
+        }
+      }
+
+      mergedCategories.push({
+        id: tCat.id,
+        name: tCat.name,
+        weight: tCat.weight,
+        kpis: mergedKpis,
+      });
+    }
+
+    for (const oldCat of existing) {
+      if (!templateCatNames.has(oldCat.name)) {
+        diffs.push({
+          kind: "category_removed",
+          categoryName: oldCat.name,
+          before: oldCat.weight,
+        });
+      }
+    }
+
+    return { diffs, merged: mergedCategories };
+  };
+
+  const previewTemplateDiff = useCallback(
+    (department: string, role: string, template: KPITemplate) => {
+      const affected = state.employees.filter(
+        (e) => e.department === department && e.role === role && !e.isAdjunct
+      );
+      const result: Record<string, KpiDiffItem[]> = {};
+      for (const emp of affected) {
+        const { diffs } = computeDiff(emp.categories || [], template);
+        if (diffs.length > 0) result[emp.id] = diffs;
+      }
+      return result;
+    },
+    [state.employees]
+  );
+
+  const pushTemplateToEmployees = useCallback(
+    async (department: string, role: string, template: KPITemplate) => {
+      const affected = state.employees.filter(
+        (e) => e.department === department && e.role === role && !e.isAdjunct
+      );
+
+      const now = new Date().toISOString();
+      const newRequests: KpiUpdateRequest[] = [];
+      const newNotifications: Notification[] = [];
+      const updatedEmployees: Employee[] = [];
+
+      for (const emp of affected) {
+        const existing = emp.categories || [];
+        const { diffs, merged } = computeDiff(existing, template);
+        if (diffs.length === 0) continue;
+
+        const beforeScore = computeScore(existing);
+        const afterScore = computeScore(merged);
+
+        updatedEmployees.push({
+          ...emp,
+          categories: merged,
+          needsKpiSetup: false,
+        });
+
+        const req: KpiUpdateRequest = {
+          id: newId(),
+          employeeId: emp.id,
+          department,
+          role,
+          templateVersion: 1,
+          diffs,
+          proposedCategories: merged,
+          beforeScore,
+          afterScore,
+          status: "unacknowledged",
+          createdAt: now,
+        };
+
+        newRequests.push(req);
+
+        newNotifications.push({
+          id: newId(),
+          userId: emp.id,
+          type: "appraisal_needs_revision" as any,
+          message: `Your KPIs were updated — ${diffs.length} change${diffs.length > 1 ? "s" : ""} to review`,
+          link: "/kpi-updates",
+          read: false,
+          createdAt: now,
+        });
+      }
+
+      setState((s) => ({
+        ...s,
+        employees: s.employees.map((emp) => {
+          const found = updatedEmployees.find((u) => u.id === emp.id);
+          return found || emp;
+        }),
+        kpiUpdateRequests: [...s.kpiUpdateRequests, ...newRequests],
+        notifications: [...s.notifications, ...newNotifications],
+      }));
+
+      try {
+        if (updatedEmployees.length > 0) {
+          await bulkUpsertEmployees(updatedEmployees);
+        }
+        for (const req of newRequests) {
+          await upsertKpiUpdateRequest(req);
+        }
+        for (const n of newNotifications) {
+          await insertNotification(n);
+        }
+      } catch (err) {
+        console.error("pushTemplateToEmployees persist error:", err);
+      }
+
+      return { affected: affected.length, created: newRequests.length };
+    },
+    [state.employees]
+  );
+
+  const getKpiUpdateRequests = useCallback(
+    (employeeId: string): KpiUpdateRequest[] =>
+      state.kpiUpdateRequests
+        .filter((r) => r.employeeId === employeeId)
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ),
+    [state.kpiUpdateRequests]
+  );
+
+  const getUnacknowledgedKpiUpdates = useCallback(
+    (): KpiUpdateRequest[] =>
+      state.kpiUpdateRequests.filter((r) => r.status === "unacknowledged"),
+    [state.kpiUpdateRequests]
+  );
+
+  const acknowledgeKpiUpdate = useCallback(
+    async (id: string) => {
+      const req = state.kpiUpdateRequests.find((r) => r.id === id);
+      if (!req) return;
+
+      const acknowledgedAt = new Date().toISOString();
+
+      setState((s) => ({
+        ...s,
+        kpiUpdateRequests: s.kpiUpdateRequests.map((r) =>
+          r.id === id
+            ? { ...r, status: "acknowledged" as const, acknowledgedAt }
+            : r
+        ),
+      }));
+
+      upsertKpiUpdateRequest({
+        ...req,
+        status: "acknowledged",
+        acknowledgedAt,
+      }).catch((err) =>
+        console.error("acknowledgeKpiUpdate save failed:", err)
+      );
+    },
+    [state.kpiUpdateRequests, state.employees]
+  );
+
+  const commentKpiUpdate = useCallback(
+    async (id: string, comment: string) => {
+      const req = state.kpiUpdateRequests.find((r) => r.id === id);
+      if (!req) return;
+
+      const commentedAt = new Date().toISOString();
+
+      setState((s) => ({
+        ...s,
+        kpiUpdateRequests: s.kpiUpdateRequests.map((r) =>
+          r.id === id
+            ? { ...r, employeeComment: comment, commentedAt }
+            : r
+        ),
+      }));
+
+      upsertKpiUpdateRequest({
+        ...req,
+        employeeComment: comment,
+        commentedAt,
+      }).catch((err) => console.error("commentKpiUpdate save failed:", err));
+    },
+    [state.kpiUpdateRequests]
+  );
+
+  // ============================================
+  // SYNC
   // ============================================
   const syncToCloud = useCallback(async () => {
     setIsSyncing(true);
@@ -1283,6 +1687,9 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       }
       for (const a of state.appraisals) {
         await upsertAppraisal(a);
+      }
+      for (const r of state.kpiUpdateRequests) {
+        await upsertKpiUpdateRequest(r);
       }
       localStorage.setItem(SYNC_FLAG_KEY, "true");
       console.log("✅ Manual sync complete");
@@ -1336,6 +1743,12 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     saveKPIProof,
     saveKPIComment,
     triggerAfterApproval,
+    previewTemplateDiff,
+    pushTemplateToEmployees,
+    getKpiUpdateRequests,
+    getUnacknowledgedKpiUpdates,
+    acknowledgeKpiUpdate,
+    commentKpiUpdate,
     syncToCloud,
   };
 
