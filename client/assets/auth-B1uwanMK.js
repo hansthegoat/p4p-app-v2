@@ -1,1 +1,0 @@
-import{s as n}from"./index-BfVc09Pg.js";async function i(a,t){const{data:s,error:r}=await n.auth.signInWithPassword({email:a,password:t});if(r)throw r;return s}async function e(a,t){const{data:s,error:r}=await n.auth.signUp({email:a,password:t});if(r)throw r;return s}export{i as l,e as r};
