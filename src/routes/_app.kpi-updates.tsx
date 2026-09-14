@@ -350,6 +350,11 @@ function DiffRow({ diff }: { diff: KpiDiffItem }) {
       tone: "text-amber-600 dark:text-amber-400 bg-amber-500/10",
       label: "Category weight changed",
     },
+    category_name_changed: {
+      icon: RefreshCw,
+      tone: "text-amber-600 dark:text-amber-400 bg-amber-500/10",
+      label: "Category renamed",
+    },
     kpi_added: {
       icon: Plus,
       tone: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10",
@@ -374,6 +379,11 @@ function DiffRow({ diff }: { diff: KpiDiffItem }) {
       icon: RefreshCw,
       tone: "text-amber-600 dark:text-amber-400 bg-amber-500/10",
       label: "KPI weight changed",
+    },
+    kpi_description_changed: {
+      icon: RefreshCw,
+      tone: "text-amber-600 dark:text-amber-400 bg-amber-500/10",
+      label: "KPI renamed",
     },
   };
 

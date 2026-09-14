@@ -23,12 +23,14 @@ import type {
 } from "./types";
 import { newId } from "./defaults";
 import { sendEmail } from "@/lib/email";
+import { supabase } from "@/lib/supabase";
 import {
   newAppraisalEmail,
   appraisalApprovedEmail,
   appraisalRejectedEmail,
   changesRequestedEmail,
   performanceTriggerEmail,
+  kpiUpdateEmail,
 } from "@/lib/email-templates";
 import {
   fetchAllEmployees,
@@ -1393,13 +1395,26 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           categoryName: tCat.name,
           after: tCat.weight,
         });
-      } else if (existingCat.weight !== tCat.weight) {
-        diffs.push({
-          kind: "category_weight_changed",
-          categoryName: tCat.name,
-          before: existingCat.weight,
-          after: tCat.weight,
-        });
+      } else {
+        if (existingCat.weight !== tCat.weight) {
+          diffs.push({
+            kind: "category_weight_changed",
+            categoryName: tCat.name,
+            before: existingCat.weight,
+            after: tCat.weight,
+          });
+        }
+        if (
+          existingByCatId.has(tCat.id) &&
+          existingCat.name !== tCat.name
+        ) {
+          diffs.push({
+            kind: "category_name_changed",
+            categoryName: tCat.name,
+            before: existingCat.name,
+            after: tCat.name,
+          });
+        }
       }
 
       const existingKpisById = new Map(
@@ -1435,6 +1450,18 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           continue;
         }
 
+        if (
+          existingKpisById.has(tKpi.id) &&
+          existingKpi.description !== tKpi.description
+        ) {
+          diffs.push({
+            kind: "kpi_description_changed",
+            categoryName: tCat.name,
+            kpiDescription: tKpi.description,
+            before: existingKpi.description,
+            after: tKpi.description,
+          });
+        }
         if (existingKpi.target !== tKpi.target) {
           diffs.push({
             kind: "kpi_target_changed",
@@ -1528,6 +1555,22 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         (e) => e.department === department && e.role === role && !e.isAdjunct
       );
 
+      let pushedBy: string | undefined;
+      let pushedByName: string | undefined;
+      try {
+        const { data } = await supabase.auth.getUser();
+        const user = data?.user;
+        if (user) {
+          pushedBy = user.id;
+          const me = state.employees.find(
+            (e) => e.authUserId === user.id || e.email === user.email
+          );
+          pushedByName = me?.name || user.email || "HR";
+        }
+      } catch {
+        // Email and audit metadata are best-effort during a push.
+      }
+
       const now = new Date().toISOString();
       const newRequests: KpiUpdateRequest[] = [];
       const newNotifications: Notification[] = [];
@@ -1559,6 +1602,8 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           afterScore,
           status: "unacknowledged",
           createdAt: now,
+          pushedBy,
+          pushedByName,
         };
 
         newRequests.push(req);
@@ -1572,6 +1617,27 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           read: false,
           createdAt: now,
         });
+
+        if (emp.email) {
+          const baseUrl =
+            typeof window !== "undefined" ? window.location.origin : "";
+          sendEmail({
+            to: [emp.email],
+            subject: `Your KPIs were updated (${diffs.length} change${diffs.length > 1 ? "s" : ""})`,
+            html: kpiUpdateEmail({
+              employeeName: emp.name,
+              department,
+              role,
+              changeCount: diffs.length,
+              diffs,
+              beforeScore,
+              afterScore,
+              baseUrl,
+            }),
+          }).catch((err) =>
+            console.error("KPI update email failed for", emp.email, err)
+          );
+        }
       }
 
       setState((s) => ({
@@ -1751,6 +1817,11 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     commentKpiUpdate,
     syncToCloud,
   };
+
+  // Dev-only: expose to window for console debugging
+  if (typeof window !== "undefined" && import.meta.env.DEV) {
+    (window as any).__p4p = value;
+  }
 
   return <C.Provider value={value}>{children}</C.Provider>;
 }

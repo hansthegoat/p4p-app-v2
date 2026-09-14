@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { EmployeeModal } from "@/components/p4p/EmployeeModal";
 import { DeleteConfirmModal } from "@/components/p4p/DeleteConfirmModal";
-import { deleteSupabaseUser, findUserByEmail } from "@/lib/supabase";
 
 export const Route = createFileRoute("/_app/employees")({
   component: EmployeesPage,
@@ -59,36 +58,8 @@ function EmployeesPage() {
 
   const handleDeleteEmployee = async () => {
     if (!employeeToDelete) return;
-    try {
-      if (!employeeToDelete.authUserId) {
-        const foundUser = await findUserByEmail(employeeToDelete.email);
-        if (foundUser) {
-          const { success, error } = await deleteSupabaseUser(foundUser.id);
-          if (!success) {
-            hardDeleteEmployee(employeeToDelete.id);
-            showToast.warning("Partial Deletion", `${employeeToDelete.name} removed from app, but could not delete from Supabase Auth.`);
-            return;
-          }
-          hardDeleteEmployee(employeeToDelete.id);
-          showToast.success("Employee Deleted", `${employeeToDelete.name} has been permanently deleted.`);
-          return;
-        } else {
-          hardDeleteEmployee(employeeToDelete.id);
-          showToast.success("Employee Removed", `${employeeToDelete.name} removed from app.`);
-          return;
-        }
-      }
-      const { success, error } = await deleteSupabaseUser(employeeToDelete.authUserId);
-      if (!success) {
-        hardDeleteEmployee(employeeToDelete.id);
-        showToast.warning("Partial Deletion", `${employeeToDelete.name} removed from app but could not delete from Supabase Auth.`);
-        return;
-      }
-      hardDeleteEmployee(employeeToDelete.id);
-      showToast.success("Employee Deleted", `${employeeToDelete.name} has been permanently deleted.`);
-    } catch (err: any) {
-      showToast.error("Deletion Failed", err.message);
-    }
+    hardDeleteEmployee(employeeToDelete.id);
+    showToast.success("Employee Removed", `${employeeToDelete.name} removed from app.`);
   };
 
   const handleClearAll = () => {

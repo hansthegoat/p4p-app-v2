@@ -571,7 +571,10 @@ function mapKpiUpdateFromDB(row: any): KpiUpdateRequest {
     status: row.status,
     employeeComment: row.employee_comment || undefined,
     createdAt: row.created_at,
-    resolvedAt: row.resolved_at || undefined,
+    acknowledgedAt: row.acknowledged_at || undefined,
+    commentedAt: row.commented_at || undefined,
+    pushedBy: row.pushed_by || undefined,
+    pushedByName: row.pushed_by_name || undefined,
   };
 }
 
@@ -589,6 +592,9 @@ function mapKpiUpdateToDB(req: KpiUpdateRequest): any {
     status: req.status,
     employee_comment: req.employeeComment || null,
     created_at: req.createdAt,
-    resolved_at: req.resolvedAt || null,
+    acknowledged_at: req.acknowledgedAt || null,
+    commented_at: req.commentedAt || null,
+    pushed_by: req.pushedBy || null,
+    pushed_by_name: req.pushedByName || null,
   };
 }

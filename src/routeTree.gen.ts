@@ -22,10 +22,12 @@ import { Route as AppSupervisorsRouteImport } from './routes/_app.supervisors'
 import { Route as AppMyCalculationRouteImport } from './routes/_app.my-calculation'
 import { Route as AppMonthlyRouteImport } from './routes/_app.monthly'
 import { Route as AppKpiUpdatesRouteImport } from './routes/_app.kpi-updates'
+import { Route as AppKpiFrameworkRouteImport } from './routes/_app.kpi-framework'
 import { Route as AppGradesRouteImport } from './routes/_app.grades'
 import { Route as AppEmployeesRouteImport } from './routes/_app.employees'
 import { Route as AppEmployeeRouteImport } from './routes/_app.employee'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppAuditLogRouteImport } from './routes/_app.audit-log'
 import { Route as AppAppraisalsReviewRouteImport } from './routes/_app.appraisals-review'
 import { Route as AppAppraisalsRouteImport } from './routes/_app.appraisals'
 
@@ -92,6 +94,11 @@ const AppKpiUpdatesRoute = AppKpiUpdatesRouteImport.update({
   path: '/kpi-updates',
   getParentRoute: () => AppRoute,
 } as any)
+const AppKpiFrameworkRoute = AppKpiFrameworkRouteImport.update({
+  id: '/kpi-framework',
+  path: '/kpi-framework',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppGradesRoute = AppGradesRouteImport.update({
   id: '/grades',
   path: '/grades',
@@ -112,6 +119,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAuditLogRoute = AppAuditLogRouteImport.update({
+  id: '/audit-log',
+  path: '/audit-log',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAppraisalsReviewRoute = AppAppraisalsReviewRouteImport.update({
   id: '/appraisals-review',
   path: '/appraisals-review',
@@ -130,10 +142,12 @@ export interface FileRoutesByFullPath {
   '/verify-otp': typeof VerifyOtpRoute
   '/appraisals': typeof AppAppraisalsRoute
   '/appraisals-review': typeof AppAppraisalsReviewRoute
+  '/audit-log': typeof AppAuditLogRoute
   '/dashboard': typeof AppDashboardRoute
   '/employee': typeof AppEmployeeRoute
   '/employees': typeof AppEmployeesRoute
   '/grades': typeof AppGradesRoute
+  '/kpi-framework': typeof AppKpiFrameworkRoute
   '/kpi-updates': typeof AppKpiUpdatesRoute
   '/monthly': typeof AppMonthlyRoute
   '/my-calculation': typeof AppMyCalculationRoute
@@ -149,10 +163,12 @@ export interface FileRoutesByTo {
   '/verify-otp': typeof VerifyOtpRoute
   '/appraisals': typeof AppAppraisalsRoute
   '/appraisals-review': typeof AppAppraisalsReviewRoute
+  '/audit-log': typeof AppAuditLogRoute
   '/dashboard': typeof AppDashboardRoute
   '/employee': typeof AppEmployeeRoute
   '/employees': typeof AppEmployeesRoute
   '/grades': typeof AppGradesRoute
+  '/kpi-framework': typeof AppKpiFrameworkRoute
   '/kpi-updates': typeof AppKpiUpdatesRoute
   '/monthly': typeof AppMonthlyRoute
   '/my-calculation': typeof AppMyCalculationRoute
@@ -171,10 +187,12 @@ export interface FileRoutesById {
   '/verify-otp': typeof VerifyOtpRoute
   '/_app/appraisals': typeof AppAppraisalsRoute
   '/_app/appraisals-review': typeof AppAppraisalsReviewRoute
+  '/_app/audit-log': typeof AppAuditLogRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/employee': typeof AppEmployeeRoute
   '/_app/employees': typeof AppEmployeesRoute
   '/_app/grades': typeof AppGradesRoute
+  '/_app/kpi-framework': typeof AppKpiFrameworkRoute
   '/_app/kpi-updates': typeof AppKpiUpdatesRoute
   '/_app/monthly': typeof AppMonthlyRoute
   '/_app/my-calculation': typeof AppMyCalculationRoute
@@ -192,10 +210,12 @@ export interface FileRouteTypes {
     | '/verify-otp'
     | '/appraisals'
     | '/appraisals-review'
+    | '/audit-log'
     | '/dashboard'
     | '/employee'
     | '/employees'
     | '/grades'
+    | '/kpi-framework'
     | '/kpi-updates'
     | '/monthly'
     | '/my-calculation'
@@ -211,10 +231,12 @@ export interface FileRouteTypes {
     | '/verify-otp'
     | '/appraisals'
     | '/appraisals-review'
+    | '/audit-log'
     | '/dashboard'
     | '/employee'
     | '/employees'
     | '/grades'
+    | '/kpi-framework'
     | '/kpi-updates'
     | '/monthly'
     | '/my-calculation'
@@ -232,10 +254,12 @@ export interface FileRouteTypes {
     | '/verify-otp'
     | '/_app/appraisals'
     | '/_app/appraisals-review'
+    | '/_app/audit-log'
     | '/_app/dashboard'
     | '/_app/employee'
     | '/_app/employees'
     | '/_app/grades'
+    | '/_app/kpi-framework'
     | '/_app/kpi-updates'
     | '/_app/monthly'
     | '/_app/my-calculation'
@@ -347,6 +371,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppKpiUpdatesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/kpi-framework': {
+      id: '/_app/kpi-framework'
+      path: '/kpi-framework'
+      fullPath: '/kpi-framework'
+      preLoaderRoute: typeof AppKpiFrameworkRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/grades': {
       id: '/_app/grades'
       path: '/grades'
@@ -375,6 +406,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/audit-log': {
+      id: '/_app/audit-log'
+      path: '/audit-log'
+      fullPath: '/audit-log'
+      preLoaderRoute: typeof AppAuditLogRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/appraisals-review': {
       id: '/_app/appraisals-review'
       path: '/appraisals-review'
@@ -395,10 +433,12 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppAppraisalsRoute: typeof AppAppraisalsRoute
   AppAppraisalsReviewRoute: typeof AppAppraisalsReviewRoute
+  AppAuditLogRoute: typeof AppAuditLogRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppEmployeeRoute: typeof AppEmployeeRoute
   AppEmployeesRoute: typeof AppEmployeesRoute
   AppGradesRoute: typeof AppGradesRoute
+  AppKpiFrameworkRoute: typeof AppKpiFrameworkRoute
   AppKpiUpdatesRoute: typeof AppKpiUpdatesRoute
   AppMonthlyRoute: typeof AppMonthlyRoute
   AppMyCalculationRoute: typeof AppMyCalculationRoute
@@ -409,10 +449,12 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAppraisalsRoute: AppAppraisalsRoute,
   AppAppraisalsReviewRoute: AppAppraisalsReviewRoute,
+  AppAuditLogRoute: AppAuditLogRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppEmployeeRoute: AppEmployeeRoute,
   AppEmployeesRoute: AppEmployeesRoute,
   AppGradesRoute: AppGradesRoute,
+  AppKpiFrameworkRoute: AppKpiFrameworkRoute,
   AppKpiUpdatesRoute: AppKpiUpdatesRoute,
   AppMonthlyRoute: AppMonthlyRoute,
   AppMyCalculationRoute: AppMyCalculationRoute,

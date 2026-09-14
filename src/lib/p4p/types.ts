@@ -319,11 +319,13 @@ export type DiffKind =
   | "category_added"
   | "category_removed"
   | "category_weight_changed"
+  | "category_name_changed"
   | "kpi_added"
   | "kpi_removed"
   | "kpi_target_changed"
   | "kpi_metric_changed"
-  | "kpi_weight_changed";
+  | "kpi_weight_changed"
+  | "kpi_description_changed";
 
 export interface KpiDiffItem {
   kind: DiffKind;
@@ -348,6 +350,8 @@ export interface KpiUpdateRequest {
   createdAt: string;
   acknowledgedAt?: string;
   commentedAt?: string;
+  pushedBy?: string;
+  pushedByName?: string;
 }
 
 // Also — patch the Employee type to declare the field we use everywhere

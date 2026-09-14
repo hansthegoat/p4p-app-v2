@@ -50,6 +50,13 @@ function infoCard(rows: string): string {
   return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #fafafa; border: 1px solid #f0f0f3; border-radius: 10px; margin: 0 0 24px;"><tr><td style="padding: 16px 20px;"><table role="presentation" width="100%">${rows}</table></td></tr></table>`;
 }
 
+function noticeCard(message: string, tone: "blue"): string {
+  const colors = tone === "blue"
+    ? { background: "#eff6ff", border: "#bfdbfe", text: "#1e3a8a" }
+    : { background: "#fafafa", border: "#f0f0f3", text: "#18181b" };
+  return `<div style="background: ${colors.background}; border: 1px solid ${colors.border}; border-radius: 10px; padding: 12px 16px; margin: 0 0 24px;"><p style="margin: 0; color: ${colors.text}; font-size: 13px; line-height: 1.5;">${message}</p></div>`;
+}
+
 interface AppraisalEmailData {
   employeeName: string;
   department: string;
@@ -131,4 +138,96 @@ export function performanceTriggerEmail(
     ${triggers.map((t) => `<div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 12px 16px; margin-bottom: 8px;"><p style="margin: 0; color: #7f1d1d; font-size: 13px;">${t.message}</p></div>`).join("")}
     ${ctaButton("View Employee", `${baseUrl}/employees`)}
   `, `Performance alert: ${employeeName}`);
+}
+
+// ─── KPI UPDATE EMAIL ─────────────────────────────────────
+
+export function kpiUpdateEmail(data: {
+  employeeName: string;
+  department: string;
+  role: string;
+  changeCount: number;
+  diffs: { kind: string; categoryName: string; kpiDescription?: string; before?: unknown; after?: unknown }[];
+  beforeScore: number;
+  afterScore: number;
+  baseUrl: string;
+}): string {
+  const {
+    employeeName, department, role, changeCount, diffs,
+    beforeScore, afterScore, baseUrl,
+  } = data;
+
+  const diffRows = diffs
+    .map((d) => {
+      const label = labelForDiffKind(d.kind);
+      const where = d.kpiDescription
+        ? `${d.categoryName} · ${d.kpiDescription}`
+        : d.categoryName;
+      const before = d.before !== undefined
+        ? `<span style="text-decoration: line-through; color: #a1a1aa;">${String(d.before)}</span>`
+        : "";
+      const after = d.after !== undefined
+        ? `<strong style="color: #18181b;">${String(d.after)}</strong>`
+        : "";
+      const values = before && after
+        ? ` ${before} <span style="color: #a1a1aa;">→</span> ${after}`
+        : after || before;
+      return `
+        <tr>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #f0f0f3;">
+            <div style="font-size: 12px; font-weight: 600; color: #18181b;">${label}</div>
+            <div style="font-size: 11px; color: #71717a; margin-top: 2px;">${where}</div>
+            ${values ? `<div style="font-size: 12px; margin-top: 6px;">${values}</div>` : ""}
+          </td>
+        </tr>`;
+    })
+    .join("");
+
+  const content = baseLayout(`
+    <h1 style="margin: 0 0 8px; color: #18181b; font-size: 22px; font-weight: 600; letter-spacing: -0.5px; line-height: 1.3;">
+      Your KPIs were updated
+    </h1>
+    <p style="margin: 0 0 24px; color: #52525b; font-size: 14px; line-height: 1.6;">
+      Hi ${employeeName}, HR has made <strong>${changeCount}</strong> change${changeCount > 1 ? "s" : ""} to your KPI structure.
+    </p>
+
+    ${infoCard(
+      infoRow("Department", department) +
+      infoRow("Role", role) +
+      infoRow("Changes", String(changeCount))
+    )}
+
+    <p style="margin: 0 0 12px; color: #18181b; font-size: 13px; font-weight: 600;">
+      What changed
+    </p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 1px solid #f0f0f3; border-radius: 10px; overflow: hidden; margin: 0 0 24px;">
+      ${diffRows}
+    </table>
+
+    ${noticeCard(
+      "These changes are <strong>already in effect</strong>. Please review and acknowledge so HR knows you've seen them.",
+      "blue"
+    )}
+
+    ${ctaButton("Review & Acknowledge", `${baseUrl}/kpi-updates`)}
+  `);
+
+  return baseLayout(
+    content,
+    `HR updated your KPIs — ${changeCount} change${changeCount > 1 ? "s" : ""}`
+  );
+}
+
+function labelForDiffKind(kind: string): string {
+  switch (kind) {
+    case "category_added": return "New category";
+    case "category_removed": return "Category removed";
+    case "category_weight_changed": return "Category weight changed";
+    case "kpi_added": return "New KPI";
+    case "kpi_removed": return "KPI removed";
+    case "kpi_target_changed": return "Target changed";
+    case "kpi_metric_changed": return "Metric changed";
+    case "kpi_weight_changed": return "KPI weight changed";
+    default: return kind;
+  }
 }

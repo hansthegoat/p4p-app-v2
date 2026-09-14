@@ -21,6 +21,7 @@ import {
   Sparkles,
   Calculator,
   RefreshCw,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +50,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "KPI Framework", to: "/kpi-framework", icon: FileSpreadsheet, roles: ["admin"] },
   { label: "Monthly Performance", to: "/monthly", icon: TrendingUp, roles: ["hr", "admin"] },
   { label: "Calculation Trace", to: "/trace", icon: FileText, roles: ["hr", "admin"] },
+  { label: "Audit Log", to: "/audit-log", icon: History, roles: ["hr", "admin"] },
   { label: "Supervisors", to: "/supervisors", icon: UserCheck, roles: ["admin"] },
   { label: "Grade Points", to: "/grades", icon: Target, roles: ["hr", "admin"] },
 ];
