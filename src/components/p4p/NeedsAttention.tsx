@@ -1,8 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useP4P } from "@/lib/p4p/store";
 import { Card } from "@/components/ui/card";
-import { motion } from "framer-motion";
-import { staggerContainer, fadeUp } from "@/lib/motion";
 import {
   UserX, Target, ClipboardCheck, Bell, ChevronRight,
   AlertCircle, CheckCircle2,
@@ -58,13 +56,10 @@ function Widget({
   const t = tones[tone];
 
   return (
-    <motion.button
-      variants={fadeUp}
+    <button
+      type="button"
       onClick={() => navigate({ to: ctaTo })}
-      whileHover={{ y: -2 }}
-      whileTap={{ scale: 0.995 }}
-      transition={{ type: "spring", stiffness: 400, damping: 30 }}
-      className={`w-full text-left rounded-lg border ${t.border} ${t.bg} p-4 transition-colors ${t.hover} group`}
+      className={`w-full text-left rounded-lg border ${t.border} ${t.bg} p-4 transition-all duration-200 ${t.hover} hover:-translate-y-0.5 active:scale-[0.99] group cursor-pointer`}
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className={`w-8 h-8 rounded-md flex items-center justify-center ${t.icon}`}>
@@ -89,7 +84,7 @@ function Widget({
         {ctaText}
         <ChevronRight className="h-3 w-3 ml-0.5 transition-transform group-hover:translate-x-0.5" />
       </div>
-    </motion.button>
+    </button>
   );
 }
 
@@ -97,21 +92,21 @@ export function NeedsAttention() {
   const { employees, appraisals, kpiUpdateRequests } = useP4P();
 
   const activeEmployees = employees.filter(
-    (employee) => employee.roleType === "employee" && !employee.isAdjunct
+    (e) => e.roleType === "employee" && !e.isAdjunct
   );
 
   const noSupervisor = activeEmployees.filter(
-    (employee) => !employee.supervisorId || employee.supervisorId === ""
+    (e) => !e.supervisorId || e.supervisorId === ""
   );
 
   const noKpis = activeEmployees.filter(
-    (employee) => !employee.categories || employee.categories.length === 0
+    (e) => !e.categories || e.categories.length === 0
   );
 
-  const pendingAppraisals = appraisals.filter((appraisal) => appraisal.status === "pending");
+  const pendingAppraisals = appraisals.filter((a) => a.status === "pending");
 
   const unackedUpdates = kpiUpdateRequests.filter(
-    (request) => request.status === "unacknowledged"
+    (r) => r.status === "unacknowledged"
   );
 
   const totalIssues =
@@ -120,38 +115,28 @@ export function NeedsAttention() {
     pendingAppraisals.length +
     unackedUpdates.length;
 
+  // Always visible — even when nothing is wrong, show a status card
   if (totalIssues === 0) {
     return (
-      <motion.div
-        initial="hidden"
-        animate="show"
-        variants={fadeUp}
-      >
-        <Card className="p-6 border-emerald-500/20 bg-emerald-500/5">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <div>
-              <div className="text-[13px] font-medium">Everything is under control</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">
-                No pending actions across the organization.
-              </div>
+      <Card className="p-6 border-emerald-500/20 bg-emerald-500/5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div>
+            <div className="text-[13px] font-medium">Everything is under control</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              No pending actions across the organization.
             </div>
           </div>
-        </Card>
-      </motion.div>
+        </div>
+      </Card>
     );
   }
 
   return (
-    <motion.div
-      initial="hidden"
-      animate="show"
-      variants={staggerContainer}
-      className="space-y-3"
-    >
-      <motion.div variants={fadeUp} className="flex items-center gap-2">
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
         <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
         <h2 className="text-[13px] font-semibold text-foreground">
           Needs your attention
@@ -159,12 +144,9 @@ export function NeedsAttention() {
         <span className="text-[11px] text-muted-foreground">
           — {totalIssues} pending {totalIssues === 1 ? "action" : "actions"}
         </span>
-      </motion.div>
+      </div>
 
-      <motion.div
-        variants={staggerContainer}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
-      >
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {noSupervisor.length > 0 && (
           <Widget
             icon={UserX}
@@ -213,7 +195,7 @@ export function NeedsAttention() {
             tone="purple"
           />
         )}
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }

@@ -2,28 +2,19 @@ import * as XLSX from "xlsx";
 import type { KPITemplate, CategoryTemplate, KPIItem } from "./types";
 import { newId } from "./defaults";
 
-export interface ParsedExcelResult {
-  template: KPITemplate | null;
-  errors: string[];
-  warnings: string[];
-}
+// ============================================
+// SINGLE TEMPLATE — EXPORT
+// ============================================
 
-/**
- * Generate an .xlsx file from the current template.
- * Flat format: one row per KPI, with Department / Role / Category repeated per row.
- * Also adds a "How to use" sheet with instructions.
- */
 export function exportTemplateToExcel(
   template: KPITemplate,
   department: string,
   roleName: string
 ): void {
-  // ─── Sheet 1: KPIs ───────────────────────────────────
   const rows: any[] = [];
 
   for (const cat of template.categories) {
     if (cat.kpis.length === 0) {
-      // Category with no KPIs — one placeholder row
       rows.push({
         "Department": department,
         "Role": roleName,
@@ -54,68 +45,36 @@ export function exportTemplateToExcel(
   }
 
   const ws = XLSX.utils.json_to_sheet(rows);
-
   ws["!cols"] = [
-    { wch: 16 },  // Department
-    { wch: 18 },  // Role
-    { wch: 24 },  // Category
-    { wch: 16 },  // Category Weight %
-    { wch: 36 },  // KPI Description
-    { wch: 14 },  // KPI Weight %
-    { wch: 10 },  // Metric
-    { wch: 10 },  // Target
-    { wch: 22 },  // Measurement Source
+    { wch: 16 },
+    { wch: 18 },
+    { wch: 24 },
+    { wch: 16 },
+    { wch: 36 },
+    { wch: 14 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 22 },
   ];
-
-  // ─── Sheet 2: How to use ─────────────────────────────
-  const help: any[][] = [
-    ["How to use this KPI template"],
-    [],
-    ["1. One row per KPI."],
-    ["   If a category has 3 KPIs, that category gets 3 rows."],
-    [],
-    ["2. Department, Role, Category, and Category Weight % repeat on every row"],
-    ["   of the same category. That's normal — change one, change them all."],
-    [],
-    ["3. Two weight rules that MUST hold or the import will fail:"],
-    ["   • Category Weight % must sum to 100 across the whole sheet"],
-    ["   • KPI Weight % must sum to 100 inside each category"],
-    [],
-    ["4. Columns explained:"],
-    ["   • Department         — free text, for reference"],
-    ["   • Role               — free text, for reference"],
-    ["   • Category           — the name of the KPI group"],
-    ["   • Category Weight %  — how much this category counts toward the total (0–100)"],
-    ["   • KPI Description    — what the KPI is, in plain language"],
-    ["   • KPI Weight %       — how much this KPI counts inside its category (0–100)"],
-    ["   • Metric             — the unit: %, #, hrs, days, GHS, $, ROI"],
-    ["   • Target             — the goal number for the period"],
-    ["   • Measurement Source — optional, where the number comes from (e.g. Zendesk)"],
-    [],
-    ["5. Common tasks:"],
-    ["   • Add a KPI:      copy any row, change KPI Description, adjust KPI Weight %"],
-    ["   • Change a target: edit the Target cell only"],
-    ["   • Remove a KPI:   delete the row, adjust the remaining KPI weights to 100"],
-    ["   • Rename category: edit Category cell on every row of that group"],
-    [],
-    ["6. When done, save the file and use the Import button in the KPI Framework page."],
-    ["   The system will preview the changes before applying them."],
-  ];
-  const wsHelp = XLSX.utils.aoa_to_sheet(help);
-  wsHelp["!cols"] = [{ wch: 90 }];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "KPIs");
-  XLSX.utils.book_append_sheet(wb, wsHelp, "How to use");
 
   const safe = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, "_");
   const filename = `KPI_${safe(department)}_${safe(roleName)}.xlsx`;
   XLSX.writeFile(wb, filename);
 }
 
-/**
- * Parse an uploaded .xlsx (flat format, one row per KPI) into a template.
- */
+// ============================================
+// SINGLE TEMPLATE — PARSE
+// ============================================
+
+export interface ParsedExcelResult {
+  template: KPITemplate | null;
+  errors: string[];
+  warnings: string[];
+}
+
 export async function parseExcelToTemplate(
   file: File
 ): Promise<ParsedExcelResult> {
@@ -125,8 +84,6 @@ export async function parseExcelToTemplate(
   try {
     const buffer = await file.arrayBuffer();
     const wb = XLSX.read(buffer, { type: "array" });
-
-    // Prefer sheet named "KPIs", fall back to first sheet
     const sheetName = wb.SheetNames.includes("KPIs")
       ? "KPIs"
       : wb.SheetNames[0];
@@ -140,7 +97,6 @@ export async function parseExcelToTemplate(
       return { template: null, errors: ["The file has no data rows."], warnings };
     }
 
-    // ─── Required columns ────────────────────────────────
     const required = [
       "Category",
       "Category Weight %",
@@ -154,7 +110,6 @@ export async function parseExcelToTemplate(
     }
     if (errors.length > 0) return { template: null, errors, warnings };
 
-    // ─── Group rows by category ──────────────────────────
     const categoryMap = new Map<
       string,
       { id: string; name: string; weight: number; kpis: KPIItem[] }
@@ -188,7 +143,7 @@ export async function parseExcelToTemplate(
       cat.weight = catWeight;
 
       const kpiDesc = String(row["KPI Description"] || "").trim();
-      if (!kpiDesc) continue; // category-only placeholder row
+      if (!kpiDesc) continue;
 
       const weightRaw = row["KPI Weight %"];
       const targetRaw = row["Target"];
@@ -228,7 +183,6 @@ export async function parseExcelToTemplate(
 
     const categories: CategoryTemplate[] = Array.from(categoryMap.values());
 
-    // ─── Weight validation ───────────────────────────────
     const totalCatWeight = categories.reduce((s, c) => s + c.weight, 0);
     if (Math.abs(totalCatWeight - 100) > 0.01) {
       errors.push(
@@ -261,6 +215,241 @@ export async function parseExcelToTemplate(
       template: null,
       errors: [`Could not read file: ${err.message || "unknown error"}`],
       warnings,
+    };
+  }
+}
+
+// ============================================
+// BULK — EXPORT ALL
+// ============================================
+
+export function exportAllTemplatesToExcel(templates: Record<string, KPITemplate>): void {
+  const rows: any[] = [];
+
+  for (const t of Object.values(templates)) {
+    for (const cat of t.categories) {
+      if (cat.kpis.length === 0) {
+        rows.push({
+          "Department": t.department,
+          "Role": t.roleName,
+          "Category": cat.name,
+          "Category Weight %": cat.weight,
+          "KPI Description": "",
+          "KPI Weight %": "",
+          "Metric": "",
+          "Target": "",
+          "Measurement Source": "",
+        });
+        continue;
+      }
+      for (const kpi of cat.kpis) {
+        rows.push({
+          "Department": t.department,
+          "Role": t.roleName,
+          "Category": cat.name,
+          "Category Weight %": cat.weight,
+          "KPI Description": kpi.description,
+          "KPI Weight %": kpi.weight ?? 0,
+          "Metric": kpi.metric,
+          "Target": kpi.target,
+          "Measurement Source": kpi.measurementSource || "",
+        });
+      }
+    }
+  }
+
+  if (rows.length === 0) {
+    rows.push({
+      "Department": "Support",
+      "Role": "Team Lead",
+      "Category": "Example Category",
+      "Category Weight %": 100,
+      "KPI Description": "Example KPI",
+      "KPI Weight %": 100,
+      "Metric": "%",
+      "Target": 100,
+      "Measurement Source": "",
+    });
+  }
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws["!cols"] = [
+    { wch: 16 }, { wch: 18 }, { wch: 24 }, { wch: 16 },
+    { wch: 36 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 22 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "All KPIs");
+  XLSX.writeFile(wb, `P4P_All_KPIs_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+// ============================================
+// BULK — PARSE
+// ============================================
+
+export interface BulkParsedResult {
+  templates: KPITemplate[];
+  errors: string[];
+  warnings: string[];
+  summary: {
+    departments: number;
+    roles: number;
+    categories: number;
+    kpis: number;
+  };
+}
+
+export async function parseExcelForBulkImport(file: File): Promise<BulkParsedResult> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const emptySummary = { departments: 0, roles: 0, categories: 0, kpis: 0 };
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: "array" });
+    const sheetName = wb.SheetNames.includes("KPIs") ? "KPIs" : wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName];
+    if (!sheet) {
+      return { templates: [], errors: ["No data sheet found."], warnings, summary: emptySummary };
+    }
+
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    if (rows.length === 0) {
+      return { templates: [], errors: ["The file has no data rows."], warnings, summary: emptySummary };
+    }
+
+    const required = [
+      "Department", "Role", "Category", "Category Weight %",
+      "KPI Description", "KPI Weight %", "Target",
+    ];
+    const headers = Object.keys(rows[0]);
+    for (const col of required) {
+      if (!headers.includes(col)) errors.push(`Missing required column: "${col}"`);
+    }
+    if (errors.length > 0) return { templates: [], errors, warnings, summary: emptySummary };
+
+    type Grouped = {
+      department: string;
+      roleName: string;
+      categories: Map<string, { id: string; name: string; weight: number; kpis: KPIItem[] }>;
+    };
+    const grouped = new Map<string, Grouped>();
+
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      const rowNum = r + 2;
+      const dept = String(row["Department"] || "").trim();
+      const role = String(row["Role"] || "").trim();
+      const catName = String(row["Category"] || "").trim();
+      if (!dept || !role || !catName) continue;
+
+      const key = `${dept}||${role}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, { department: dept, roleName: role, categories: new Map() });
+      }
+      const g = grouped.get(key)!;
+
+      const catWeightRaw = row["Category Weight %"];
+      const catWeight = Number(catWeightRaw);
+      if (isNaN(catWeight)) {
+        errors.push(`Row ${rowNum}: Category Weight % is not a number ("${catWeightRaw}")`);
+        continue;
+      }
+
+      if (!g.categories.has(catName)) {
+        g.categories.set(catName, { id: newId(), name: catName, weight: catWeight, kpis: [] });
+      }
+      const cat = g.categories.get(catName)!;
+      cat.weight = catWeight;
+
+      const kpiDesc = String(row["KPI Description"] || "").trim();
+      if (!kpiDesc) continue;
+
+      const weightRaw = row["KPI Weight %"];
+      const targetRaw = row["Target"];
+      const metric = String(row["Metric"] || "").trim();
+      const source = String(row["Measurement Source"] || "").trim();
+
+      const weight = Number(weightRaw);
+      const target = Number(targetRaw);
+
+      if (isNaN(weight)) {
+        errors.push(`Row ${rowNum} ("${kpiDesc}"): KPI Weight % is not a number ("${weightRaw}")`);
+        continue;
+      }
+      if (isNaN(target)) {
+        errors.push(`Row ${rowNum} ("${kpiDesc}"): Target is not a number ("${targetRaw}")`);
+        continue;
+      }
+
+      cat.kpis.push({
+        id: newId(),
+        description: kpiDesc,
+        metric: metric || "%",
+        target,
+        weight,
+        measurementSource: source || undefined,
+      });
+    }
+
+    if (grouped.size === 0) {
+      return { templates: [], errors: ["No valid rows found."], warnings, summary: emptySummary };
+    }
+
+    const templates: KPITemplate[] = [];
+    let totalCats = 0;
+    let totalKpis = 0;
+    const depts = new Set<string>();
+
+    for (const g of grouped.values()) {
+      depts.add(g.department);
+      const categories = Array.from(g.categories.values());
+      totalCats += categories.length;
+      totalKpis += categories.reduce((s, c) => s + c.kpis.length, 0);
+
+      const totalCatWeight = categories.reduce((s, c) => s + c.weight, 0);
+      if (Math.abs(totalCatWeight - 100) > 0.01) {
+        errors.push(
+          `${g.department} / ${g.roleName}: category weights sum to ${totalCatWeight}% (must be 100%)`
+        );
+      }
+      for (const cat of categories) {
+        if (cat.kpis.length === 0) continue;
+        const kpiSum = cat.kpis.reduce((s, k) => s + (k.weight || 0), 0);
+        if (Math.abs(kpiSum - 100) > 0.01) {
+          errors.push(
+            `${g.department} / ${g.roleName} → ${cat.name}: KPI weights sum to ${kpiSum}% (must be 100%)`
+          );
+        }
+      }
+
+      templates.push({
+        department: g.department,
+        roleName: g.roleName,
+        jobGrade: "",
+        categories,
+      });
+    }
+
+    if (errors.length > 0) return { templates: [], errors, warnings, summary: emptySummary };
+
+    return {
+      templates,
+      errors: [],
+      warnings,
+      summary: {
+        departments: depts.size,
+        roles: grouped.size,
+        categories: totalCats,
+        kpis: totalKpis,
+      },
+    };
+  } catch (err: any) {
+    return {
+      templates: [],
+      errors: [`Could not read file: ${err.message || "unknown error"}`],
+      warnings,
+      summary: emptySummary,
     };
   }
 }

@@ -17,13 +17,16 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { getCurrentUser } from "@/lib/supabase";
 import { useUser } from "@/lib/p4p/user-context";
 import { staggerContainer, fadeUp, tabContent, cardHover } from "@/lib/motion";
+import { showToast } from "@/lib/toast";
 import { KpiUpdatesBanner } from "@/components/p4p/KpiUpdatesBanner";
 import { NeedsAttention } from "@/components/p4p/NeedsAttention";
+import { BonusGate } from "@/components/p4p/BonusGate";
+import { DepartmentLeaderboard } from "@/components/p4p/DepartmentLeaderboard";
 import {
   TrendingUp, Wallet, Users, UserCheck, DollarSign,
   Sparkles, Target, Calendar, Award, AlertTriangle,
   Settings, Save, RefreshCw, Activity, PieChart,
-  BarChart3, CheckCircle, Clock, Star, Zap, Info, AlertCircle,
+  BarChart3, CheckCircle, Clock, Star, Zap, Info, AlertCircle, Eye, EyeOff,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -67,9 +70,36 @@ function Dashboard() {
   const {
     globals, setGlobals, calc, employees, monthlyData,
     getAllTrends, getMonthlyStats, getMonthlyHistory,
+    bonusRevealed, setBonusRevealed,
   } = useP4P();
-  const { role } = useUser();
-  const isAdmin = role === "admin" || role === "hr";
+  const { role: contextRole, user: contextUser } = useUser();
+  const [detectedRole, setDetectedRole] = useState<string>("employee");
+
+  useEffect(() => {
+    (async () => {
+      // Shared HR login — always HR
+      if (contextUser?.email === "hr@aoholdings.net") {
+        setDetectedRole("hr");
+        return;
+      }
+      // Otherwise find the employee record by email or auth id
+      const emp = employees.find(
+        (e) =>
+          (contextUser?.email && e.email === contextUser.email) ||
+          (contextUser?.id && e.authUserId === contextUser.id)
+      );
+      if (emp?.roleType) {
+        setDetectedRole(emp.roleType);
+        return;
+      }
+      // Fallback to context role
+      if (contextRole && ["employee", "hr", "admin"].includes(contextRole)) {
+        setDetectedRole(contextRole);
+      }
+    })();
+  }, [contextUser, employees, contextRole]);
+
+  const isAdmin = detectedRole === "admin" || detectedRole === "hr";
 
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -295,6 +325,53 @@ function Dashboard() {
 
         <NeedsAttention />
 
+        <Card className="p-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                bonusRevealed
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              }`}>
+                {bonusRevealed ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              </div>
+              <div className="min-w-0">
+                <div className="text-[13px] font-semibold">
+                  Bonus visibility: {bonusRevealed ? "Revealed" : "Hidden"}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  {bonusRevealed
+                    ? "Employees can see their bonus amounts."
+                    : "Employees see a locked placeholder until you reveal."}
+                </div>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={async () => {
+                try {
+                  await setBonusRevealed(!bonusRevealed);
+                  showToast.success(
+                    !bonusRevealed ? "Bonuses revealed" : "Bonuses hidden",
+                    !bonusRevealed
+                      ? "All employees can now see their amounts."
+                      : "Employees see the locked placeholder again."
+                  );
+                } catch (err: any) {
+                  showToast.error("Could not update", err.message);
+                }
+              }}
+              className={`gap-2 ${
+                bonusRevealed
+                  ? "bg-background border border-border text-foreground hover:bg-accent"
+                  : "bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white"
+              }`}
+            >
+              {bonusRevealed ? "Hide bonuses" : "Reveal bonuses"}
+            </Button>
+          </div>
+        </Card>
+
         <SectionCard title="Global P4P Settings" description="Controls revenue, pool allocation, and thresholds" icon={<Settings className="h-4 w-4" />}
           action={<Button size="sm" onClick={handleSaveGlobals} disabled={saving} className="gap-1.5">{saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}Save</Button>}
         >
@@ -468,7 +545,7 @@ function Dashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard icon={<Target className="h-4 w-4" />} label="Current Score" value={<AnimatedNumber value={currentMonthScore} decimals={1} suffix="%" />} sub={monthOverMonthChange !== null ? `${Math.abs(monthOverMonthChange).toFixed(1)}% from last month` : "No previous data"} trend={monthOverMonthChange ?? undefined} accent="primary" />
         <StatCard icon={<TrendingUp className="h-4 w-4" />} label="YTD Average" value={<AnimatedNumber value={ytdAverage} decimals={1} suffix="%" />} sub={`${employeeHistory.length} months tracked`} accent="success" />
-        <StatCard icon={<Wallet className="h-4 w-4" />} label="Est. Bonus" value={<AnimatedNumber value={estimatedBonus} decimals={0} prefix="GHS " />} sub="Based on current performance" accent="info" />
+        <StatCard icon={<Wallet className="h-4 w-4" />} label="Est. Bonus" value={<BonusGate value={estimatedBonus} compact />} sub="Based on current performance" accent="info" />
         <StatCard icon={<Calendar className="h-4 w-4" />} label="Months Tracked" value={employeeHistory.length} sub={employeeHistory.length > 0 ? `${new Date().getFullYear()}` : "Start your first submission"} accent="purple" />
       </div>
 
@@ -536,6 +613,8 @@ function Dashboard() {
               </div>
             </SectionCard>
             </div>
+
+            <DepartmentLeaderboard />
           </motion.div>
         </TabsContent>
 
@@ -643,7 +722,7 @@ function Dashboard() {
               </Card>
               <Card className="p-4 bg-muted/30 border-border/50">
                 <div className="text-xs text-muted-foreground mb-1">Est. Bonus</div>
-                <div className="text-lg font-bold">{fmtGHS(estimatedBonus)}</div>
+                <div className="text-lg font-bold"><BonusGate value={estimatedBonus} /></div>
                 <div className="text-xs text-muted-foreground mt-1">Based on current performance</div>
               </Card>
             </div>

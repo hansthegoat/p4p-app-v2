@@ -26,7 +26,7 @@ export function KpiUpdatesBanner() {
   );
   const pending = me
     ? kpiUpdateRequests.filter(
-        (r) => r.employeeId === me.id && r.status === "unacknowledged"
+        (r) => r.employeeId === me.id && r.status === "pending"
       ).length
     : 0;
 
@@ -35,13 +35,13 @@ export function KpiUpdatesBanner() {
   return (
     <button
       onClick={() => navigate({ to: "/kpi-updates" })}
-      className="w-full mb-4 p-3 sm:p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/15 transition-colors flex items-start sm:items-center gap-3 text-left"
+      className="w-full mb-4 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/15 transition-colors flex items-center gap-3 text-left"
     >
       <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
-      <div className="flex-1 min-w-0 break-words">
-        <div className="font-medium text-[13px]">KPI updates need your attention</div>
-        <div className="text-[11px] text-muted-foreground">
-          HR made {pending} change{pending > 1 ? "s" : ""} to your KPIs. Review and acknowledge.
+      <div className="flex-1">
+        <div className="font-medium text-sm">KPI updates need your review</div>
+        <div className="text-xs text-muted-foreground">
+          HR proposed {pending} change{pending > 1 ? "s" : ""} to your KPIs.
         </div>
       </div>
       <ArrowRight className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />

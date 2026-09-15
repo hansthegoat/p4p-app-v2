@@ -12,13 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as VerifyOtpRouteImport } from './routes/verify-otp'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
-import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as AuthRouteRouteImport } from './routes/_auth/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthRegisterRouteImport } from './routes/_auth.register'
-import { Route as AuthLoginRouteImport } from './routes/_auth.login'
+import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
+import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AppTraceRouteImport } from './routes/_app.trace'
 import { Route as AppSupervisorsRouteImport } from './routes/_app.supervisors'
+import { Route as AppProfileRouteImport } from './routes/_app.profile'
 import { Route as AppMyCalculationRouteImport } from './routes/_app.my-calculation'
 import { Route as AppMonthlyRouteImport } from './routes/_app.monthly'
 import { Route as AppKpiUpdatesRouteImport } from './routes/_app.kpi-updates'
@@ -47,12 +48,12 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/_auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRouteRoute = AuthRouteRouteImport.update({
+  id: '/_auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -63,12 +64,12 @@ const IndexRoute = IndexRouteImport.update({
 const AuthRegisterRoute = AuthRegisterRouteImport.update({
   id: '/register',
   path: '/register',
-  getParentRoute: () => AuthRoute,
+  getParentRoute: () => AuthRouteRoute,
 } as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/login',
   path: '/login',
-  getParentRoute: () => AuthRoute,
+  getParentRoute: () => AuthRouteRoute,
 } as any)
 const AppTraceRoute = AppTraceRouteImport.update({
   id: '/trace',
@@ -78,6 +79,11 @@ const AppTraceRoute = AppTraceRouteImport.update({
 const AppSupervisorsRoute = AppSupervisorsRouteImport.update({
   id: '/supervisors',
   path: '/supervisors',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfileRoute = AppProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMyCalculationRoute = AppMyCalculationRouteImport.update({
@@ -158,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/kpi-updates': typeof AppKpiUpdatesRoute
   '/monthly': typeof AppMonthlyRoute
   '/my-calculation': typeof AppMyCalculationRoute
+  '/profile': typeof AppProfileRoute
   '/supervisors': typeof AppSupervisorsRoute
   '/trace': typeof AppTraceRoute
   '/login': typeof AuthLoginRoute
@@ -180,6 +187,7 @@ export interface FileRoutesByTo {
   '/kpi-updates': typeof AppKpiUpdatesRoute
   '/monthly': typeof AppMonthlyRoute
   '/my-calculation': typeof AppMyCalculationRoute
+  '/profile': typeof AppProfileRoute
   '/supervisors': typeof AppSupervisorsRoute
   '/trace': typeof AppTraceRoute
   '/login': typeof AuthLoginRoute
@@ -188,8 +196,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_auth': typeof AuthRouteRouteWithChildren
   '/_app': typeof AppRouteWithChildren
-  '/_auth': typeof AuthRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/verify-otp': typeof VerifyOtpRoute
@@ -205,6 +213,7 @@ export interface FileRoutesById {
   '/_app/kpi-updates': typeof AppKpiUpdatesRoute
   '/_app/monthly': typeof AppMonthlyRoute
   '/_app/my-calculation': typeof AppMyCalculationRoute
+  '/_app/profile': typeof AppProfileRoute
   '/_app/supervisors': typeof AppSupervisorsRoute
   '/_app/trace': typeof AppTraceRoute
   '/_auth/login': typeof AuthLoginRoute
@@ -229,6 +238,7 @@ export interface FileRouteTypes {
     | '/kpi-updates'
     | '/monthly'
     | '/my-calculation'
+    | '/profile'
     | '/supervisors'
     | '/trace'
     | '/login'
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/kpi-updates'
     | '/monthly'
     | '/my-calculation'
+    | '/profile'
     | '/supervisors'
     | '/trace'
     | '/login'
@@ -258,8 +269,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/_app'
     | '/_auth'
+    | '/_app'
     | '/forgot-password'
     | '/reset-password'
     | '/verify-otp'
@@ -275,6 +286,7 @@ export interface FileRouteTypes {
     | '/_app/kpi-updates'
     | '/_app/monthly'
     | '/_app/my-calculation'
+    | '/_app/profile'
     | '/_app/supervisors'
     | '/_app/trace'
     | '/_auth/login'
@@ -283,8 +295,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRouteRoute: typeof AuthRouteRouteWithChildren
   AppRoute: typeof AppRouteWithChildren
-  AuthRoute: typeof AuthRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   VerifyOtpRoute: typeof VerifyOtpRoute
@@ -313,18 +325,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_auth': {
-      id: '/_auth'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_app': {
       id: '/_app'
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_auth': {
+      id: '/_auth'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -339,14 +351,14 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof AuthRegisterRouteImport
-      parentRoute: typeof AuthRoute
+      parentRoute: typeof AuthRouteRoute
     }
     '/_auth/login': {
       id: '/_auth/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof AuthLoginRouteImport
-      parentRoute: typeof AuthRoute
+      parentRoute: typeof AuthRouteRoute
     }
     '/_app/trace': {
       id: '/_app/trace'
@@ -360,6 +372,13 @@ declare module '@tanstack/react-router' {
       path: '/supervisors'
       fullPath: '/supervisors'
       preLoaderRoute: typeof AppSupervisorsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/profile': {
+      id: '/_app/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AppProfileRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/my-calculation': {
@@ -449,6 +468,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthRouteRouteChildren {
+  AuthLoginRoute: typeof AuthLoginRoute
+  AuthRegisterRoute: typeof AuthRegisterRoute
+}
+
+const AuthRouteRouteChildren: AuthRouteRouteChildren = {
+  AuthLoginRoute: AuthLoginRoute,
+  AuthRegisterRoute: AuthRegisterRoute,
+}
+
+const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
+  AuthRouteRouteChildren,
+)
+
 interface AppRouteChildren {
   AppAppraisalsRoute: typeof AppAppraisalsRoute
   AppAppraisalsReviewRoute: typeof AppAppraisalsReviewRoute
@@ -462,6 +495,7 @@ interface AppRouteChildren {
   AppKpiUpdatesRoute: typeof AppKpiUpdatesRoute
   AppMonthlyRoute: typeof AppMonthlyRoute
   AppMyCalculationRoute: typeof AppMyCalculationRoute
+  AppProfileRoute: typeof AppProfileRoute
   AppSupervisorsRoute: typeof AppSupervisorsRoute
   AppTraceRoute: typeof AppTraceRoute
 }
@@ -479,28 +513,17 @@ const AppRouteChildren: AppRouteChildren = {
   AppKpiUpdatesRoute: AppKpiUpdatesRoute,
   AppMonthlyRoute: AppMonthlyRoute,
   AppMyCalculationRoute: AppMyCalculationRoute,
+  AppProfileRoute: AppProfileRoute,
   AppSupervisorsRoute: AppSupervisorsRoute,
   AppTraceRoute: AppTraceRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
-interface AuthRouteChildren {
-  AuthLoginRoute: typeof AuthLoginRoute
-  AuthRegisterRoute: typeof AuthRegisterRoute
-}
-
-const AuthRouteChildren: AuthRouteChildren = {
-  AuthLoginRoute: AuthLoginRoute,
-  AuthRegisterRoute: AuthRegisterRoute,
-}
-
-const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRouteRoute: AuthRouteRouteWithChildren,
   AppRoute: AppRouteWithChildren,
-  AuthRoute: AuthRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   VerifyOtpRoute: VerifyOtpRoute,

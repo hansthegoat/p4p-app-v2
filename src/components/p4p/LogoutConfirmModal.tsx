@@ -39,21 +39,21 @@ export function LogoutConfirmModal({ open, onClose, onConfirm }: LogoutConfirmMo
                   </div>
                   <div>
                     <h3 className="text-base font-semibold">Log out?</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="text-xs text-foreground/70 mt-0.5">
                       You'll need to sign in again.
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-1 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                  className="p-1 rounded-md hover:bg-accent transition-colors text-foreground/60 hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
 
               <div className="rounded-lg bg-muted/40 border border-border/60 p-3 mb-4">
-                <p className="text-xs text-muted-foreground leading-relaxed">
+                <p className="text-xs text-foreground/80 leading-relaxed">
                   Any unsaved changes will be lost. Make sure you've saved your work before logging out.
                 </p>
               </div>

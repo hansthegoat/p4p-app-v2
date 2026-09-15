@@ -12,7 +12,6 @@ import { supabase } from "@/lib/supabase";
 import { showToast } from "@/lib/toast";
 import { checkPassword, passwordColor } from "@/lib/p4p/password";
 
-// Manager roles that should be auto-marked as supervisors
 const MANAGER_ROLES = [
   "President",
   "Executive President",
@@ -39,8 +38,8 @@ function RegisterForm() {
   const [role, setRole] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [pwCheck, setPwCheck] = useState(checkPassword(""));
   const [roles, setRoles] = useState<string[]>([]);
+  const [pwCheck, setPwCheck] = useState(checkPassword(""));
 
   const departments = getDepartments();
 
@@ -56,6 +55,7 @@ function RegisterForm() {
     setLoading(true);
     setError("");
 
+    // ⭐ Enforce password rules
     const pwResult = checkPassword(password);
     if (!pwResult.ok) {
       setError(pwResult.errors[0] || "Password doesn't meet requirements");
@@ -64,7 +64,6 @@ function RegisterForm() {
     }
 
     try {
-      // Try to find a KPI template — but don't block registration if missing
       const template = getTemplate(department, role);
       const hasTemplate = !!template;
 
@@ -74,29 +73,19 @@ function RegisterForm() {
         );
       }
 
-      // Sign up with Supabase Auth (sends OTP email)
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: {
-            name,
-            department,
-            role,
-          },
+          data: { name, department, role },
         },
       });
 
       if (authError) throw authError;
+      if (!authData.user) throw new Error("Failed to create user account");
 
-      if (!authData.user) {
-        throw new Error("Failed to create user account");
-      }
-
-      // Supabase sets `session` to null when email confirmation is required
       const needsVerification = !authData.session;
 
-      // Store pending registration data to finish after OTP verification
       const pendingRegistration = {
         authUserId: authData.user.id,
         name,
@@ -114,58 +103,87 @@ function RegisterForm() {
           "Verification Code Sent",
           `Check ${email} for your 6-digit code.`
         );
-        navigate({
-          to: "/verify-otp",
-          search: { email },
-        });
-      } else {
-        // No verification needed (email confirmation is off) — create employee directly
-        const isManager = MANAGER_ROLES.some(
-          (r) => r.toLowerCase() === role.toLowerCase()
-        );
-
-        const newEmployee = {
-          id: authData.user.id,
-          name,
-          email,
-          authUserId: authData.user.id,
-          department,
-          role,
-          jobGrade: template?.jobGrade || "4",
-          isAdjunct: false,
-          isSalesRole: false,
-          joinDate: new Date().toISOString().slice(0, 10),
-          monthsWorked: 12,
-          kpis: [],
-          categories: template
-            ? template.categories.map((cat: any) => ({
-                id: `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                name: cat.name,
-                weight: cat.weight,
-                kpis: cat.kpis.map((k: any) => ({
-                  id: `kpi_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                  description: k.description,
-                  metric: k.metric,
-                  target: k.target,
-                  actual: 0,
-                  weight: 100,
-                  measurementSource: k.measurementSource || "",
-                })),
-              }))
-            : [],
-          roleType: "employee" as const,
-          isManager,
-          supervisorId: "",
-          supervisorName: "",
-          needsKpiSetup: !hasTemplate,
-        };
-
-        upsertEmployee(newEmployee);
-        localStorage.removeItem("p4p_pending_registration");
-
-        showToast.success("Account Created!", "You're now logged in.");
-        navigate({ to: "/dashboard" });
+        navigate({ to: "/verify-otp", search: { email } });
+        return;
       }
+
+      // ─── No verification needed — create employee now ───
+      const isManager = MANAGER_ROLES.some(
+        (r) => r.toLowerCase() === role.toLowerCase()
+      );
+
+      const newEmployee = {
+        id: authData.user.id,
+        name,
+        email,
+        authUserId: authData.user.id,
+        department,
+        role,
+        jobGrade: template?.jobGrade || "4",
+        isAdjunct: false,
+        isSalesRole: false,
+        joinDate: new Date().toISOString().slice(0, 10),
+        monthsWorked: 12,
+        kpis: [],
+        categories: template
+          ? template.categories.map((cat: any) => ({
+              id: `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              name: cat.name,
+              weight: cat.weight,
+              kpis: cat.kpis.map((k: any) => ({
+                id: `kpi_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                description: k.description,
+                metric: k.metric,
+                target: k.target,
+                actual: 0,
+                weight: 100,
+                measurementSource: k.measurementSource || "",
+              })),
+            }))
+          : [],
+        roleType: "employee" as const,
+        isManager,
+        supervisorId: "",
+        supervisorName: "",
+        needsKpiSetup: !hasTemplate,
+      };
+
+      // ⭐ Write to Supabase first (snake_case mapping)
+      const dbRow = {
+        id: newEmployee.id,
+        auth_id: authData.user.id,
+        name: newEmployee.name,
+        email: newEmployee.email,
+        department: newEmployee.department,
+        role: newEmployee.role,
+        job_grade: newEmployee.jobGrade,
+        is_adjunct: newEmployee.isAdjunct,
+        is_sales_role: newEmployee.isSalesRole,
+        is_manager: newEmployee.isManager,
+        supervisor_id: newEmployee.supervisorId || null,
+        supervisor_name: newEmployee.supervisorName || null,
+        join_date: newEmployee.joinDate,
+        months_worked: newEmployee.monthsWorked,
+        role_type: newEmployee.roleType,
+        categories: newEmployee.categories,
+        kpis: newEmployee.kpis,
+        needs_kpi_setup: newEmployee.needsKpiSetup,
+      };
+
+      const { error: dbError } = await supabase
+        .from("employees")
+        .upsert(dbRow, { onConflict: "id" });
+
+      if (dbError) {
+        console.error("Failed to save employee to Supabase:", dbError);
+        showToast.error("Profile sync failed", dbError.message);
+      }
+
+      upsertEmployee(newEmployee);
+      localStorage.removeItem("p4p_pending_registration");
+
+      showToast.success("Account Created!", "You're now logged in.");
+      navigate({ to: "/dashboard" });
     } catch (err: any) {
       console.error("Registration error:", err);
       setError(err.message || "Registration failed. Please try again.");
@@ -230,6 +248,7 @@ function RegisterForm() {
 
           {password.length > 0 && (
             <>
+              {/* Strength bar */}
               <div className="flex gap-1 mt-2">
                 {[0, 1, 2, 3].map((i) => (
                   <div
@@ -241,6 +260,7 @@ function RegisterForm() {
                 ))}
               </div>
 
+              {/* Label + feedback */}
               <div className="mt-1.5 flex items-start justify-between gap-2">
                 <div className="text-[11px] text-muted-foreground">
                   {pwCheck.errors.length > 0 ? (
@@ -298,7 +318,7 @@ function RegisterForm() {
         <Button
           type="submit"
           className="w-full"
-          disabled={loading || !department || !role}
+          disabled={loading || !department || !role || !pwCheck.ok}
         >
           {loading ? "Creating Account..." : "Register"}
         </Button>

@@ -49,6 +49,8 @@ import {
   markNotificationReadDB,
   fetchAllKpiUpdateRequests,
   upsertKpiUpdateRequest,
+  fetchAppSettings,
+  upsertAppSetting,
 } from "./supabase-data";
 
 const LS_KEY = "p4p_state_v1";
@@ -146,6 +148,7 @@ interface State {
   appraisals: AppraisalRequest[];
   notifications: Notification[];
   kpiUpdateRequests: KpiUpdateRequest[];
+  bonusRevealed: boolean;
 }
 
 interface Ctx extends State {
@@ -204,6 +207,7 @@ interface Ctx extends State {
   commentKpiUpdate: (id: string, comment: string) => Promise<void>;
 
   syncToCloud: () => Promise<void>;
+  setBonusRevealed: (value: boolean) => Promise<void>;
 }
 
 const C = createContext<Ctx | null>(null);
@@ -223,6 +227,7 @@ function loadInitial(): State {
       appraisals: [],
       notifications: [],
       kpiUpdateRequests: [],
+      bonusRevealed: false,
     };
   }
   try {
@@ -238,6 +243,7 @@ function loadInitial(): State {
         appraisals: loadAppraisals(),
         notifications: loadNotifications(),
         kpiUpdateRequests: loadKpiUpdateRequests(),
+        bonusRevealed: false,
       };
     }
   } catch {}
@@ -250,6 +256,7 @@ function loadInitial(): State {
     appraisals: loadAppraisals(),
     notifications: loadNotifications(),
     kpiUpdateRequests: loadKpiUpdateRequests(),
+    bonusRevealed: false,
   };
 }
 
@@ -271,13 +278,14 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     const refetchFromCloud = async () => {
       setIsSyncing(true);
       try {
-        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates] =
+        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudSettings] =
           await Promise.all([
             fetchAllEmployees(),
             fetchAllTemplates(),
             fetchAllMonthly(),
             fetchAllAppraisals(),
             fetchAllKpiUpdateRequests(),
+            fetchAppSettings(),
           ]);
 
         if (cancelled) return;
@@ -290,6 +298,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           monthlyData: cloudMonthly.length > 0 ? cloudMonthly : s.monthlyData,
           appraisals: cloudAppraisals.length > 0 ? cloudAppraisals : s.appraisals,
           kpiUpdateRequests: cloudKpiUpdates,
+          bonusRevealed: cloudSettings.bonus_revealed === true,
         }));
 
         setIsCloudSynced(true);
@@ -315,13 +324,14 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
       setIsSyncing(true);
       try {
-        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates] =
+        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudSettings] =
           await Promise.all([
             fetchAllEmployees(),
             fetchAllTemplates(),
             fetchAllMonthly(),
             fetchAllAppraisals(),
             fetchAllKpiUpdateRequests(),
+            fetchAppSettings(),
           ]);
 
         if (cancelled) return;
@@ -360,6 +370,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           monthlyData: cloudMonthly.length > 0 ? cloudMonthly : s.monthlyData,
           appraisals: cloudAppraisals.length > 0 ? cloudAppraisals : s.appraisals,
           kpiUpdateRequests: cloudKpiUpdates,
+          bonusRevealed: cloudSettings.bonus_revealed === true,
         }));
 
         setIsCloudSynced(true);
@@ -467,6 +478,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       appraisals: [],
       notifications: [],
       kpiUpdateRequests: [],
+      bonusRevealed: false,
     });
   }, []);
 
@@ -1741,6 +1753,18 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   // ============================================
   // SYNC
   // ============================================
+  const setBonusRevealed = useCallback(async (value: boolean) => {
+    setState((s) => ({ ...s, bonusRevealed: value }));
+    try {
+      await upsertAppSetting("bonus_revealed", value);
+    } catch (err) {
+      console.error("setBonusRevealed persist failed:", err);
+      // revert on failure
+      setState((s) => ({ ...s, bonusRevealed: !value }));
+      throw err;
+    }
+  }, []);
+
   const syncToCloud = useCallback(async () => {
     setIsSyncing(true);
     try {
@@ -1816,6 +1840,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     acknowledgeKpiUpdate,
     commentKpiUpdate,
     syncToCloud,
+    setBonusRevealed,
   };
 
   // Dev-only: expose to window for console debugging

@@ -21,7 +21,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { showToast } from "@/lib/toast";
 import { staggerContainer, fadeUp } from "@/lib/motion";
 import { ExcelImportDialog } from "@/lib/p4p/ExcelImportDialog";
-import { exportTemplateToExcel } from "@/lib/p4p/excel";
+import { BulkExcelImportDialog } from "@/components/p4p/BulkExcelImportDialog";
+import { exportTemplateToExcel, exportAllTemplatesToExcel } from "@/lib/p4p/excel";
 import { AlertCircle, Send, Loader2 } from "lucide-react";
 import {
   Plus, Trash2, FolderPlus, Save,
@@ -60,6 +61,22 @@ interface PushPreview {
   employees: PushPreviewEmployee[];
 }
 
+interface PushAllPreviewEmployee {
+  employeeId: string;
+  name: string;
+  email: string;
+  department: string;
+  role: string;
+  changeCount: number;
+}
+
+interface PushAllPreview {
+  templateCount: number;
+  affectedCount: number;
+  totalChanges: number;
+  employees: PushAllPreviewEmployee[];
+}
+
 function KPIFrameworkPage() {
   const {
     getTemplate,
@@ -78,10 +95,18 @@ function KPIFrameworkPage() {
 
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
   const [pushPreview, setPushPreview] = useState<PushPreview | null>(null);
+
+  const [pushAllDialogOpen, setPushAllDialogOpen] = useState(false);
+  const [pushAllPreview, setPushAllPreview] = useState<PushAllPreview | null>(null);
+  const [pushingAll, setPushingAll] = useState(false);
+
   const [excelImportOpen, setExcelImportOpen] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
   const departments = getDepartments();
   const templates = getAllTemplates();
+
+  const isSingleMode = !!selectedDept && !!selectedRole;
 
   useEffect(() => {
     if (selectedDept) setRoles(getRolesForDepartment(selectedDept));
@@ -129,6 +154,7 @@ function KPIFrameworkPage() {
   const totalWeight = template?.categories?.reduce((s: number, c: any) => s + c.weight, 0) || 0;
   const totalKpis = template?.categories?.reduce((s: number, c: any) => s + c.kpis.length, 0) || 0;
 
+  // ─── Category / KPI operations ────────────────────────────
   const addCategory = () => {
     setTemplate((t: any) => ({
       ...t,
@@ -225,10 +251,31 @@ function KPIFrameworkPage() {
     showToast.success("Template Saved", `${selectedDept} · ${selectedRole}`);
   };
 
-  const handleExportExcel = () => {
-    if (!template || !selectedDept || !selectedRole) return;
-    exportTemplateToExcel(template, selectedDept, selectedRole);
-    showToast.success("Downloaded", `${selectedDept} · ${selectedRole}`);
+  // ─── Export (context-aware) ───────────────────────────────
+  const handleExport = () => {
+    if (isSingleMode) {
+      if (!template) return;
+      exportTemplateToExcel(template, selectedDept, selectedRole);
+      showToast.success("Downloaded", `${selectedDept} · ${selectedRole}`);
+    } else {
+      const all = getAllTemplates();
+      const count = Object.keys(all).length;
+      if (count === 0) {
+        showToast.error("Nothing to export", "No templates have been saved yet.");
+        return;
+      }
+      exportAllTemplatesToExcel(all);
+      showToast.success("Downloaded", `${count} template${count === 1 ? "" : "s"} exported.`);
+    }
+  };
+
+  // ─── Import (context-aware) ───────────────────────────────
+  const handleImportClick = () => {
+    if (isSingleMode) {
+      setExcelImportOpen(true);
+    } else {
+      setBulkImportOpen(true);
+    }
   };
 
   const handleImportApply = (imported: KPITemplate) => {
@@ -237,7 +284,26 @@ function KPIFrameworkPage() {
     showToast.success("Imported from Excel", "Template loaded. Review and push when ready.");
   };
 
-  const handlePush = async () => {
+  const handleBulkApply = async (imported: KPITemplate[]) => {
+    for (const t of imported) {
+      saveTemplate(t);
+    }
+    showToast.success(
+      `Imported ${imported.length} template${imported.length === 1 ? "" : "s"}`,
+      "All KPIs saved. Review and push when ready."
+    );
+  };
+
+  // ─── Push (context-aware) ─────────────────────────────────
+  const handlePushClick = async () => {
+    if (isSingleMode) {
+      await handlePushSingle();
+    } else {
+      await handlePushAllPreview();
+    }
+  };
+
+  const handlePushSingle = async () => {
     if (!validate()) return;
     if (!template || !selectedDept || !selectedRole) return;
 
@@ -299,7 +365,7 @@ function KPIFrameworkPage() {
     setPushDialogOpen(true);
   };
 
-  const confirmPush = async () => {
+  const confirmPushSingle = async () => {
     if (!template || !selectedDept || !selectedRole) return;
     setPushing(true);
     try {
@@ -314,6 +380,80 @@ function KPIFrameworkPage() {
       showToast.error("Push failed", err.message || "Something went wrong.");
     } finally {
       setPushing(false);
+    }
+  };
+
+  const handlePushAllPreview = async () => {
+    const all = getAllTemplates();
+    const keys = Object.keys(all);
+    if (keys.length === 0) {
+      showToast.error("No templates", "Save some templates first.");
+      return;
+    }
+
+    const aggregated = new Map<string, PushAllPreviewEmployee>();
+    let totalTemplates = 0;
+    let totalChanges = 0;
+
+    for (const key of keys) {
+      const t = all[key];
+      const rawPreview = previewTemplateDiff(t.department, t.roleName, t);
+      const affectedIds = Object.keys(rawPreview);
+      if (affectedIds.length === 0) continue;
+      totalTemplates++;
+
+      for (const empId of affectedIds) {
+        const emp = employees.find((e) => e.id === empId);
+        if (!emp) continue;
+        const diffs = rawPreview[empId];
+        totalChanges += diffs.length;
+        aggregated.set(empId, {
+          employeeId: empId,
+          name: emp.name,
+          email: emp.email,
+          department: emp.department,
+          role: emp.role,
+          changeCount: diffs.length,
+        });
+      }
+    }
+
+    if (aggregated.size === 0) {
+      showToast.success("No changes", "Every employee is already up to date.");
+      return;
+    }
+
+    setPushAllPreview({
+      templateCount: totalTemplates,
+      affectedCount: aggregated.size,
+      totalChanges,
+      employees: Array.from(aggregated.values()),
+    });
+    setPushAllDialogOpen(true);
+  };
+
+  const confirmPushAll = async () => {
+    setPushingAll(true);
+    try {
+      const all = getAllTemplates();
+      let totalCreated = 0;
+      let templatesPushed = 0;
+      for (const key of Object.keys(all)) {
+        const t = all[key];
+        const result = await pushTemplateToEmployees(t.department, t.roleName, t);
+        totalCreated += result.created;
+        if (result.created > 0) templatesPushed++;
+      }
+      showToast.success(
+        "Pushed all",
+        `${templatesPushed} template${templatesPushed === 1 ? "" : "s"} · ${totalCreated} employee${totalCreated === 1 ? "" : "s"} notified.`
+      );
+      setPushAllDialogOpen(false);
+      setPushAllPreview(null);
+    } catch (err: any) {
+      showToast.error("Push failed", err.message || "Something went wrong.");
+    } finally {
+      setPushingAll(false);
     }
   };
 
@@ -334,47 +474,58 @@ function KPIFrameworkPage() {
       className="space-y-6"
     >
       <PageHeader
-        title="KPI Framework"
-        description="Define weighted KPI templates per department and role."
+        title={isSingleMode ? `Editing: ${selectedDept} / ${selectedRole}` : "KPI Framework"}
+        description={
+          isSingleMode
+            ? "Edit the template below, then save and push to employees."
+            : "Bulk operations across every department and role. Pick a specific template below to edit it."
+        }
         icon={<FileSpreadsheet className="h-6 w-6" />}
         actions={
-          template && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportExcel}
-                className="gap-2"
-                title="Download current template as Excel"
-              >
-                <Download className="h-3.5 w-3.5" /> Export
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setExcelImportOpen(true)}
-                className="gap-2"
-                title="Import KPIs from an Excel file"
-              >
-                <Upload className="h-3.5 w-3.5" /> Import
-              </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              className="gap-2"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {isSingleMode ? "Export Template" : "Export All"}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleImportClick}
+              className="gap-2"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              {isSingleMode ? "Import Template" : "Bulk Import"}
+            </Button>
+
+            {isSingleMode && template && (
               <Button variant="outline" size="sm" onClick={handleSave} className="gap-2">
                 <Save className="h-3.5 w-3.5" /> Save
               </Button>
-              <Button
-                size="sm"
-                onClick={handlePush}
-                disabled={pushing || totalWeight !== 100}
-                className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20 disabled:opacity-50"
-              >
-                <Send className="h-3.5 w-3.5" />
-                Push to Employees
-              </Button>
-            </div>
-          )
+            )}
+
+            <Button
+              size="sm"
+              onClick={handlePushClick}
+              disabled={
+                (isSingleMode && (pushing || totalWeight !== 100)) ||
+                (!isSingleMode && pushingAll)
+              }
+              className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20 disabled:opacity-50"
+            >
+              <Send className="h-3.5 w-3.5" />
+              {isSingleMode ? "Push to Employees" : "Push All"}
+            </Button>
+          </div>
         }
       />
 
+      {/* Department / Role selector */}
       <motion.div variants={fadeUp}>
         <Card className="p-5">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -382,9 +533,15 @@ function KPIFrameworkPage() {
               <Label className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1.5">
                 <Building2 className="h-3.5 w-3.5" /> Department
               </Label>
-              <Select value={selectedDept} onValueChange={setSelectedDept}>
+              <Select
+                value={selectedDept}
+                onValueChange={(v) => {
+                  setSelectedDept(v);
+                  setSelectedRole("");
+                }}
+              >
                 <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Select department" />
+                  <SelectValue placeholder="Select department (or leave empty for bulk)" />
                 </SelectTrigger>
                 <SelectContent>
                   {departments.map((d, i) => (
@@ -409,9 +566,11 @@ function KPIFrameworkPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground mb-1.5">Template Status</Label>
+              <Label className="text-xs text-muted-foreground mb-1.5">
+                {isSingleMode ? "Template Status" : "Mode"}
+              </Label>
               <div className="flex items-center gap-2 h-10 px-3 rounded-md border border-border bg-muted/30 text-sm">
-                {template ? (
+                {isSingleMode && template ? (
                   <>
                     <Badge
                       variant="outline"
@@ -425,15 +584,28 @@ function KPIFrameworkPage() {
                     </span>
                   </>
                 ) : (
-                  <span className="text-muted-foreground text-[11px]">No template selected</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    Bulk mode — actions affect every template
+                  </span>
                 )}
               </div>
+              {isSingleMode && (
+                <button
+                  onClick={() => {
+                    setSelectedDept("");
+                    setSelectedRole("");
+                  }}
+                  className="text-[10px] text-muted-foreground hover:text-foreground mt-1.5 underline"
+                >
+                  ← Back to bulk view
+                </button>
+              )}
             </div>
           </div>
         </Card>
       </motion.div>
 
-      {template ? (
+      {isSingleMode && template ? (
         <div className="space-y-4">
           {template.categories.length > 0 && (
             <motion.div variants={fadeUp}>
@@ -707,7 +879,7 @@ function KPIFrameworkPage() {
                   </Button>
                   <Button
                     size="sm"
-                    onClick={handlePush}
+                    onClick={handlePushClick}
                     disabled={pushing || totalWeight !== 100}
                     className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20 disabled:opacity-50"
                   >
@@ -724,13 +896,18 @@ function KPIFrameworkPage() {
           <Card>
             <EmptyState
               icon={<FileSpreadsheet className="h-6 w-6" />}
-              title="No template selected"
-              description="Choose a department and role above to view or create its KPI template."
+              title={isSingleMode ? "Loading template…" : "Bulk mode"}
+              description={
+                isSingleMode
+                  ? "Loading the KPI template for this department and role."
+                  : "Use the buttons above to export, import, or push all templates at once. Or pick a specific department and role to edit it."
+              }
             />
           </Card>
         </motion.div>
       )}
 
+      {/* Single push dialog */}
       <Dialog open={pushDialogOpen} onOpenChange={setPushDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-5">
           <DialogHeader className="space-y-1.5">
@@ -812,7 +989,7 @@ function KPIFrameworkPage() {
             </Button>
             <Button
               size="sm"
-              onClick={confirmPush}
+              onClick={confirmPushSingle}
               disabled={pushing}
               className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white"
             >
@@ -832,12 +1009,99 @@ function KPIFrameworkPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Push All dialog */}
+      <Dialog open={pushAllDialogOpen} onOpenChange={setPushAllDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-5">
+          <DialogHeader className="space-y-1.5">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Send className="h-4 w-4 text-primary" />
+              Push all KPI changes to every employee?
+            </DialogTitle>
+            <DialogDescription className="text-[11px] leading-relaxed">
+              {pushAllPreview && (
+                <>
+                  <strong className="text-foreground">{pushAllPreview.templateCount}</strong> template
+                  {pushAllPreview.templateCount === 1 ? "" : "s"} will be pushed to{" "}
+                  <strong className="text-foreground">{pushAllPreview.affectedCount}</strong> employee
+                  {pushAllPreview.affectedCount === 1 ? "" : "s"} —{" "}
+                  <strong className="text-foreground">{pushAllPreview.totalChanges}</strong> total change
+                  {pushAllPreview.totalChanges === 1 ? "" : "s"}.
+                  <br />
+                  Each employee will be notified and can comment if they have concerns.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {pushAllPreview && (
+            <div className="flex-1 overflow-y-auto -mx-5 px-5 py-1 space-y-2">
+              {pushAllPreview.employees.map((emp) => (
+                <Card key={emp.employeeId} className="p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-[13px] truncate">{emp.name}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {emp.email} · {emp.department} / {emp.role}
+                      </div>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 text-[10px] h-5 px-1.5 font-medium"
+                    >
+                      {emp.changeCount} change{emp.changeCount === 1 ? "" : "s"}
+                    </Badge>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter className="flex-row justify-end gap-2 pt-3 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPushAllDialogOpen(false);
+                setPushAllPreview(null);
+              }}
+              disabled={pushingAll}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={confirmPushAll}
+              disabled={pushingAll}
+              className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white"
+            >
+              {pushingAll ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Pushing all…
+                </>
+              ) : (
+                <>
+                  <Send className="h-3.5 w-3.5" />
+                  Push all changes
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ExcelImportDialog
         open={excelImportOpen}
         onOpenChange={setExcelImportOpen}
         department={selectedDept}
         role={selectedRole}
         onApply={handleImportApply}
+      />
+
+      <BulkExcelImportDialog
+        open={bulkImportOpen}
+        onOpenChange={setBulkImportOpen}
+        onApply={handleBulkApply}
       />
     </motion.div>
   );
@@ -857,4 +1121,4 @@ function labelForDiffKind(kind: string): string {
     case "kpi_description_changed": return "KPI renamed";
     default: return kind;
   }
-}6
+}

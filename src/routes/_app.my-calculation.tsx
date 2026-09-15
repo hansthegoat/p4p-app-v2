@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useP4P } from "@/lib/p4p/store";
 import { fmtGHS, fmtNum } from "@/lib/p4p/calc";
+import { BonusGate } from "@/components/p4p/BonusGate";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -131,7 +132,7 @@ function MyCalculationPage() {
         icon={<Calculator className="h-6 w-6" />}
         actions={
           <div className={`px-4 py-2.5 rounded-xl text-sm font-bold border-2 flex items-center gap-2 ${band.bg} ${band.color}`}>
-            <Calculator className="h-4 w-4" /> {fmtGHS(empCalc.bonus)}
+            <Calculator className="h-4 w-4" /> <BonusGate value={empCalc.bonus} />
           </div>
         }
       />
@@ -145,7 +146,7 @@ function MyCalculationPage() {
               <div className="flex items-center gap-2 text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-2">
                 <DollarSign className="h-3.5 w-3.5" /> Your Current Bonus
               </div>
-              <div className="text-4xl md:text-5xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">{fmtGHS(empCalc.bonus)}</div>
+              <div className="text-4xl md:text-5xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight"><BonusGate value={empCalc.bonus} /></div>
               <div className="flex items-center gap-3 mt-3">
                 <Badge variant="outline" className={`${band.bg} ${band.color} gap-1`}><TrendingUp className="h-3 w-3" />{band.label}</Badge>
                 <span className="text-xs text-muted-foreground">Based on {fmtNum(empCalc.performanceMultiplier * 100, 0)}% KPI achievement</span>
@@ -183,7 +184,7 @@ function MyCalculationPage() {
               </div>
               <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/20">
                 <div className="flex items-center gap-2 mb-2"><Users className="h-4 w-4 text-purple-600 dark:text-purple-400" /><span className="text-xs uppercase tracking-wider font-semibold text-purple-700 dark:text-purple-400">3. Your Share</span></div>
-                <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{fmtGHS(empCalc.bonus)}</div>
+                <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400"><BonusGate value={empCalc.bonus} /></div>
               </div>
             </div>
             <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
@@ -382,7 +383,7 @@ function MyCalculationPage() {
               <span className="text-muted-foreground font-bold">=</span>
               <div className="flex flex-col items-center gap-1 px-4 py-2 rounded-lg bg-emerald-500/15 border-2 border-emerald-500/40">
                 <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-sm">{fmtGHS(empCalc.bonus)}</span>
+                <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-sm"><BonusGate value={empCalc.bonus} /></span>
                 <span className="text-[9px] text-emerald-700 dark:text-emerald-400">your bonus</span>
               </div>
             </div>
@@ -396,20 +397,20 @@ function MyCalculationPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-4 rounded-xl bg-muted/30 border border-border/60">
               <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Current</span>
-              <div className="text-2xl font-bold mt-2">{fmtGHS(empCalc.bonus)}</div>
+              <div className="text-2xl font-bold mt-2"><BonusGate value={empCalc.bonus} /></div>
               <p className="text-xs text-muted-foreground mt-1">At {fmtNum(empCalc.performanceMultiplier * 100, 0)}% achievement</p>
             </div>
             <div className={`p-4 rounded-xl border ${empCalc.performanceMultiplier >= 1.0 ? "bg-emerald-500/5 border-emerald-500/20" : "bg-blue-500/5 border-blue-500/20"}`}>
               <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">If You Hit Targets</span>
-              <div className="text-2xl font-bold mt-2">{fmtGHS(potentialBonus)}</div>
+              <div className="text-2xl font-bold mt-2"><BonusGate value={potentialBonus} /></div>
               <p className={`text-xs mt-1 ${differenceToTarget > 0 ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-muted-foreground"}`}>
-                {differenceToTarget > 0 ? `+${fmtGHS(differenceToTarget)} more` : "You're already there!"}
+                {differenceToTarget > 0 ? <><BonusGate value={differenceToTarget} /> more</> : "You're already there!"}
               </p>
             </div>
             <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/20">
               <span className="text-xs uppercase tracking-wider font-semibold text-purple-700 dark:text-purple-400">Max Potential (120%)</span>
-              <div className="text-2xl font-bold mt-2">{fmtGHS(perfectBonus)}</div>
-              <p className="text-xs text-purple-700 dark:text-purple-400 mt-1">+{fmtGHS(perfectBonus - empCalc.bonus)} more</p>
+              <div className="text-2xl font-bold mt-2"><BonusGate value={perfectBonus} /></div>
+              <p className="text-xs text-purple-700 dark:text-purple-400 mt-1">+<BonusGate value={perfectBonus - empCalc.bonus} /> more</p>
             </div>
           </div>
         </SectionCard>

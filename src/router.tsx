@@ -1,9 +1,14 @@
 import { initSentry } from "@/lib/sentry";
-initSentry();
-
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+
+// Initialize Sentry BEFORE creating the router
+try {
+  initSentry();
+} catch (err) {
+  console.error("Sentry init failed (non-fatal):", err);
+}
 
 export const getRouter = () => {
   const queryClient = new QueryClient();

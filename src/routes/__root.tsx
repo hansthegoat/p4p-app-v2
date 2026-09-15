@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -16,6 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { P4PProvider } from "@/lib/p4p/store";
 import { UserProvider } from "@/lib/p4p/user-context";
 import { ThemeProvider, useTheme } from "@/components/theme-provider";
+import { SplashScreen } from "@/components/p4p/SplashScreen";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -39,6 +39,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "icon", href: "/p4p-app-v2/favicon.ico", sizes: "any" },
+      { rel: "icon", type: "image/png", href: "/p4p-app-v2/logo-mark.png" },
+      { rel: "apple-touch-icon", href: "/p4p-app-v2/logo-mark.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -57,14 +60,14 @@ function RootShell({ children }: { children: ReactNode }) {
             __html: `
               (function() {
                 try {
-                  var theme = localStorage.getItem('p4p-theme') || 'system';
+                  var theme = localStorage.getItem('p4p-theme') || 'light';
                   var root = document.documentElement;
                   root.classList.remove('light', 'dark');
-                  if (theme === 'system') {
-                    var systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                    root.classList.add(systemTheme);
+                  // Only apply dark if the user has explicitly chosen it
+                  if (theme === 'dark') {
+                    root.classList.add('dark');
                   } else {
-                    root.classList.add(theme);
+                    root.classList.add('light');
                   }
                 } catch (e) {}
               })();
@@ -73,61 +76,23 @@ function RootShell({ children }: { children: ReactNode }) {
         />
       </head>
       <body>
-        <Sentry.ErrorBoundary
-          fallback={({ error, resetError }) => (
-            <div style={{ padding: 40, fontFamily: "system-ui" }}>
-              <h1 style={{ fontSize: 20, marginBottom: 8 }}>Something went wrong</h1>
-              <p style={{ color: "#71717a", marginBottom: 16 }}>
-                The error has been reported. Please refresh the page.
-              </p>
-              <button
-                onClick={resetError}
-                style={{
-                  padding: "8px 16px",
-                  background: "#18181b",
-                  color: "#fff",
-                  borderRadius: 6,
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                Try again
-              </button>
-              {import.meta.env.DEV && (
-                <pre style={{ marginTop: 24, fontSize: 12, color: "#ef4444" }}>
-                  {String(error)}
-                </pre>
-              )}
-            </div>
-          )}
-        >
-          {children}
-          <Scripts />
-        </Sentry.ErrorBoundary>
+        {children}
+        <Scripts />
       </body>
     </html>
   );
 }
 
-// ✅ New component — sits INSIDE ThemeProvider so it can read the current theme
 function ThemedToaster() {
   const { theme } = useTheme();
 
-  // Resolve "system" to the actual current theme
-  const resolvedTheme =
-    theme === "system"
-      ? typeof window !== "undefined" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light"
-      : theme;
-
+  // Theme is now either "light" or "dark" (no system detection)
   return (
     <Toaster
       position="top-right"
       richColors
       closeButton
-      theme={resolvedTheme}
+      theme={theme === "dark" ? "dark" : "light"}
     />
   );
 }
@@ -137,9 +102,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system" storageKey="p4p-theme">
+      <ThemeProvider defaultTheme="light" storageKey="p4p-theme">
         <P4PProvider>
           <UserProvider>
+            <SplashScreen />
             <Outlet />
             <ThemedToaster />
           </UserProvider>

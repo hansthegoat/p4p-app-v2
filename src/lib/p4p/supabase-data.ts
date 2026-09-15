@@ -598,3 +598,31 @@ function mapKpiUpdateToDB(req: KpiUpdateRequest): any {
     pushed_by_name: req.pushedByName || null,
   };
 }
+
+// ============================================
+// APP SETTINGS (key-value)
+// ============================================
+
+export async function fetchAppSettings(): Promise<Record<string, any>> {
+  const { data, error } = await supabase.from("app_settings").select("*");
+  if (error) {
+    console.error("fetchAppSettings error:", error);
+    return {};
+  }
+  const result: Record<string, any> = {};
+  for (const row of data || []) result[row.key] = row.value;
+  return result;
+}
+
+export async function upsertAppSetting(key: string, value: any): Promise<void> {
+  const { error } = await supabase
+    .from("app_settings")
+    .upsert(
+      { key, value, updated_at: new Date().toISOString() },
+      { onConflict: "key" }
+    );
+  if (error) {
+    console.error("upsertAppSetting error:", error);
+    throw error;
+  }
+}
