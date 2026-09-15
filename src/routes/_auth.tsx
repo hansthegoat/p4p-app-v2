@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { AuthLayout } from "@/components/p4p/AuthLayout";
 
 export const Route = createFileRoute("/_auth")({
@@ -12,14 +12,17 @@ function AuthLayoutWrapper() {
 
   return (
     <AuthLayout mode={mode}>
-      <motion.div
-        key={pathname}
-        initial={{ opacity: 0, x: mode === "register" ? 32 : -32 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      >
-        <Outlet />
-      </motion.div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={pathname}
+          initial={{ opacity: 0, x: mode === "register" ? 24 : -24, filter: "blur(4px)" }}
+          animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+          exit={{ opacity: 0, x: mode === "register" ? -24 : 24, filter: "blur(4px)" }}
+          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <Outlet />
+        </motion.div>
+      </AnimatePresence>
     </AuthLayout>
   );
 }

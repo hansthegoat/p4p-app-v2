@@ -29,7 +29,7 @@ const PULSE_CLASSES: Record<PulseColor, string> = {
 interface StatCardProps {
   icon: ReactNode;
   label: string;
-  value: string | number;
+  value: ReactNode;
   sub?: string;
   trend?: number;
   accent?: Accent;

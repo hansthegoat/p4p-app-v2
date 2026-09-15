@@ -11,6 +11,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { showToast } from "@/lib/toast";
 import { staggerContainer, fadeUp } from "@/lib/motion";
 import {
@@ -28,6 +36,7 @@ function SupervisorsPage() {
   const [search, setSearch] = useState("");
   const [selectedSupervisor, setSelectedSupervisor] = useState<string>("");
   const [editingSupervisor, setEditingSupervisor] = useState<string | null>(null);
+  const [crownTarget, setCrownTarget] = useState<string | null>(null);
 
   const managers = useMemo(() => employees.filter((e) => e.isManager === true), [employees]);
 
@@ -71,20 +80,17 @@ function SupervisorsPage() {
     );
   };
 
-  const toggleManager = (employeeId: string) => {
-    const employee = employees.find((e) => e.id === employeeId);
+  const confirmToggleManager = () => {
+    if (!crownTarget) return;
+    const employee = employees.find((e) => e.id === crownTarget);
     if (!employee) return;
-
-    const msg = employee.isManager
-      ? `Remove ${employee.name} as a manager?`
-      : `Make ${employee.name} a manager?`;
-    if (!confirm(msg)) return;
 
     upsertEmployee({ ...employee, isManager: !employee.isManager });
     showToast.success(
       employee.isManager ? "Manager Status Removed" : "Manager Status Added",
       employee.name
     );
+    setCrownTarget(null);
   };
 
   const totalEmployees = employees.filter((e) => !e.isManager).length;
@@ -380,7 +386,7 @@ function SupervisorsPage() {
                                   ? "text-amber-600 hover:bg-amber-500/10"
                                   : "text-muted-foreground hover:bg-amber-500/10 hover:text-amber-600"
                               }`}
-                              onClick={() => toggleManager(emp.id)}
+                              onClick={() => setCrownTarget(emp.id)}
                               title={emp.isManager ? "Remove as manager" : "Make manager"}
                             >
                               <Crown className="h-4 w-4" />
@@ -430,6 +436,37 @@ function SupervisorsPage() {
           </div>
         </Card>
       </motion.div>
+
+      <Dialog open={!!crownTarget} onOpenChange={(open) => !open && setCrownTarget(null)}>
+        <DialogContent className="max-w-sm p-5">
+          <DialogHeader className="space-y-1.5">
+            <DialogTitle className="text-base flex items-center gap-2">
+              <Crown className="h-4 w-4 text-amber-500" />
+              {employees.find((employee) => employee.id === crownTarget)?.isManager
+                ? "Remove manager status?"
+                : "Promote to manager?"}
+            </DialogTitle>
+            <DialogDescription className="text-[11px]">
+              {employees.find((employee) => employee.id === crownTarget)?.isManager
+                ? "They will no longer appear as a supervisor option for other employees."
+                : "They will be able to be assigned as a supervisor to other employees."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row justify-end gap-2 pt-3 border-t">
+            <Button variant="outline" size="sm" onClick={() => setCrownTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={confirmToggleManager}
+              className="gap-2 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-600 hover:to-amber-500 text-white"
+            >
+              <Crown className="h-3.5 w-3.5" />
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

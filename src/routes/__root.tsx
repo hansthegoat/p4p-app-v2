@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -72,8 +73,37 @@ function RootShell({ children }: { children: ReactNode }) {
         />
       </head>
       <body>
-        {children}
-        <Scripts />
+        <Sentry.ErrorBoundary
+          fallback={({ error, resetError }) => (
+            <div style={{ padding: 40, fontFamily: "system-ui" }}>
+              <h1 style={{ fontSize: 20, marginBottom: 8 }}>Something went wrong</h1>
+              <p style={{ color: "#71717a", marginBottom: 16 }}>
+                The error has been reported. Please refresh the page.
+              </p>
+              <button
+                onClick={resetError}
+                style={{
+                  padding: "8px 16px",
+                  background: "#18181b",
+                  color: "#fff",
+                  borderRadius: 6,
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Try again
+              </button>
+              {import.meta.env.DEV && (
+                <pre style={{ marginTop: 24, fontSize: 12, color: "#ef4444" }}>
+                  {String(error)}
+                </pre>
+              )}
+            </div>
+          )}
+        >
+          {children}
+          <Scripts />
+        </Sentry.ErrorBoundary>
       </body>
     </html>
   );

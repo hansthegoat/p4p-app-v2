@@ -1,10 +1,15 @@
-import { type ReactNode, useState, useEffect } from "react";
+import { type ReactNode, useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "@tanstack/react-router";
+import { motion } from "framer-motion";
 import { useUser } from "@/lib/p4p/user-context";
 import { useP4P } from "@/lib/p4p/store";
 import { supabase, getCurrentUser } from "@/lib/supabase";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationBell } from "@/components/p4p/NotificationBell";
 import { LogoutConfirmModal } from "@/components/p4p/LogoutConfirmModal";
+import { SessionTimeoutWarning } from "@/components/p4p/SessionTimeoutWarning";
+import { useSessionTimeout } from "@/lib/p4p/session-timeout";
+import { pageTransition } from "@/lib/motion";
 import { showToast } from "@/lib/toast";
 import {
   LayoutDashboard,
@@ -22,6 +27,7 @@ import {
   Calculator,
   RefreshCw,
   History,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,16 +53,17 @@ const NAV_ITEMS: NavItem[] = [
   { label: "KPI Updates", to: "/kpi-updates", icon: RefreshCw, roles: ["employee", "hr", "admin"], showOnlyIfPending: true },
   { label: "Review Appraisals", to: "/appraisals-review", icon: ClipboardCheck, roles: ["employee", "hr", "admin"] },
   { label: "Employees", to: "/employees", icon: Users, roles: ["hr", "admin"] },
-  { label: "KPI Framework", to: "/kpi-framework", icon: FileSpreadsheet, roles: ["admin"] },
+  { label: "KPI Framework", to: "/kpi-framework", icon: FileSpreadsheet, roles: ["hr", "admin"] },
   { label: "Monthly Performance", to: "/monthly", icon: TrendingUp, roles: ["hr", "admin"] },
   { label: "Calculation Trace", to: "/trace", icon: FileText, roles: ["hr", "admin"] },
   { label: "Audit Log", to: "/audit-log", icon: History, roles: ["hr", "admin"] },
-  { label: "Supervisors", to: "/supervisors", icon: UserCheck, roles: ["admin"] },
+  { label: "Supervisors", to: "/supervisors", icon: UserCheck, roles: ["hr", "admin"] },
+  { label: "Change Password", to: "/change-password", icon: KeyRound, roles: ["employee", "hr", "admin"] },
   { label: "Grade Points", to: "/grades", icon: Target, roles: ["hr", "admin"] },
 ];
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { user, role: contextRole, logout } = useUser();
+  const { user, role: contextRole } = useUser();
   const { employees, kpiUpdateRequests } = useP4P();
   const navigate = useNavigate();
   const location = useLocation();
@@ -64,6 +71,11 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [detectedRole, setDetectedRole] = useState<string | null>(null);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const handleLogoutRef = useRef<() => void>(() => {});
+
+  const sessionTimeout = useSessionTimeout(() => {
+    handleLogoutRef.current?.();
+  });
 
   // Auto-detect role + capture current auth user id
   useEffect(() => {
@@ -121,7 +133,6 @@ export function AppLayout({ children }: AppLayoutProps) {
     try {
       setLogoutModalOpen(false);
       await supabase.auth.signOut();
-      logout?.();
       showToast.success("Logged Out", "You've been signed out safely.");
       navigate({ to: "/login" });
     } catch (err: any) {
@@ -129,6 +140,8 @@ export function AppLayout({ children }: AppLayoutProps) {
       showToast.error("Logout Failed", err.message || "Something went wrong. Please try again.");
     }
   };
+
+  handleLogoutRef.current = handleLogout;
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + "/");
@@ -145,16 +158,23 @@ export function AppLayout({ children }: AppLayoutProps) {
         key={item.to}
         to={item.to}
         onClick={onClick}
-        className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+        className={`relative flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
           active
-            ? "bg-primary text-primary-foreground"
-            : "hover:bg-accent hover:text-accent-foreground"
+            ? "text-primary-foreground"
+            : "text-foreground hover:bg-accent hover:text-accent-foreground"
         }`}
       >
-        <Icon className="h-4 w-4 shrink-0" />
-        <span className="truncate">{item.label}</span>
+        {active && (
+          <motion.div
+            layoutId="nav-active-bg"
+            className="absolute inset-0 bg-primary rounded-md -z-0"
+            transition={{ type: "spring", stiffness: 400, damping: 32 }}
+          />
+        )}
+        <Icon className="h-4 w-4 shrink-0 relative z-10" />
+        <span className="truncate relative z-10">{item.label}</span>
         {showBadge && (
-          <span className="ml-auto bg-amber-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
+          <span className="relative z-10 ml-auto bg-amber-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
             {pendingKpiUpdates}
           </span>
         )}
@@ -187,6 +207,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            <NotificationBell />
 
             {user && (
               <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted">
@@ -247,7 +268,16 @@ export function AppLayout({ children }: AppLayoutProps) {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 p-4 lg:p-6 min-w-0">{children}</main>
+        <motion.main
+          key={location.pathname}
+          variants={pageTransition}
+          initial="initial"
+          animate="enter"
+          exit="exit"
+          className="flex-1 p-4 lg:p-6 min-w-0"
+        >
+          {children}
+        </motion.main>
       </div>
 
       {/* Logout Confirmation Modal */}
@@ -255,6 +285,12 @@ export function AppLayout({ children }: AppLayoutProps) {
         open={logoutModalOpen}
         onClose={() => setLogoutModalOpen(false)}
         onConfirm={handleLogout}
+      />
+      <SessionTimeoutWarning
+        open={sessionTimeout.showWarning}
+        secondsLeft={sessionTimeout.secondsLeft}
+        onStay={sessionTimeout.extend}
+        onLogout={sessionTimeout.logoutNow}
       />
     </div>
   );

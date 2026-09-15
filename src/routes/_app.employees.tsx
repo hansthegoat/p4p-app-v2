@@ -40,7 +40,10 @@ function EmployeesPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<any>(null);
 
-  const filteredEmployees = employees.filter((emp) => {
+  // ⭐ Exclude admins (they're operators, not employees)
+  const realEmployees = employees.filter((e) => e.roleType !== "admin");
+
+  const filteredEmployees = realEmployees.filter((emp) => {
     const s = search.toLowerCase();
     return (
       emp.name.toLowerCase().includes(s) ||
@@ -82,13 +85,13 @@ function EmployeesPage() {
     return "text-red-600 dark:text-red-400";
   };
 
-  const coreCount = employees.filter((e) => !e.isAdjunct).length;
-  const adjunctCount = employees.filter((e) => e.isAdjunct).length;
-  const managerCount = employees.filter((e) => e.isManager).length;
-  const needsKpiCount = employees.filter((e) => e.needsKpiSetup).length;
+  const coreCount = realEmployees.filter((e) => !e.isAdjunct).length;
+  const adjunctCount = realEmployees.filter((e) => e.isAdjunct).length;
+  const managerCount = realEmployees.filter((e) => e.isManager).length;
+  const needsKpiCount = realEmployees.filter((e) => e.needsKpiSetup).length;
   const avgMult =
     coreCount > 0
-      ? employees
+      ? realEmployees
           .filter((e) => !e.isAdjunct)
           .reduce((s, e) => s + (calc.perEmployee[e.id]?.performanceMultiplier || 0), 0) / coreCount
       : 0;
@@ -150,7 +153,7 @@ function EmployeesPage() {
         <StatCard
           icon={<Users className="h-4 w-4" />}
           label="Total Employees"
-          value={employees.length}
+          value={realEmployees.length}
           sub={`${coreCount} core · ${adjunctCount} adjunct`}
           accent="primary"
           size="large"
@@ -253,7 +256,6 @@ function EmployeesPage() {
                         transition={{ delay: Math.min(idx * 0.02, 0.3) }}
                         className="group hover:bg-accent/40 transition-colors border-b border-border/50"
                       >
-                        {/* Employee */}
                         <TableCell className="py-3">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
@@ -294,7 +296,6 @@ function EmployeesPage() {
                           </div>
                         </TableCell>
 
-                        {/* Department */}
                         <TableCell>
                           <span className="text-sm text-muted-foreground flex items-center gap-1.5">
                             <Building2 className="h-3.5 w-3.5" />
@@ -302,19 +303,16 @@ function EmployeesPage() {
                           </span>
                         </TableCell>
 
-                        {/* Role */}
                         <TableCell>
                           <span className="text-sm">{emp.role || "—"}</span>
                         </TableCell>
 
-                        {/* Grade */}
                         <TableCell className="text-center">
                           <Badge variant="outline" className="font-mono text-xs">
                             {emp.jobGrade || "—"}
                           </Badge>
                         </TableCell>
 
-                        {/* Multiplier */}
                         <TableCell className="text-center">
                           {emp.isAdjunct ? (
                             <span className="text-muted-foreground">—</span>
@@ -325,19 +323,16 @@ function EmployeesPage() {
                           )}
                         </TableCell>
 
-                        {/* Months */}
                         <TableCell className="text-center">
                           <span className="text-sm">{emp.isAdjunct ? "—" : emp.monthsWorked || 12}</span>
                         </TableCell>
 
-                        {/* Bonus */}
                         <TableCell className="text-right">
                           <span className="font-semibold text-sm text-blue-600 dark:text-blue-400">
                             {fmtGHS(bonus)}
                           </span>
                         </TableCell>
 
-                        {/* Actions */}
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                             <Button
@@ -376,7 +371,6 @@ function EmployeesPage() {
         </Card>
       </motion.div>
 
-      {/* Modals */}
       <EmployeeModal
         open={modalOpen}
         onClose={() => {

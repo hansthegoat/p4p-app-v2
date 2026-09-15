@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { AnimatedNumber } from "@/components/p4p/AnimatedNumber";
 import { useP4P } from "@/lib/p4p/store";
 import { fmtGHS, fmtNum } from "@/lib/p4p/calc";
 import { Card } from "@/components/ui/card";
@@ -15,8 +16,9 @@ import { SectionCard } from "@/components/ui/section-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getCurrentUser } from "@/lib/supabase";
 import { useUser } from "@/lib/p4p/user-context";
-import { staggerContainer, fadeUp } from "@/lib/motion";
+import { staggerContainer, fadeUp, tabContent, cardHover } from "@/lib/motion";
 import { KpiUpdatesBanner } from "@/components/p4p/KpiUpdatesBanner";
+import { NeedsAttention } from "@/components/p4p/NeedsAttention";
 import {
   TrendingUp, Wallet, Users, UserCheck, DollarSign,
   Sparkles, Target, Calendar, Award, AlertTriangle,
@@ -291,6 +293,8 @@ function Dashboard() {
           badge={<Badge variant="outline" className="gap-1.5"><Calendar className="h-3 w-3" />{monthlyData.length} data points</Badge>}
         />
 
+        <NeedsAttention />
+
         <SectionCard title="Global P4P Settings" description="Controls revenue, pool allocation, and thresholds" icon={<Settings className="h-4 w-4" />}
           action={<Button size="sm" onClick={handleSaveGlobals} disabled={saving} className="gap-1.5">{saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}Save</Button>}
         >
@@ -449,7 +453,9 @@ function Dashboard() {
           <div className="flex items-center gap-3">
             <div className="text-right">
               <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">Current Score</div>
-              <div className={`text-xl font-bold ${band.color}`}>{fmtNum(currentMonthScore, 1)}%</div>
+              <div className={`text-xl font-bold ${band.color}`}>
+                <AnimatedNumber value={currentMonthScore} decimals={1} suffix="%" />
+              </div>
             </div>
             <Badge variant="outline" className={`px-3 py-1.5 ${band.color} border-current/30`}>
               <band.icon className="h-3.5 w-3.5 mr-1.5" />
@@ -460,9 +466,9 @@ function Dashboard() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={<Target className="h-4 w-4" />} label="Current Score" value={`${fmtNum(currentMonthScore, 1)}%`} sub={monthOverMonthChange !== null ? `${Math.abs(monthOverMonthChange).toFixed(1)}% from last month` : "No previous data"} trend={monthOverMonthChange ?? undefined} accent="primary" />
-        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="YTD Average" value={`${fmtNum(ytdAverage, 1)}%`} sub={`${employeeHistory.length} months tracked`} accent="success" />
-        <StatCard icon={<Wallet className="h-4 w-4" />} label="Est. Bonus" value={fmtGHS(estimatedBonus)} sub="Based on current performance" accent="info" />
+        <StatCard icon={<Target className="h-4 w-4" />} label="Current Score" value={<AnimatedNumber value={currentMonthScore} decimals={1} suffix="%" />} sub={monthOverMonthChange !== null ? `${Math.abs(monthOverMonthChange).toFixed(1)}% from last month` : "No previous data"} trend={monthOverMonthChange ?? undefined} accent="primary" />
+        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="YTD Average" value={<AnimatedNumber value={ytdAverage} decimals={1} suffix="%" />} sub={`${employeeHistory.length} months tracked`} accent="success" />
+        <StatCard icon={<Wallet className="h-4 w-4" />} label="Est. Bonus" value={<AnimatedNumber value={estimatedBonus} decimals={0} prefix="GHS " />} sub="Based on current performance" accent="info" />
         <StatCard icon={<Calendar className="h-4 w-4" />} label="Months Tracked" value={employeeHistory.length} sub={employeeHistory.length > 0 ? `${new Date().getFullYear()}` : "Start your first submission"} accent="purple" />
       </div>
 
@@ -473,8 +479,9 @@ function Dashboard() {
           <TabsTrigger value="insights" className="gap-2"><Zap className="h-4 w-4" /> Insights</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-4 space-y-4">
-          <SectionCard title="Performance Trend" description="Last 12 months" icon={<Activity className="h-4 w-4" />} noPadding>
+        <TabsContent value="overview" className="mt-4">
+          <motion.div key="overview" variants={tabContent} initial="hidden" animate="show" className="space-y-4">
+            <SectionCard title="Performance Trend" description="Last 12 months" icon={<Activity className="h-4 w-4" />} noPadding>
             <div className="p-4 h-72">
               {timelineData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -491,9 +498,9 @@ function Dashboard() {
                 <EmptyState icon={<Activity className="h-6 w-6" />} title="No data yet" description="Submit your first appraisal to see your performance trend." />
               )}
             </div>
-          </SectionCard>
+            </SectionCard>
 
-          <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-4">
             <SectionCard title="Category Performance" description="Weighted scores" icon={<PieChart className="h-4 w-4" />} noPadding>
               <div className="p-4 h-64">
                 {categoryScores.length > 0 ? (
@@ -528,18 +535,20 @@ function Dashboard() {
                 )}
               </div>
             </SectionCard>
-          </div>
+            </div>
+          </motion.div>
         </TabsContent>
 
         <TabsContent value="categories" className="mt-4">
-          {categoryScores.length > 0 ? (
+          <motion.div key="categories" variants={tabContent} initial="hidden" animate="show">
+            {categoryScores.length > 0 ? (
             <div className="grid md:grid-cols-2 gap-4">
-              {categoryScores.map((cat, i) => {
+              {categoryScores.map((cat: any, i: number) => {
                 const status = cat.score >= 100 ? "Exceeded" : cat.score >= 70 ? "On Track" : cat.score >= 50 ? "At Risk" : "Missed";
                 const color = status === "Exceeded" ? "emerald" : status === "On Track" ? "blue" : status === "At Risk" ? "amber" : "red";
                 const totalKpiWeight = cat.kpis.reduce((s: number, k: any) => s + (k.weight || 0), 0);
                 return (
-                  <motion.div key={i} variants={fadeUp}>
+                  <motion.div key={i} variants={fadeUp} layout {...cardHover}>
                     <Card className={`p-5 border-l-4 border-l-${color}-500`}>
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className="min-w-0">
@@ -575,13 +584,15 @@ function Dashboard() {
                 );
               })}
             </div>
-          ) : (
-            <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories yet" description="Categories will appear once you have KPIs assigned." />
-          )}
+            ) : (
+              <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories yet" description="Categories will appear once you have KPIs assigned." />
+            )}
+          </motion.div>
         </TabsContent>
 
-        <TabsContent value="insights" className="mt-4 space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
+        <TabsContent value="insights" className="mt-4">
+          <motion.div key="insights" variants={tabContent} initial="hidden" animate="show" className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
             <SectionCard title="Strengths" description="KPIs you've exceeded" icon={<CheckCircle className="h-4 w-4 text-emerald-600" />}>
               <div className="space-y-2">
                 {kpiAchievementData.filter((k) => k.achievement >= 100).slice(0, 5).map((k, i) => (
@@ -615,9 +626,9 @@ function Dashboard() {
                 )}
               </div>
             </SectionCard>
-          </div>
+            </div>
 
-          <SectionCard title="Performance Summary" icon={<Info className="h-4 w-4" />}>
+            <SectionCard title="Performance Summary" icon={<Info className="h-4 w-4" />}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Card className="p-4 bg-muted/30 border-border/50">
                 <div className="text-xs text-muted-foreground mb-1">Overall Status</div>
@@ -636,7 +647,8 @@ function Dashboard() {
                 <div className="text-xs text-muted-foreground mt-1">Based on current performance</div>
               </Card>
             </div>
-          </SectionCard>
+            </SectionCard>
+          </motion.div>
         </TabsContent>
       </Tabs>
     </motion.div>

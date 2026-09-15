@@ -10,6 +10,7 @@ import { P4PProvider, useP4P } from "@/lib/p4p/store";
 import { getDepartments, getRolesForDepartment } from "@/lib/p4p/kpi-templates";
 import { supabase } from "@/lib/supabase";
 import { showToast } from "@/lib/toast";
+import { checkPassword, passwordColor } from "@/lib/p4p/password";
 
 // Manager roles that should be auto-marked as supervisors
 const MANAGER_ROLES = [
@@ -38,6 +39,7 @@ function RegisterForm() {
   const [role, setRole] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [pwCheck, setPwCheck] = useState(checkPassword(""));
   const [roles, setRoles] = useState<string[]>([]);
 
   const departments = getDepartments();
@@ -53,6 +55,13 @@ function RegisterForm() {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    const pwResult = checkPassword(password);
+    if (!pwResult.ok) {
+      setError(pwResult.errors[0] || "Password doesn't meet requirements");
+      setLoading(false);
+      return;
+    }
 
     try {
       // Try to find a KPI template — but don't block registration if missing
@@ -211,11 +220,45 @@ function RegisterForm() {
             type="password"
             placeholder="••••••••"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setPwCheck(checkPassword(e.target.value));
+            }}
             required
-            minLength={6}
             disabled={loading}
           />
+
+          {password.length > 0 && (
+            <>
+              <div className="flex gap-1 mt-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className={`h-1 flex-1 rounded-full transition-colors ${
+                      i < pwCheck.score ? passwordColor(pwCheck.score) : "bg-muted"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <div className="mt-1.5 flex items-start justify-between gap-2">
+                <div className="text-[11px] text-muted-foreground">
+                  {pwCheck.errors.length > 0 ? (
+                    <ul className="space-y-0.5">
+                      {pwCheck.errors.map((err, i) => (
+                        <li key={i}>• {err}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      ✓ Password is {pwCheck.label.toLowerCase()}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] font-medium shrink-0">{pwCheck.label}</span>
+              </div>
+            </>
+          )}
         </div>
 
         <div>

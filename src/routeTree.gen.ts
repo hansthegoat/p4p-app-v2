@@ -27,6 +27,7 @@ import { Route as AppGradesRouteImport } from './routes/_app.grades'
 import { Route as AppEmployeesRouteImport } from './routes/_app.employees'
 import { Route as AppEmployeeRouteImport } from './routes/_app.employee'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppChangePasswordRouteImport } from './routes/_app.change-password'
 import { Route as AppAuditLogRouteImport } from './routes/_app.audit-log'
 import { Route as AppAppraisalsReviewRouteImport } from './routes/_app.appraisals-review'
 import { Route as AppAppraisalsRouteImport } from './routes/_app.appraisals'
@@ -119,6 +120,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const AppChangePasswordRoute = AppChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAuditLogRoute = AppAuditLogRouteImport.update({
   id: '/audit-log',
   path: '/audit-log',
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/appraisals': typeof AppAppraisalsRoute
   '/appraisals-review': typeof AppAppraisalsReviewRoute
   '/audit-log': typeof AppAuditLogRoute
+  '/change-password': typeof AppChangePasswordRoute
   '/dashboard': typeof AppDashboardRoute
   '/employee': typeof AppEmployeeRoute
   '/employees': typeof AppEmployeesRoute
@@ -164,6 +171,7 @@ export interface FileRoutesByTo {
   '/appraisals': typeof AppAppraisalsRoute
   '/appraisals-review': typeof AppAppraisalsReviewRoute
   '/audit-log': typeof AppAuditLogRoute
+  '/change-password': typeof AppChangePasswordRoute
   '/dashboard': typeof AppDashboardRoute
   '/employee': typeof AppEmployeeRoute
   '/employees': typeof AppEmployeesRoute
@@ -188,6 +196,7 @@ export interface FileRoutesById {
   '/_app/appraisals': typeof AppAppraisalsRoute
   '/_app/appraisals-review': typeof AppAppraisalsReviewRoute
   '/_app/audit-log': typeof AppAuditLogRoute
+  '/_app/change-password': typeof AppChangePasswordRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/employee': typeof AppEmployeeRoute
   '/_app/employees': typeof AppEmployeesRoute
@@ -211,6 +220,7 @@ export interface FileRouteTypes {
     | '/appraisals'
     | '/appraisals-review'
     | '/audit-log'
+    | '/change-password'
     | '/dashboard'
     | '/employee'
     | '/employees'
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/appraisals'
     | '/appraisals-review'
     | '/audit-log'
+    | '/change-password'
     | '/dashboard'
     | '/employee'
     | '/employees'
@@ -255,6 +266,7 @@ export interface FileRouteTypes {
     | '/_app/appraisals'
     | '/_app/appraisals-review'
     | '/_app/audit-log'
+    | '/_app/change-password'
     | '/_app/dashboard'
     | '/_app/employee'
     | '/_app/employees'
@@ -406,6 +418,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/change-password': {
+      id: '/_app/change-password'
+      path: '/change-password'
+      fullPath: '/change-password'
+      preLoaderRoute: typeof AppChangePasswordRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/audit-log': {
       id: '/_app/audit-log'
       path: '/audit-log'
@@ -434,6 +453,7 @@ interface AppRouteChildren {
   AppAppraisalsRoute: typeof AppAppraisalsRoute
   AppAppraisalsReviewRoute: typeof AppAppraisalsReviewRoute
   AppAuditLogRoute: typeof AppAuditLogRoute
+  AppChangePasswordRoute: typeof AppChangePasswordRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppEmployeeRoute: typeof AppEmployeeRoute
   AppEmployeesRoute: typeof AppEmployeesRoute
@@ -450,6 +470,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAppraisalsRoute: AppAppraisalsRoute,
   AppAppraisalsReviewRoute: AppAppraisalsReviewRoute,
   AppAuditLogRoute: AppAuditLogRoute,
+  AppChangePasswordRoute: AppChangePasswordRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppEmployeeRoute: AppEmployeeRoute,
   AppEmployeesRoute: AppEmployeesRoute,
