@@ -10,16 +10,13 @@ export default defineConfig({
     base: process.env.NODE_ENV === "production" ? "/" : "/p4p-app-v2/",
   },
   base: process.env.NODE_ENV === "production" ? "/" : "/p4p-app-v2/",
-  // ⭐ Force nitro to build with the Vercel preset so the SSR server deploys correctly.
   nitro: {
     preset: "vercel",
   },
   tanstackStart: {
     server: { entry: "server" },
     prerender: {
-      enabled: true,
-      routes: ["/"],
-      crawlLinks: true,
+      enabled: false,  // ⭐ Disabled — SSR handles everything on Vercel
     },
   },
 });
