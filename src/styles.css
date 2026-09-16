@@ -254,3 +254,12 @@ button:not(:disabled):active,
     transform: translateY(0);
   }
 }
+
+@keyframes bonusBreath {
+  0%, 100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}

@@ -4,7 +4,7 @@ import { useP4P } from './store';
 import type { Employee } from './types';
 
 // Hardcode your admin email here – change to your actual login email
-const ADMIN_EMAIL = 'dts6@aoholdings.net'; // 👈 CHANGE THIS TO YOUR LOGIN EMAIL
+const ADMIN_EMAIL = 'iddoadugyamfi123@gmail.com'; // 👈 CHANGE THIS TO YOUR LOGIN EMAIL
 
 interface UserContextType {
   user: any | null;
