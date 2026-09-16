@@ -13,8 +13,8 @@ export function SplashScreen() {
   const [messageIndex, setMessageIndex] = useState(0);
 
   useEffect(() => {
-    const fadeTimer = window.setTimeout(() => setFading(true), 1800);
-    const hideTimer = window.setTimeout(() => setHidden(true), 2400);
+    const fadeTimer = window.setTimeout(() => setFading(true), 1300);
+    const hideTimer = window.setTimeout(() => setHidden(true), 1800);
     return () => {
       window.clearTimeout(fadeTimer);
       window.clearTimeout(hideTimer);
@@ -93,7 +93,7 @@ export function SplashScreen() {
           <img
             src={logoSrc}
             alt="P4P Platform"
-            className="relative w-80 sm:w-[26rem] h-auto object-contain animate-[splashLogo_1.4s_cubic-bezier(0.22,1,0.36,1)_forwards]"
+            className="relative w-80 sm:w-[26rem] h-auto object-contain animate-[splashFadeIn_1.4s_cubic-bezier(0.22,1,0.36,1)_forwards]"
             draggable={false}
           />
         </div>
@@ -102,7 +102,7 @@ export function SplashScreen() {
         <div className="h-6 mt-4 flex items-center justify-center overflow-hidden">
           <p
             key={messageIndex}
-            className="text-[13px] tracking-wide animate-[splashFade_0.4s_ease-out_forwards]"
+            className="text-[13px] tracking-wide animate-[splashTagline_0.4s_ease-out_forwards]"
             style={{ color: "#0B2545", opacity: 0.65 }}
           >
             {STATUS_MESSAGES[messageIndex]}

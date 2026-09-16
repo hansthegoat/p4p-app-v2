@@ -246,7 +246,13 @@ function VerifyOtpPage() {
       setSuccess(true);
       showToast.success("Email Verified!", "Your account is ready.");
 
-      setTimeout(() => navigate({ to: "/dashboard" }), 1200);
+      setTimeout(() => {
+        if (!localStorage.getItem("p4p_onboarding_done")) {
+          navigate({ to: "/onboarding" });
+        } else {
+          navigate({ to: "/dashboard" });
+        }
+      }, 1200);
     } catch (err: any) {
       console.error("Verify error:", err);
       setError(err.message || "Invalid or expired code. Please try again.");

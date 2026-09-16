@@ -14,6 +14,8 @@ import { StatCard } from "@/components/ui/stat-card";
 import { SectionCard } from "@/components/ui/section-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { showToast } from "@/lib/toast";
+import { usePageTour } from "@/hooks/usePageTour";
+import { PAGE_TOURS } from "@/lib/p4p/tours";
 import { staggerContainer, fadeUp } from "@/lib/motion";
 import { getCurrentUser, uploadProofFile } from "@/lib/supabase";
 import {

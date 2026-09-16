@@ -263,3 +263,198 @@ button:not(:disabled):active,
     opacity: 0.75;
   }
 }
+/* ===== Driver.js tour theming — premium ===== */
+
+/* ---------- Entrance animation ---------- */
+@keyframes tourEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.p4p-tour-popover.p4p-tour-enter {
+  animation: tourEnter 320ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ---------- Popover container ---------- */
+.driver-popover.p4p-tour-popover {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 8px 24px -6px rgba(0, 0, 0, 0.12),
+    0 24px 48px -12px rgba(0, 0, 0, 0.18);
+  padding: 20px 22px 18px;
+  max-width: 340px;
+  min-width: 280px;
+  font-family: inherit;
+}
+
+/* ---------- Title ---------- */
+.driver-popover.p4p-tour-popover .driver-popover-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: hsl(var(--foreground));
+  margin: 0 0 6px;
+  padding-right: 24px; /* leave room for the close button */
+  line-height: 1.3;
+}
+
+/* ---------- Description ---------- */
+.driver-popover.p4p-tour-popover .driver-popover-description {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: hsl(var(--muted-foreground));
+  margin: 0;
+}
+
+/* ---------- Progress text ("1 of 5") ---------- */
+.driver-popover.p4p-tour-popover .driver-popover-progress-text {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  margin-top: 16px;
+  display: inline-block;
+  padding: 3px 8px;
+  background: hsl(var(--muted));
+  border-radius: 6px;
+}
+
+/* ---------- Footer / buttons ---------- */
+.driver-popover.p4p-tour-popover .driver-popover-footer {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid hsl(var(--border) / 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Hide driver.js's own container styling that fights our layout */
+.driver-popover.p4p-tour-popover .driver-popover-navigation-btns {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.driver-popover.p4p-tour-popover .driver-popover-navigation-btns button {
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  padding: 7px 14px;
+  border-radius: 999px; /* pill shape */
+  border: none;
+  text-shadow: none;
+  transition:
+    transform 120ms ease,
+    background-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.driver-popover.p4p-tour-popover .driver-popover-navigation-btns button:active {
+  transform: scale(0.97);
+}
+
+/* Primary — Next / Got it */
+.driver-popover.p4p-tour-popover .driver-popover-next-btn {
+  background: #0b2545;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(11, 37, 69, 0.25);
+}
+
+.driver-popover.p4p-tour-popover .driver-popover-next-btn:hover {
+  background: #133155;
+  box-shadow: 0 2px 6px rgba(11, 37, 69, 0.35);
+}
+
+/* Secondary — Back */
+.driver-popover.p4p-tour-popover .driver-popover-prev-btn {
+  background: transparent;
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+}
+
+.driver-popover.p4p-tour-popover .driver-popover-prev-btn:hover {
+  background: hsl(var(--accent));
+}
+
+/* Disabled state */
+.driver-popover.p4p-tour-popover .driver-popover-navigation-btns button:disabled,
+.driver-popover.p4p-tour-popover .driver-popover-navigation-btns button[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------- Close button ---------- */
+.driver-popover.p4p-tour-popover .driver-popover-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: hsl(var(--muted-foreground));
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.driver-popover.p4p-tour-popover .driver-popover-close-btn:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+}
+
+/* ---------- Arrow ---------- */
+.driver-popover-arrow {
+  display: none; /* cleaner without it — the popover floats near the element */
+}
+
+/* ---------- Highlighted element (the "stage") ---------- */
+.driver-active-element,
+.driver-active-element * {
+  box-shadow: none !important;
+}
+
+/* Smooth transitions for the overlay + stage as it moves between elements */
+.driver-overlay {
+  transition: opacity 250ms ease;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .p4p-tour-popover.p4p-tour-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  .driver-overlay {
+    transition: none;
+  }
+}

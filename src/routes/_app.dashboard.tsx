@@ -22,6 +22,8 @@ import { KpiUpdatesBanner } from "@/components/p4p/KpiUpdatesBanner";
 import { NeedsAttention } from "@/components/p4p/NeedsAttention";
 import { BonusGate } from "@/components/p4p/BonusGate";
 import { DepartmentLeaderboard } from "@/components/p4p/DepartmentLeaderboard";
+import { usePageTour } from "@/hooks/usePageTour";
+import { getWelcomeTourForRole, type Tour } from "@/lib/p4p/tours";
 import {
   TrendingUp, Wallet, Users, UserCheck, DollarSign,
   Sparkles, Target, Calendar, Award, AlertTriangle,
@@ -73,37 +75,78 @@ function Dashboard() {
     bonusRevealed, setBonusRevealed,
   } = useP4P();
   const { role: contextRole, user: contextUser } = useUser();
+
   const [detectedRole, setDetectedRole] = useState<string>("employee");
-
-  useEffect(() => {
-    (async () => {
-      // Shared HR login — always HR
-      if (contextUser?.email === "hr@aoholdings.net") {
-        setDetectedRole("hr");
-        return;
-      }
-      // Otherwise find the employee record by email or auth id
-      const emp = employees.find(
-        (e) =>
-          (contextUser?.email && e.email === contextUser.email) ||
-          (contextUser?.id && e.authUserId === contextUser.id)
-      );
-      if (emp?.roleType) {
-        setDetectedRole(emp.roleType);
-        return;
-      }
-      // Fallback to context role
-      if (contextRole && ["employee", "hr", "admin"].includes(contextRole)) {
-        setDetectedRole(contextRole);
-      }
-    })();
-  }, [contextUser, employees, contextRole]);
-
-  const isAdmin = detectedRole === "admin" || detectedRole === "hr";
-
+  const [welcomeTour, setWelcomeTour] = useState<Tour | null>(null);
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+
+  // ⭐ Fix #1: Capture auth user ID immediately, and retry the employee lookup
+  // every time `employees` changes (so the record appears without a refresh).
+  useEffect(() => {
+    let cancelled = false;
+
+    const lookup = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (!user) {
+          navigate({ to: "/login" });
+          return;
+        }
+        if (cancelled) return;
+        setAuthUserId(user.id);
+
+        // Match by authUserId (preferred) OR email (fallback)
+        const emp =
+          employees.find((e) => e.authUserId === user.id) ||
+          employees.find((e) => e.email === user.email) ||
+          null;
+
+        setEmployee(emp);
+        setLoading(false);
+      } catch {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    lookup();
+    return () => {
+      cancelled = true;
+    };
+  }, [employees, navigate]);
+
+  // Detect role
+  useEffect(() => {
+    if (contextUser?.email === "hr@aoholdings.net") {
+      setDetectedRole("hr");
+      return;
+    }
+    if (employee?.roleType) {
+      setDetectedRole(employee.roleType);
+      return;
+    }
+    if (contextRole && ["employee", "hr", "admin"].includes(contextRole)) {
+      setDetectedRole(contextRole);
+    }
+  }, [contextUser, employee, contextRole]);
+
+  const role = detectedRole || contextRole || "employee";
+  const isAdmin = role === "admin" || role === "hr";
+
+  // ⭐ Fix #2: Welcome tour fires based on role, not on the employee record.
+  // It points at sidebar + notifications, which always exist on the dashboard.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const pending = localStorage.getItem("p4p_welcome_tour_pending");
+    if (pending === "true" && role) {
+      setWelcomeTour(getWelcomeTourForRole(role));
+      localStorage.removeItem("p4p_welcome_tour_pending");
+    }
+  }, [role]);
+
+  usePageTour(welcomeTour, !!role && !!employee);
 
   const [localGlobals, setLocalGlobals] = useState({
     totalRevenue: globals.totalRevenue,
@@ -118,21 +161,6 @@ function Dashboard() {
 
   const trends = getAllTrends();
   const stats = getMonthlyStats();
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = await getCurrentUser();
-        if (!user) { navigate({ to: "/login" }); return; }
-        const emp = employees.find((e) => e.email === user.email);
-        setEmployee(emp || null);
-        setLoading(false);
-      } catch {
-        setLoading(false);
-      }
-    };
-    fetchUser();
-  }, [employees, navigate]);
 
   // ============ ADMIN: Monthly trend ============
   const monthlyTrendData = useMemo(() => {
@@ -313,7 +341,6 @@ function Dashboard() {
   if (isAdmin) {
     return (
       <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
-        {/* ⭐ NEW — KPI updates banner (renders nothing if no pending) */}
         <KpiUpdatesBanner />
 
         <PageHeader
@@ -323,7 +350,9 @@ function Dashboard() {
           badge={<Badge variant="outline" className="gap-1.5"><Calendar className="h-3 w-3" />{monthlyData.length} data points</Badge>}
         />
 
-        <NeedsAttention />
+        <div data-tour="needs-attention">
+          <NeedsAttention />
+        </div>
 
         <Card className="p-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -519,7 +548,6 @@ function Dashboard() {
 
   return (
     <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
-      {/* ⭐ NEW — KPI updates banner (renders nothing if no pending) */}
       <KpiUpdatesBanner />
 
       <PageHeader
@@ -543,7 +571,9 @@ function Dashboard() {
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={<Target className="h-4 w-4" />} label="Current Score" value={<AnimatedNumber value={currentMonthScore} decimals={1} suffix="%" />} sub={monthOverMonthChange !== null ? `${Math.abs(monthOverMonthChange).toFixed(1)}% from last month` : "No previous data"} trend={monthOverMonthChange ?? undefined} accent="primary" />
+        <div data-tour="kpi-score">
+          <StatCard icon={<Target className="h-4 w-4" />} label="Current Score" value={`${fmtNum(currentMonthScore, 1)}%`} sub={monthOverMonthChange !== null ? `${Math.abs(monthOverMonthChange).toFixed(1)}% from last month` : "No previous data"} trend={monthOverMonthChange ?? undefined} accent="primary" />
+        </div>
         <StatCard icon={<TrendingUp className="h-4 w-4" />} label="YTD Average" value={<AnimatedNumber value={ytdAverage} decimals={1} suffix="%" />} sub={`${employeeHistory.length} months tracked`} accent="success" />
         <StatCard icon={<Wallet className="h-4 w-4" />} label="Est. Bonus" value={<BonusGate value={estimatedBonus} compact />} sub="Based on current performance" accent="info" />
         <StatCard icon={<Calendar className="h-4 w-4" />} label="Months Tracked" value={employeeHistory.length} sub={employeeHistory.length > 0 ? `${new Date().getFullYear()}` : "Start your first submission"} accent="purple" />
@@ -559,59 +589,59 @@ function Dashboard() {
         <TabsContent value="overview" className="mt-4">
           <motion.div key="overview" variants={tabContent} initial="hidden" animate="show" className="space-y-4">
             <SectionCard title="Performance Trend" description="Last 12 months" icon={<Activity className="h-4 w-4" />} noPadding>
-            <div className="p-4 h-72">
-              {timelineData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={timelineData}>
-                    <defs><linearGradient id="empTrend" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COLORS.primary} stopOpacity={0.3} /><stop offset="100%" stopColor={COLORS.primary} stopOpacity={0.02} /></linearGradient></defs>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} vertical={false} />
-                    <XAxis dataKey="month" fontSize={11} axisLine={false} tickLine={false} />
-                    <YAxis domain={[0, 150]} fontSize={11} axisLine={false} tickLine={false} width={30} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
-                    <Area type="monotone" dataKey="score" stroke={COLORS.primary} strokeWidth={2.5} fill="url(#empTrend)" dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 6 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <EmptyState icon={<Activity className="h-6 w-6" />} title="No data yet" description="Submit your first appraisal to see your performance trend." />
-              )}
-            </div>
+              <div className="p-4 h-72">
+                {timelineData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={timelineData}>
+                      <defs><linearGradient id="empTrend" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COLORS.primary} stopOpacity={0.3} /><stop offset="100%" stopColor={COLORS.primary} stopOpacity={0.02} /></linearGradient></defs>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.1} vertical={false} />
+                      <XAxis dataKey="month" fontSize={11} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 150]} fontSize={11} axisLine={false} tickLine={false} width={30} />
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
+                      <Area type="monotone" dataKey="score" stroke={COLORS.primary} strokeWidth={2.5} fill="url(#empTrend)" dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 6 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <EmptyState icon={<Activity className="h-6 w-6" />} title="No data yet" description="Submit your first appraisal to see your performance trend." />
+                )}
+              </div>
             </SectionCard>
 
             <div className="grid md:grid-cols-2 gap-4">
-            <SectionCard title="Category Performance" description="Weighted scores" icon={<PieChart className="h-4 w-4" />} noPadding>
-              <div className="p-4 h-64">
-                {categoryScores.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={categoryScores} layout="vertical" margin={{ left: 8, right: 16 }}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.1} horizontal={false} />
-                      <XAxis type="number" domain={[0, 100]} fontSize={11} axisLine={false} tickLine={false} />
-                      <YAxis type="category" dataKey="name" fontSize={11} axisLine={false} tickLine={false} width={90} />
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
-                      <Bar dataKey="score" fill={COLORS.primary} radius={[0, 6, 6, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories" />
-                )}
-              </div>
-            </SectionCard>
+              <SectionCard title="Category Performance" description="Weighted scores" icon={<PieChart className="h-4 w-4" />} noPadding>
+                <div className="p-4 h-64">
+                  {categoryScores.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={categoryScores} layout="vertical" margin={{ left: 8, right: 16 }}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.1} horizontal={false} />
+                        <XAxis type="number" domain={[0, 100]} fontSize={11} axisLine={false} tickLine={false} />
+                        <YAxis type="category" dataKey="name" fontSize={11} axisLine={false} tickLine={false} width={90} />
+                        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
+                        <Bar dataKey="score" fill={COLORS.primary} radius={[0, 6, 6, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories" />
+                  )}
+                </div>
+              </SectionCard>
 
-            <SectionCard title="KPI Status Breakdown" icon={<Target className="h-4 w-4" />} noPadding>
-              <div className="p-4 h-64">
-                {kpiStatusData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RePieChart>
-                      <Pie data={kpiStatusData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={4} dataKey="value" label={(entry: any) => `${entry.name} ${entry.value}`} labelLine={false}>
-                        {kpiStatusData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={0} />)}
-                      </Pie>
-                      <Tooltip contentStyle={tooltipStyle} />
-                    </RePieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState icon={<Target className="h-6 w-6" />} title="No KPIs" />
-                )}
-              </div>
-            </SectionCard>
+              <SectionCard title="KPI Status Breakdown" icon={<Target className="h-4 w-4" />} noPadding>
+                <div className="p-4 h-64">
+                  {kpiStatusData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RePieChart>
+                        <Pie data={kpiStatusData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={4} dataKey="value" label={(entry: any) => `${entry.name} ${entry.value}`} labelLine={false}>
+                          {kpiStatusData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={0} />)}
+                        </Pie>
+                        <Tooltip contentStyle={tooltipStyle} />
+                      </RePieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <EmptyState icon={<Target className="h-6 w-6" />} title="No KPIs" />
+                  )}
+                </div>
+              </SectionCard>
             </div>
 
             <DepartmentLeaderboard />
@@ -621,48 +651,48 @@ function Dashboard() {
         <TabsContent value="categories" className="mt-4">
           <motion.div key="categories" variants={tabContent} initial="hidden" animate="show">
             {categoryScores.length > 0 ? (
-            <div className="grid md:grid-cols-2 gap-4">
-              {categoryScores.map((cat: any, i: number) => {
-                const status = cat.score >= 100 ? "Exceeded" : cat.score >= 70 ? "On Track" : cat.score >= 50 ? "At Risk" : "Missed";
-                const color = status === "Exceeded" ? "emerald" : status === "On Track" ? "blue" : status === "At Risk" ? "amber" : "red";
-                const totalKpiWeight = cat.kpis.reduce((s: number, k: any) => s + (k.weight || 0), 0);
-                return (
-                  <motion.div key={i} variants={fadeUp} layout {...cardHover}>
-                    <Card className={`p-5 border-l-4 border-l-${color}-500`}>
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div className="min-w-0">
-                          <h4 className="font-semibold text-sm truncate">{cat.name}</h4>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {cat.kpiCount} KPIs · Category weight {cat.weight}%
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className={`text-2xl font-bold text-${color}-600 dark:text-${color}-400`}>{fmtNum(cat.score, 1)}%</div>
-                          <Badge variant="outline" className={`text-[10px] mt-1 text-${color}-600 border-${color}-500/30`}>{status}</Badge>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5 mt-3 pt-3 border-t border-border/40">
-                        <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2 flex items-center justify-between">
-                          <span>KPIs (weight within category)</span>
-                          <span className={totalKpiWeight === 100 ? "text-emerald-600" : "text-amber-600"}>{totalKpiWeight}% total</span>
-                        </div>
-                        {cat.kpis.map((kpi: any, kIdx: number) => (
-                          <div key={kIdx} className="flex items-center justify-between text-xs gap-2">
-                            <span className="truncate text-muted-foreground">{kpi.description}</span>
-                            <span className="font-mono font-semibold shrink-0 ml-2">{kpi.weight}%</span>
+              <div className="grid md:grid-cols-2 gap-4">
+                {categoryScores.map((cat: any, i: number) => {
+                  const status = cat.score >= 100 ? "Exceeded" : cat.score >= 70 ? "On Track" : cat.score >= 50 ? "At Risk" : "Missed";
+                  const color = status === "Exceeded" ? "emerald" : status === "On Track" ? "blue" : status === "At Risk" ? "amber" : "red";
+                  const totalKpiWeight = cat.kpis.reduce((s: number, k: any) => s + (k.weight || 0), 0);
+                  return (
+                    <motion.div key={i} variants={fadeUp} layout {...cardHover}>
+                      <Card className={`p-5 border-l-4 border-l-${color}-500`}>
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="min-w-0">
+                            <h4 className="font-semibold text-sm truncate">{cat.name}</h4>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {cat.kpiCount} KPIs · Category weight {cat.weight}%
+                            </p>
                           </div>
-                        ))}
-                      </div>
+                          <div className="text-right shrink-0">
+                            <div className={`text-2xl font-bold text-${color}-600 dark:text-${color}-400`}>{fmtNum(cat.score, 1)}%</div>
+                            <Badge variant="outline" className={`text-[10px] mt-1 text-${color}-600 border-${color}-500/30`}>{status}</Badge>
+                          </div>
+                        </div>
 
-                      <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden mt-3">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, cat.score)}%` }} transition={{ duration: 0.8, delay: i * 0.1 }} className={`h-full rounded-full bg-${color}-500`} />
-                      </div>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </div>
+                        <div className="space-y-1.5 mt-3 pt-3 border-t border-border/40">
+                          <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2 flex items-center justify-between">
+                            <span>KPIs (weight within category)</span>
+                            <span className={totalKpiWeight === 100 ? "text-emerald-600" : "text-amber-600"}>{totalKpiWeight}% total</span>
+                          </div>
+                          {cat.kpis.map((kpi: any, kIdx: number) => (
+                            <div key={kIdx} className="flex items-center justify-between text-xs gap-2">
+                              <span className="truncate text-muted-foreground">{kpi.description}</span>
+                              <span className="font-mono font-semibold shrink-0 ml-2">{kpi.weight}%</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden mt-3">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, cat.score)}%` }} transition={{ duration: 0.8, delay: i * 0.1 }} className={`h-full rounded-full bg-${color}-500`} />
+                        </div>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
+              </div>
             ) : (
               <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories yet" description="Categories will appear once you have KPIs assigned." />
             )}
@@ -672,60 +702,60 @@ function Dashboard() {
         <TabsContent value="insights" className="mt-4">
           <motion.div key="insights" variants={tabContent} initial="hidden" animate="show" className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
-            <SectionCard title="Strengths" description="KPIs you've exceeded" icon={<CheckCircle className="h-4 w-4 text-emerald-600" />}>
-              <div className="space-y-2">
-                {kpiAchievementData.filter((k) => k.achievement >= 100).slice(0, 5).map((k, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{k.name}</div>
-                      <div className="text-[10px] text-muted-foreground">Weight {k.weight}%</div>
+              <SectionCard title="Strengths" description="KPIs you've exceeded" icon={<CheckCircle className="h-4 w-4 text-emerald-600" />}>
+                <div className="space-y-2">
+                  {kpiAchievementData.filter((k) => k.achievement >= 100).slice(0, 5).map((k, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{k.name}</div>
+                        <div className="text-[10px] text-muted-foreground">Weight {k.weight}%</div>
+                      </div>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">{fmtNum(k.achievement, 0)}%</span>
                     </div>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">{fmtNum(k.achievement, 0)}%</span>
-                  </div>
-                ))}
-                {kpiAchievementData.filter((k) => k.achievement >= 100).length === 0 && (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No exceeded KPIs yet. Keep pushing!</p>
-                )}
-              </div>
-            </SectionCard>
+                  ))}
+                  {kpiAchievementData.filter((k) => k.achievement >= 100).length === 0 && (
+                    <p className="text-sm text-muted-foreground py-4 text-center">No exceeded KPIs yet. Keep pushing!</p>
+                  )}
+                </div>
+              </SectionCard>
 
-            <SectionCard title="Areas for Improvement" description="KPIs needing attention" icon={<AlertTriangle className="h-4 w-4 text-red-600" />}>
-              <div className="space-y-2">
-                {kpiAchievementData.filter((k) => k.achievement < 70).sort((a, b) => a.achievement - b.achievement).slice(0, 5).map((k, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm p-2.5 rounded-lg bg-red-500/5 border border-red-500/20 gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{k.name}</div>
-                      <div className="text-[10px] text-muted-foreground">Weight {k.weight}%</div>
+              <SectionCard title="Areas for Improvement" description="KPIs needing attention" icon={<AlertTriangle className="h-4 w-4 text-red-600" />}>
+                <div className="space-y-2">
+                  {kpiAchievementData.filter((k) => k.achievement < 70).sort((a, b) => a.achievement - b.achievement).slice(0, 5).map((k, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm p-2.5 rounded-lg bg-red-500/5 border border-red-500/20 gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{k.name}</div>
+                        <div className="text-[10px] text-muted-foreground">Weight {k.weight}%</div>
+                      </div>
+                      <span className="font-bold text-red-600 dark:text-red-400 shrink-0">{fmtNum(k.achievement, 0)}%</span>
                     </div>
-                    <span className="font-bold text-red-600 dark:text-red-400 shrink-0">{fmtNum(k.achievement, 0)}%</span>
-                  </div>
-                ))}
-                {kpiAchievementData.filter((k) => k.achievement < 70).length === 0 && (
-                  <p className="text-sm text-muted-foreground py-4 text-center">All KPIs are on track! 🎉</p>
-                )}
-              </div>
-            </SectionCard>
+                  ))}
+                  {kpiAchievementData.filter((k) => k.achievement < 70).length === 0 && (
+                    <p className="text-sm text-muted-foreground py-4 text-center">All KPIs are on track! 🎉</p>
+                  )}
+                </div>
+              </SectionCard>
             </div>
 
             <SectionCard title="Performance Summary" icon={<Info className="h-4 w-4" />}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Card className="p-4 bg-muted/30 border-border/50">
-                <div className="text-xs text-muted-foreground mb-1">Overall Status</div>
-                <div className={`text-lg font-bold ${band.color}`}>{band.label}</div>
-              </Card>
-              <Card className="p-4 bg-muted/30 border-border/50">
-                <div className="text-xs text-muted-foreground mb-1">KPIs on Target</div>
-                <div className="text-lg font-bold">{kpiAchievementData.filter((k) => k.achievement >= 70).length} / {kpiAchievementData.length}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {kpiAchievementData.length > 0 ? Math.round((kpiAchievementData.filter((k) => k.achievement >= 70).length / kpiAchievementData.length) * 100) : 0}% success rate
-                </div>
-              </Card>
-              <Card className="p-4 bg-muted/30 border-border/50">
-                <div className="text-xs text-muted-foreground mb-1">Est. Bonus</div>
-                <div className="text-lg font-bold"><BonusGate value={estimatedBonus} /></div>
-                <div className="text-xs text-muted-foreground mt-1">Based on current performance</div>
-              </Card>
-            </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Card className="p-4 bg-muted/30 border-border/50">
+                  <div className="text-xs text-muted-foreground mb-1">Overall Status</div>
+                  <div className={`text-lg font-bold ${band.color}`}>{band.label}</div>
+                </Card>
+                <Card className="p-4 bg-muted/30 border-border/50">
+                  <div className="text-xs text-muted-foreground mb-1">KPIs on Target</div>
+                  <div className="text-lg font-bold">{kpiAchievementData.filter((k) => k.achievement >= 70).length} / {kpiAchievementData.length}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {kpiAchievementData.length > 0 ? Math.round((kpiAchievementData.filter((k) => k.achievement >= 70).length / kpiAchievementData.length) * 100) : 0}% success rate
+                  </div>
+                </Card>
+                <Card className="p-4 bg-muted/30 border-border/50">
+                  <div className="text-xs text-muted-foreground mb-1">Est. Bonus</div>
+                  <div className="text-lg font-bold"><BonusGate value={estimatedBonus} /></div>
+                  <div className="text-xs text-muted-foreground mt-1">Based on current performance</div>
+                </Card>
+              </div>
             </SectionCard>
           </motion.div>
         </TabsContent>

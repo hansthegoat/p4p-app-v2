@@ -6,6 +6,8 @@ import { fmtGHS, fmtNum } from "@/lib/p4p/calc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { usePageTour } from "@/hooks/usePageTour";
+import { PAGE_TOURS } from "@/lib/p4p/tours";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";

@@ -12,6 +12,8 @@ import { SectionCard } from "@/components/ui/section-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { staggerContainer, fadeUp } from "@/lib/motion";
 import { getCurrentUser } from "@/lib/supabase";
+import { usePageTour } from "@/hooks/usePageTour";
+import { PAGE_TOURS } from "@/lib/p4p/tours";
 import {
   Calculator, Wallet, TrendingUp, Target, Award, DollarSign,
   Percent, Zap, Hash, Info, ChevronRight, Activity, Calendar,

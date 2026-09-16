@@ -8,6 +8,7 @@ import { useP4P } from "@/lib/p4p/store";
 import { useUser } from "@/lib/p4p/user-context";
 import { supabase } from "@/lib/supabase";
 import { showToast } from "@/lib/toast";
+import { TourReplayButton } from "@/components/p4p/TourReplayButton";
 import {
   KeyRound, LogOut, Mail, Building2, UserCog, Calendar,
   Target, Award, CheckCircle,
@@ -133,11 +134,14 @@ function ProfilePage() {
         </Card>
       )}
 
-      <Card className="p-5 space-y-2">
-        <h3 className="text-sm font-semibold mb-3">Account</h3>
-        <Button
-          variant="outline"
-          onClick={() => navigate({ to: "/change-password" })}
+<Card className="p-5 space-y-2">
+  <h3 className="text-sm font-semibold mb-3">Account</h3>
+
+  <TourReplayButton role={me?.roleType || "employee"} />
+
+  <Button
+    variant="outline"
+    onClick={() => navigate({ to: "/change-password" })}
           className="w-full justify-start gap-2"
         >
           <KeyRound className="h-4 w-4" /> Change password

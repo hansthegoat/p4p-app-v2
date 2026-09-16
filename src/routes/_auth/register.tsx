@@ -11,6 +11,7 @@ import { getDepartments, getRolesForDepartment } from "@/lib/p4p/kpi-templates";
 import { supabase } from "@/lib/supabase";
 import { showToast } from "@/lib/toast";
 import { checkPassword, passwordColor } from "@/lib/p4p/password";
+import { Check, X, Eye, EyeOff } from "lucide-react";
 
 const MANAGER_ROLES = [
   "President",
@@ -34,6 +35,9 @@ function RegisterForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [department, setDepartment] = useState("");
   const [role, setRole] = useState("");
   const [loading, setLoading] = useState(false);
@@ -42,6 +46,9 @@ function RegisterForm() {
   const [pwCheck, setPwCheck] = useState(checkPassword(""));
 
   const departments = getDepartments();
+
+  const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
+  const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
   useEffect(() => {
     if (department) {
@@ -55,10 +62,15 @@ function RegisterForm() {
     setLoading(true);
     setError("");
 
-    // ⭐ Enforce password rules
     const pwResult = checkPassword(password);
     if (!pwResult.ok) {
       setError(pwResult.errors[0] || "Password doesn't meet requirements");
+      setLoading(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords don't match");
       setLoading(false);
       return;
     }
@@ -107,7 +119,6 @@ function RegisterForm() {
         return;
       }
 
-      // ─── No verification needed — create employee now ───
       const isManager = MANAGER_ROLES.some(
         (r) => r.toLowerCase() === role.toLowerCase()
       );
@@ -148,7 +159,6 @@ function RegisterForm() {
         needsKpiSetup: !hasTemplate,
       };
 
-      // ⭐ Write to Supabase first (snake_case mapping)
       const dbRow = {
         id: newEmployee.id,
         auth_id: authData.user.id,
@@ -183,7 +193,13 @@ function RegisterForm() {
       localStorage.removeItem("p4p_pending_registration");
 
       showToast.success("Account Created!", "You're now logged in.");
-      navigate({ to: "/dashboard" });
+
+      // New accounts get the onboarding tour once
+      if (!localStorage.getItem("p4p_onboarding_done")) {
+        navigate({ to: "/onboarding" });
+      } else {
+        navigate({ to: "/dashboard" });
+      }
     } catch (err: any) {
       console.error("Registration error:", err);
       setError(err.message || "Registration failed. Please try again.");
@@ -191,6 +207,9 @@ function RegisterForm() {
       setLoading(false);
     }
   };
+
+  const canSubmit =
+    !loading && department && role && pwCheck.ok && passwordsMatch;
 
   return (
     <Card className="p-6">
@@ -232,23 +251,36 @@ function RegisterForm() {
           />
         </div>
 
+        {/* Password with show/hide */}
         <div>
           <Label>Password</Label>
-          <Input
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setPwCheck(checkPassword(e.target.value));
-            }}
-            required
-            disabled={loading}
-          />
+          <div className="relative">
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setPwCheck(checkPassword(e.target.value));
+              }}
+              required
+              disabled={loading}
+              autoComplete="new-password"
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              tabIndex={-1}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
 
           {password.length > 0 && (
             <>
-              {/* Strength bar */}
               <div className="flex gap-1 mt-2">
                 {[0, 1, 2, 3].map((i) => (
                   <div
@@ -260,7 +292,6 @@ function RegisterForm() {
                 ))}
               </div>
 
-              {/* Label + feedback */}
               <div className="mt-1.5 flex items-start justify-between gap-2">
                 <div className="text-[11px] text-muted-foreground">
                   {pwCheck.errors.length > 0 ? (
@@ -278,6 +309,60 @@ function RegisterForm() {
                 <span className="text-[11px] font-medium shrink-0">{pwCheck.label}</span>
               </div>
             </>
+          )}
+        </div>
+
+        {/* Confirm Password with show/hide + match check */}
+        <div>
+          <Label>Confirm Password</Label>
+          <div className="relative">
+            <Input
+              type={showConfirm ? "text" : "password"}
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              disabled={loading}
+              autoComplete="new-password"
+              className={`pr-16 ${
+                passwordsMatch
+                  ? "border-emerald-500/50 focus-visible:ring-emerald-500/30"
+                  : passwordsMismatch
+                  ? "border-red-500/50 focus-visible:ring-red-500/30"
+                  : ""
+              }`}
+            />
+            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              {confirmPassword.length > 0 && (
+                <>
+                  {passwordsMatch ? (
+                    <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <X className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  )}
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowConfirm((v) => !v)}
+                tabIndex={-1}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={showConfirm ? "Hide password" : "Show password"}
+              >
+                {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          {passwordsMismatch && (
+            <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5">
+              Passwords don't match
+            </p>
+          )}
+          {passwordsMatch && (
+            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1.5">
+              ✓ Passwords match
+            </p>
           )}
         </div>
 
@@ -315,11 +400,7 @@ function RegisterForm() {
           </Select>
         </div>
 
-        <Button
-          type="submit"
-          className="w-full"
-          disabled={loading || !department || !role || !pwCheck.ok}
-        >
+        <Button type="submit" className="w-full" disabled={!canSubmit}>
           {loading ? "Creating Account..." : "Register"}
         </Button>
       </form>

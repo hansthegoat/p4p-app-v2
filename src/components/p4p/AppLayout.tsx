@@ -152,11 +152,20 @@ export function AppLayout({ children }: AppLayoutProps) {
     const active = isActive(item.to);
     const showBadge = item.to === "/kpi-updates" && pendingKpiUpdates > 0;
 
+    const tourAnchorMap: Record<string, string> = {
+      "/employee": "nav-my-performance",
+      "/profile": "nav-my-profile",
+      "/kpi-framework": "nav-kpi-framework",
+      "/employees": "nav-employees",
+      "/audit-log": "nav-audit-log",
+    };
+
     return (
       <Link
         key={item.to}
         to={item.to}
         onClick={onClick}
+        data-tour={tourAnchorMap[item.to] || undefined}
         className={`relative flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
           active
             ? "bg-primary text-primary-foreground"
@@ -207,7 +216,9 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <NotificationBell />
+            <div data-tour="notifications">
+              <NotificationBell />
+            </div>
 
             {user && (
               <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted">
@@ -238,7 +249,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Body */}
       <div className="flex items-start">
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:flex lg:flex-col w-64 border-r bg-background sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto">
+<aside data-tour="sidebar" className="hidden lg:flex lg:flex-col w-64 border-r bg-background sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto">
           <nav className="flex-1 p-3 space-y-1">
             {visibleItems.length === 0 ? (
               <p className="text-xs text-muted-foreground px-3 py-2">
