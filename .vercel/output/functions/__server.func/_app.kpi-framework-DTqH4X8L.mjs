@@ -1,0 +1,1456 @@
+import { r as reactExports, j as jsxRuntimeExports } from "./_libs/react.mjs";
+import { a as useP4P, n as newId } from "./_ssr/router-BPHF_myF.mjs";
+import { C as Card } from "./_ssr/card-DJtmP4ah.mjs";
+import { B as Button } from "./_ssr/button-D-QX7IMW.mjs";
+import { I as Input } from "./_ssr/input-BgWjUwUQ.mjs";
+import { L as Label } from "./_ssr/label-zkAJpnXH.mjs";
+import { B as Badge } from "./_ssr/badge-wpDZCSRZ.mjs";
+import { S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem } from "./_ssr/select-FVkpvMO7.mjs";
+import { D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, d as DialogDescription, e as DialogFooter } from "./_ssr/dialog-BU3bSDRt.mjs";
+import { P as PageHeader } from "./_ssr/page-header-DgJSKcTG.mjs";
+import { E as EmptyState } from "./_ssr/empty-state-DzL3lmex.mjs";
+import { s as showToast } from "./_ssr/toast-DYWvTbJb.mjs";
+import { s as staggerContainer, f as fadeUp } from "./_ssr/motion-DlChdgW6.mjs";
+import { u as utils, w as writeFileSync, r as readSync } from "./_libs/xlsx.mjs";
+import { getRolesForDepartment, getTemplateByDepartmentAndRole, getDepartments } from "./_ssr/kpi-templates-DZws1qej.mjs";
+import "./_libs/sonner.mjs";
+import { m as motion } from "./_libs/framer-motion.mjs";
+import { D as Download, a3 as Upload, ab as Save, ac as Send, F as FileSpreadsheet, z as Building2, N as UserCog, C as CircleCheckBig, p as TriangleAlert, I as Info, ad as Layers, ae as FolderPlus, a5 as Trash2, a as CircleAlert, af as GripVertical, aa as Plus, ag as ListChecks, L as LoaderCircle } from "./_libs/lucide-react.mjs";
+import "./_libs/tanstack__query-core.mjs";
+import "./_libs/tanstack__react-query.mjs";
+import "./_libs/tanstack__react-router.mjs";
+import "./_libs/tanstack__router-core.mjs";
+import "./_libs/tanstack__history.mjs";
+import "./_libs/cookie-es.mjs";
+import "./_libs/seroval.mjs";
+import "./_libs/seroval-plugins.mjs";
+import "node:stream/web";
+import "node:stream";
+import "./_libs/react-dom.mjs";
+import "util";
+import "crypto";
+import "async_hooks";
+import "stream";
+import "./_libs/isbot.mjs";
+import "./_libs/supabase__supabase-js.mjs";
+import "./_libs/supabase__postgrest-js.mjs";
+import "./_libs/supabase__realtime-js.mjs";
+import "./_libs/supabase__phoenix.mjs";
+import "./_libs/supabase__storage-js.mjs";
+import "./_libs/iceberg-js.mjs";
+import "./_libs/supabase__auth-js.mjs";
+import "tslib";
+import "./_libs/supabase__functions-js.mjs";
+import "./_libs/zod.mjs";
+import "./_libs/sentry__react.mjs";
+import "./_libs/sentry__core.mjs";
+import "./_libs/sentry__browser.mjs";
+import "./_libs/sentry__browser-utils.mjs";
+import "./_libs/sentry__conventions.mjs";
+import "./_libs/clsx.mjs";
+import "./_libs/tailwind-merge.mjs";
+import "./_libs/radix-ui__react-slot.mjs";
+import "./_libs/radix-ui__react-compose-refs.mjs";
+import "./_libs/class-variance-authority.mjs";
+import "./_libs/radix-ui__react-label.mjs";
+import "./_libs/radix-ui__react-primitive.mjs";
+import "./_libs/radix-ui__react-select.mjs";
+import "./_libs/radix-ui__number.mjs";
+import "./_libs/radix-ui__primitive.mjs";
+import "./_libs/radix-ui__react-collection.mjs";
+import "./_libs/radix-ui__react-context.mjs";
+import "./_libs/radix-ui__react-direction.mjs";
+import "./_libs/@radix-ui/react-dismissable-layer+[...].mjs";
+import "./_libs/@radix-ui/react-use-callback-ref+[...].mjs";
+import "./_libs/@radix-ui/react-use-escape-keydown+[...].mjs";
+import "./_libs/radix-ui__react-focus-guards.mjs";
+import "./_libs/radix-ui__react-focus-scope.mjs";
+import "./_libs/radix-ui__react-id.mjs";
+import "./_libs/@radix-ui/react-use-layout-effect+[...].mjs";
+import "./_libs/radix-ui__react-popper.mjs";
+import "./_libs/floating-ui__react-dom.mjs";
+import "./_libs/floating-ui__dom.mjs";
+import "./_libs/floating-ui__core.mjs";
+import "./_libs/floating-ui__utils.mjs";
+import "./_libs/radix-ui__react-arrow.mjs";
+import "./_libs/radix-ui__react-use-size.mjs";
+import "./_libs/radix-ui__react-portal.mjs";
+import "./_libs/@radix-ui/react-use-controllable-state+[...].mjs";
+import "./_libs/radix-ui__react-use-previous.mjs";
+import "./_libs/@radix-ui/react-visually-hidden+[...].mjs";
+import "./_libs/aria-hidden.mjs";
+import "./_libs/react-remove-scroll.mjs";
+import "./_libs/react-remove-scroll-bar.mjs";
+import "./_libs/react-style-singleton.mjs";
+import "./_libs/get-nonce.mjs";
+import "./_libs/use-sidecar.mjs";
+import "./_libs/use-callback-ref.mjs";
+import "./_libs/radix-ui__react-dialog.mjs";
+import "./_libs/radix-ui__react-presence.mjs";
+import "./_libs/motion-dom.mjs";
+import "./_libs/motion-utils.mjs";
+function exportTemplateToExcel(template, department, roleName) {
+  const rows = [];
+  for (const cat of template.categories) {
+    if (cat.kpis.length === 0) {
+      rows.push({
+        "Department": department,
+        "Role": roleName,
+        "Category": cat.name,
+        "Category Weight %": cat.weight,
+        "KPI Description": "",
+        "KPI Weight %": "",
+        "Metric": "",
+        "Target": "",
+        "Measurement Source": ""
+      });
+      continue;
+    }
+    for (const kpi of cat.kpis) {
+      rows.push({
+        "Department": department,
+        "Role": roleName,
+        "Category": cat.name,
+        "Category Weight %": cat.weight,
+        "KPI Description": kpi.description,
+        "KPI Weight %": kpi.weight ?? 0,
+        "Metric": kpi.metric,
+        "Target": kpi.target,
+        "Measurement Source": kpi.measurementSource || ""
+      });
+    }
+  }
+  const ws = utils.json_to_sheet(rows);
+  ws["!cols"] = [
+    { wch: 16 },
+    { wch: 18 },
+    { wch: 24 },
+    { wch: 16 },
+    { wch: 36 },
+    { wch: 14 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 22 }
+  ];
+  const wb = utils.book_new();
+  utils.book_append_sheet(wb, ws, "KPIs");
+  const safe = (s) => s.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const filename = `KPI_${safe(department)}_${safe(roleName)}.xlsx`;
+  writeFileSync(wb, filename);
+}
+async function parseExcelToTemplate(file) {
+  const errors = [];
+  const warnings = [];
+  try {
+    const buffer = await file.arrayBuffer();
+    const wb = readSync(buffer, { type: "array" });
+    const sheetName = wb.SheetNames.includes("KPIs") ? "KPIs" : wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName];
+    if (!sheet) {
+      return { template: null, errors: ["No data sheet found in the file."], warnings };
+    }
+    const rows = utils.sheet_to_json(sheet, { defval: "" });
+    if (rows.length === 0) {
+      return { template: null, errors: ["The file has no data rows."], warnings };
+    }
+    const required = [
+      "Category",
+      "Category Weight %",
+      "KPI Description",
+      "KPI Weight %",
+      "Target"
+    ];
+    const headers = Object.keys(rows[0]);
+    for (const col of required) {
+      if (!headers.includes(col)) errors.push(`Missing required column: "${col}"`);
+    }
+    if (errors.length > 0) return { template: null, errors, warnings };
+    const categoryMap = /* @__PURE__ */ new Map();
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      const rowNum = r + 2;
+      const catName = String(row["Category"] || "").trim();
+      if (!catName) continue;
+      const catWeightRaw = row["Category Weight %"];
+      const catWeight = Number(catWeightRaw);
+      if (isNaN(catWeight)) {
+        errors.push(
+          `Row ${rowNum}: Category Weight % is not a number ("${catWeightRaw}").`
+        );
+        continue;
+      }
+      if (!categoryMap.has(catName)) {
+        categoryMap.set(catName, {
+          id: newId(),
+          name: catName,
+          weight: catWeight,
+          kpis: []
+        });
+      }
+      const cat = categoryMap.get(catName);
+      cat.weight = catWeight;
+      const kpiDesc = String(row["KPI Description"] || "").trim();
+      if (!kpiDesc) continue;
+      const weightRaw = row["KPI Weight %"];
+      const targetRaw = row["Target"];
+      const metric = String(row["Metric"] || "").trim();
+      const source = String(row["Measurement Source"] || "").trim();
+      const weight = Number(weightRaw);
+      const target = Number(targetRaw);
+      if (isNaN(weight)) {
+        errors.push(
+          `Row ${rowNum} ("${kpiDesc}"): KPI Weight % is not a number ("${weightRaw}").`
+        );
+        continue;
+      }
+      if (isNaN(target)) {
+        errors.push(
+          `Row ${rowNum} ("${kpiDesc}"): Target is not a number ("${targetRaw}").`
+        );
+        continue;
+      }
+      cat.kpis.push({
+        id: newId(),
+        description: kpiDesc,
+        metric: metric || "%",
+        target,
+        weight,
+        measurementSource: source || void 0
+      });
+    }
+    if (categoryMap.size === 0) {
+      errors.push("No valid category rows found.");
+      return { template: null, errors, warnings };
+    }
+    const categories = Array.from(categoryMap.values());
+    const totalCatWeight = categories.reduce((s, c) => s + c.weight, 0);
+    if (Math.abs(totalCatWeight - 100) > 0.01) {
+      errors.push(
+        `Category weights sum to ${totalCatWeight}%. Must be exactly 100%.`
+      );
+    }
+    for (const cat of categories) {
+      if (cat.kpis.length === 0) continue;
+      const kpiSum = cat.kpis.reduce((s, k) => s + (k.weight || 0), 0);
+      if (Math.abs(kpiSum - 100) > 0.01) {
+        errors.push(
+          `In category "${cat.name}", KPI weights sum to ${kpiSum}%. Must be 100%.`
+        );
+      }
+    }
+    if (errors.length > 0) return { template: null, errors, warnings };
+    const template = {
+      department: "",
+      roleName: "",
+      jobGrade: "",
+      categories
+    };
+    return { template, errors: [], warnings };
+  } catch (err) {
+    return {
+      template: null,
+      errors: [`Could not read file: ${err.message || "unknown error"}`],
+      warnings
+    };
+  }
+}
+function exportAllTemplatesToExcel(templates) {
+  const rows = [];
+  for (const t of Object.values(templates)) {
+    for (const cat of t.categories) {
+      if (cat.kpis.length === 0) {
+        rows.push({
+          "Department": t.department,
+          "Role": t.roleName,
+          "Category": cat.name,
+          "Category Weight %": cat.weight,
+          "KPI Description": "",
+          "KPI Weight %": "",
+          "Metric": "",
+          "Target": "",
+          "Measurement Source": ""
+        });
+        continue;
+      }
+      for (const kpi of cat.kpis) {
+        rows.push({
+          "Department": t.department,
+          "Role": t.roleName,
+          "Category": cat.name,
+          "Category Weight %": cat.weight,
+          "KPI Description": kpi.description,
+          "KPI Weight %": kpi.weight ?? 0,
+          "Metric": kpi.metric,
+          "Target": kpi.target,
+          "Measurement Source": kpi.measurementSource || ""
+        });
+      }
+    }
+  }
+  if (rows.length === 0) {
+    rows.push({
+      "Department": "Support",
+      "Role": "Team Lead",
+      "Category": "Example Category",
+      "Category Weight %": 100,
+      "KPI Description": "Example KPI",
+      "KPI Weight %": 100,
+      "Metric": "%",
+      "Target": 100,
+      "Measurement Source": ""
+    });
+  }
+  const ws = utils.json_to_sheet(rows);
+  ws["!cols"] = [
+    { wch: 16 },
+    { wch: 18 },
+    { wch: 24 },
+    { wch: 16 },
+    { wch: 36 },
+    { wch: 14 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 22 }
+  ];
+  const wb = utils.book_new();
+  utils.book_append_sheet(wb, ws, "All KPIs");
+  writeFileSync(wb, `P4P_All_KPIs_${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.xlsx`);
+}
+async function parseExcelForBulkImport(file) {
+  const errors = [];
+  const warnings = [];
+  const emptySummary = { departments: 0, roles: 0, categories: 0, kpis: 0 };
+  try {
+    const buffer = await file.arrayBuffer();
+    const wb = readSync(buffer, { type: "array" });
+    const sheetName = wb.SheetNames.includes("KPIs") ? "KPIs" : wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName];
+    if (!sheet) {
+      return { templates: [], errors: ["No data sheet found."], warnings, summary: emptySummary };
+    }
+    const rows = utils.sheet_to_json(sheet, { defval: "" });
+    if (rows.length === 0) {
+      return { templates: [], errors: ["The file has no data rows."], warnings, summary: emptySummary };
+    }
+    const required = [
+      "Department",
+      "Role",
+      "Category",
+      "Category Weight %",
+      "KPI Description",
+      "KPI Weight %",
+      "Target"
+    ];
+    const headers = Object.keys(rows[0]);
+    for (const col of required) {
+      if (!headers.includes(col)) errors.push(`Missing required column: "${col}"`);
+    }
+    if (errors.length > 0) return { templates: [], errors, warnings, summary: emptySummary };
+    const grouped = /* @__PURE__ */ new Map();
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      const rowNum = r + 2;
+      const dept = String(row["Department"] || "").trim();
+      const role = String(row["Role"] || "").trim();
+      const catName = String(row["Category"] || "").trim();
+      if (!dept || !role || !catName) continue;
+      const key = `${dept}||${role}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, { department: dept, roleName: role, categories: /* @__PURE__ */ new Map() });
+      }
+      const g = grouped.get(key);
+      const catWeightRaw = row["Category Weight %"];
+      const catWeight = Number(catWeightRaw);
+      if (isNaN(catWeight)) {
+        errors.push(`Row ${rowNum}: Category Weight % is not a number ("${catWeightRaw}")`);
+        continue;
+      }
+      if (!g.categories.has(catName)) {
+        g.categories.set(catName, { id: newId(), name: catName, weight: catWeight, kpis: [] });
+      }
+      const cat = g.categories.get(catName);
+      cat.weight = catWeight;
+      const kpiDesc = String(row["KPI Description"] || "").trim();
+      if (!kpiDesc) continue;
+      const weightRaw = row["KPI Weight %"];
+      const targetRaw = row["Target"];
+      const metric = String(row["Metric"] || "").trim();
+      const source = String(row["Measurement Source"] || "").trim();
+      const weight = Number(weightRaw);
+      const target = Number(targetRaw);
+      if (isNaN(weight)) {
+        errors.push(`Row ${rowNum} ("${kpiDesc}"): KPI Weight % is not a number ("${weightRaw}")`);
+        continue;
+      }
+      if (isNaN(target)) {
+        errors.push(`Row ${rowNum} ("${kpiDesc}"): Target is not a number ("${targetRaw}")`);
+        continue;
+      }
+      cat.kpis.push({
+        id: newId(),
+        description: kpiDesc,
+        metric: metric || "%",
+        target,
+        weight,
+        measurementSource: source || void 0
+      });
+    }
+    if (grouped.size === 0) {
+      return { templates: [], errors: ["No valid rows found."], warnings, summary: emptySummary };
+    }
+    const templates = [];
+    let totalCats = 0;
+    let totalKpis = 0;
+    const depts = /* @__PURE__ */ new Set();
+    for (const g of grouped.values()) {
+      depts.add(g.department);
+      const categories = Array.from(g.categories.values());
+      totalCats += categories.length;
+      totalKpis += categories.reduce((s, c) => s + c.kpis.length, 0);
+      const totalCatWeight = categories.reduce((s, c) => s + c.weight, 0);
+      if (Math.abs(totalCatWeight - 100) > 0.01) {
+        errors.push(
+          `${g.department} / ${g.roleName}: category weights sum to ${totalCatWeight}% (must be 100%)`
+        );
+      }
+      for (const cat of categories) {
+        if (cat.kpis.length === 0) continue;
+        const kpiSum = cat.kpis.reduce((s, k) => s + (k.weight || 0), 0);
+        if (Math.abs(kpiSum - 100) > 0.01) {
+          errors.push(
+            `${g.department} / ${g.roleName} → ${cat.name}: KPI weights sum to ${kpiSum}% (must be 100%)`
+          );
+        }
+      }
+      templates.push({
+        department: g.department,
+        roleName: g.roleName,
+        jobGrade: "",
+        categories
+      });
+    }
+    if (errors.length > 0) return { templates: [], errors, warnings, summary: emptySummary };
+    return {
+      templates,
+      errors: [],
+      warnings,
+      summary: {
+        departments: depts.size,
+        roles: grouped.size,
+        categories: totalCats,
+        kpis: totalKpis
+      }
+    };
+  } catch (err) {
+    return {
+      templates: [],
+      errors: [`Could not read file: ${err.message || "unknown error"}`],
+      warnings,
+      summary: emptySummary
+    };
+  }
+}
+function ExcelImportDialog({
+  open,
+  onOpenChange,
+  department,
+  role,
+  onApply
+}) {
+  const fileInputRef = reactExports.useRef(null);
+  const [parsing, setParsing] = reactExports.useState(false);
+  const [parsed, setParsed] = reactExports.useState(null);
+  const [errors, setErrors] = reactExports.useState([]);
+  const [fileName, setFileName] = reactExports.useState("");
+  const reset = () => {
+    setParsed(null);
+    setErrors([]);
+    setFileName("");
+    setParsing(false);
+  };
+  const handleChoose = () => {
+    reset();
+    fileInputRef.current?.click();
+  };
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setParsing(true);
+    setErrors([]);
+    setParsed(null);
+    try {
+      const result = await parseExcelToTemplate(file);
+      if (result.errors.length > 0) {
+        setErrors(result.errors);
+      } else if (result.template) {
+        setParsed(result.template);
+      } else {
+        setErrors(["Could not parse the file."]);
+      }
+    } catch (err) {
+      setErrors([err.message || "Unknown error while reading the file."]);
+    } finally {
+      setParsing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+  const handleApply = () => {
+    if (!parsed) return;
+    const finalTemplate = {
+      ...parsed,
+      department,
+      roleName: role
+    };
+    onApply(finalTemplate);
+    reset();
+    onOpenChange(false);
+  };
+  const handleClose = (next) => {
+    if (!next) reset();
+    onOpenChange(next);
+  };
+  const totalKpis = parsed?.categories.reduce((s, c) => s + c.kpis.length, 0) || 0;
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(Dialog, { open, onOpenChange: handleClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogContent, { className: "max-w-2xl max-h-[85vh] flex flex-col p-5", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogHeader, { className: "space-y-1.5", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogTitle, { className: "flex items-center gap-2 text-base", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(FileSpreadsheet, { className: "h-4 w-4 text-primary" }),
+        "Import KPI template from Excel"
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogDescription, { className: "text-[11px] leading-relaxed", children: [
+        "Upload your KPI Excel file.",
+        /* @__PURE__ */ jsxRuntimeExports.jsx("br", {}),
+        "Category weights must sum to 100% across the sheet. KPI weights must sum to 100% inside each category."
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      "input",
+      {
+        ref: fileInputRef,
+        type: "file",
+        accept: ".xlsx,.xls",
+        onChange: handleFile,
+        className: "hidden"
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 overflow-y-auto -mx-5 px-5 py-1 space-y-3", children: [
+      !parsed && !parsing && errors.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          onClick: handleChoose,
+          className: "w-full p-8 rounded-lg border-2 border-dashed border-border hover:border-primary/40 hover:bg-accent/30 transition-colors flex flex-col items-center gap-3 text-center",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Upload, { className: "h-8 w-8 text-muted-foreground" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[13px] font-medium", children: "Click to choose a file" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-muted-foreground mt-0.5", children: ".xlsx or .xls · first sheet is used" })
+            ] })
+          ]
+        }
+      ),
+      parsing && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-center py-12 gap-3 text-[13px] text-muted-foreground", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { className: "h-5 w-5 animate-spin" }),
+        "Reading ",
+        fileName,
+        "…"
+      ] }),
+      errors.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "p-3 rounded-lg bg-red-500/5 border border-red-500/20", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start gap-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(CircleAlert, { className: "h-4 w-4 text-red-600 shrink-0 mt-0.5" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[12px] font-semibold text-red-700 dark:text-red-400 mb-1", children: [
+            "Could not import ",
+            fileName
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { className: "text-[11px] text-red-800 dark:text-red-300 space-y-0.5", children: errors.map((e, i) => /* @__PURE__ */ jsxRuntimeExports.jsxs("li", { children: [
+            "• ",
+            e
+          ] }, i)) })
+        ] })
+      ] }) }),
+      parsed && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20 flex items-center gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(CircleCheckBig, { className: "h-4 w-4 text-emerald-600 shrink-0" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[12px] text-emerald-800 dark:text-emerald-300", children: [
+            "Parsed ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: parsed.categories.length }),
+            " categories ·",
+            " ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: totalKpis }),
+            " KPIs · weights valid"
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: parsed.categories.map((cat, i) => /* @__PURE__ */ jsxRuntimeExports.jsxs(Card, { className: "p-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between mb-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[13px] font-medium", children: cat.name }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(Badge, { variant: "outline", className: "text-[10px] h-5", children: [
+              cat.weight,
+              "% weight · ",
+              cat.kpis.length,
+              " KPIs"
+            ] })
+          ] }),
+          cat.kpis.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-1", children: cat.kpis.map((kpi, j) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "div",
+            {
+              className: "text-[11px] flex items-center gap-2 text-muted-foreground leading-relaxed",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "w-1 h-1 rounded-full bg-primary shrink-0" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-foreground truncate", children: kpi.description }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "shrink-0", children: [
+                  "· target ",
+                  kpi.target,
+                  " ",
+                  kpi.metric,
+                  " · weight ",
+                  kpi.weight,
+                  "%"
+                ] })
+              ]
+            },
+            j
+          )) })
+        ] }, i)) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          Button,
+          {
+            variant: "outline",
+            size: "sm",
+            onClick: handleChoose,
+            className: "w-full gap-2",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Upload, { className: "h-3.5 w-3.5" }),
+              "Choose a different file"
+            ]
+          }
+        )
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogFooter, { className: "flex-row justify-end gap-2 pt-3 border-t", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Button, { variant: "outline", size: "sm", onClick: () => handleClose(false), children: "Cancel" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        Button,
+        {
+          size: "sm",
+          onClick: handleApply,
+          disabled: !parsed,
+          className: "gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white",
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(CircleCheckBig, { className: "h-3.5 w-3.5" }),
+            "Apply to template"
+          ]
+        }
+      )
+    ] })
+  ] }) });
+}
+function BulkExcelImportDialog({
+  open,
+  onOpenChange,
+  onApply
+}) {
+  const fileInputRef = reactExports.useRef(null);
+  const [parsing, setParsing] = reactExports.useState(false);
+  const [templates, setTemplates] = reactExports.useState([]);
+  const [errors, setErrors] = reactExports.useState([]);
+  const [fileName, setFileName] = reactExports.useState("");
+  const reset = () => {
+    setParsing(false);
+    setTemplates([]);
+    setErrors([]);
+    setFileName("");
+  };
+  const handleFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setParsing(true);
+    setErrors([]);
+    setTemplates([]);
+    try {
+      const result = await parseExcelForBulkImport(file);
+      if (result.errors.length > 0) setErrors(result.errors);
+      else setTemplates(result.templates);
+    } catch (error) {
+      setErrors([error.message || "Unknown error while reading the file."]);
+    } finally {
+      setParsing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+  const handleClose = (next) => {
+    if (!next) reset();
+    onOpenChange(next);
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(Dialog, { open, onOpenChange: handleClose, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogContent, { className: "max-w-lg", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogHeader, { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(DialogTitle, { children: "Bulk import KPI templates" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(DialogDescription, { children: "Upload an Excel file containing multiple department and role templates." })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      "input",
+      {
+        ref: fileInputRef,
+        type: "file",
+        accept: ".xlsx,.xls",
+        onChange: handleFile,
+        className: "hidden"
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      Button,
+      {
+        variant: "outline",
+        onClick: () => fileInputRef.current?.click(),
+        disabled: parsing,
+        className: "gap-2",
+        children: [
+          parsing ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { className: "h-4 w-4 animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Upload, { className: "h-4 w-4" }),
+          fileName || "Choose Excel file"
+        ]
+      }
+    ),
+    errors.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-sm text-red-600 space-y-1", children: errors.slice(0, 10).map((error, index) => /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: error }, index)) }),
+    templates.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-sm text-muted-foreground", children: [
+      "Parsed ",
+      templates.length,
+      " template",
+      templates.length === 1 ? "" : "s",
+      "."
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogFooter, { children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(Button, { variant: "outline", onClick: () => handleClose(false), children: "Cancel" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(Button, { onClick: () => {
+        onApply(templates);
+        handleClose(false);
+      }, disabled: templates.length === 0, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(CircleCheckBig, { className: "mr-2 h-4 w-4" }),
+        " Apply templates"
+      ] })
+    ] })
+  ] }) });
+}
+const METRICS = ["%", "GHS", "$", "#", "ROI", "days", "hrs"];
+function KPIFrameworkPage() {
+  const {
+    getTemplate,
+    saveTemplate,
+    getAllTemplates,
+    pushTemplateToEmployees,
+    previewTemplateDiff,
+    employees
+  } = useP4P();
+  const [selectedDept, setSelectedDept] = reactExports.useState("");
+  const [selectedRole, setSelectedRole] = reactExports.useState("");
+  const [roles, setRoles] = reactExports.useState([]);
+  const [template, setTemplate] = reactExports.useState(null);
+  const [pushing, setPushing] = reactExports.useState(false);
+  const [pushDialogOpen, setPushDialogOpen] = reactExports.useState(false);
+  const [pushPreview, setPushPreview] = reactExports.useState(null);
+  const [pushAllDialogOpen, setPushAllDialogOpen] = reactExports.useState(false);
+  const [pushAllPreview, setPushAllPreview] = reactExports.useState(null);
+  const [pushingAll, setPushingAll] = reactExports.useState(false);
+  const [excelImportOpen, setExcelImportOpen] = reactExports.useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = reactExports.useState(false);
+  const departments = getDepartments();
+  getAllTemplates();
+  const isSingleMode = !!selectedDept && !!selectedRole;
+  reactExports.useEffect(() => {
+    if (selectedDept) setRoles(getRolesForDepartment());
+  }, [selectedDept]);
+  reactExports.useEffect(() => {
+    if (selectedDept && selectedRole) {
+      const existing = getTemplate(selectedDept, selectedRole);
+      if (existing) {
+        setTemplate(JSON.parse(JSON.stringify(existing)));
+        return;
+      }
+      const defaultTemplate = getTemplateByDepartmentAndRole(selectedDept, selectedRole);
+      if (defaultTemplate) {
+        setTemplate({
+          jobGrade: defaultTemplate.jobGrade || "",
+          roleName: defaultTemplate.roleName,
+          department: defaultTemplate.department,
+          categories: defaultTemplate.categories.map((cat) => ({
+            id: cat.id || newId(),
+            name: cat.name,
+            weight: cat.weight,
+            kpis: cat.kpis.map((k) => ({
+              id: k.id || newId(),
+              description: k.description,
+              metric: k.metric,
+              target: k.target,
+              weight: k.weight || 0
+            }))
+          }))
+        });
+        return;
+      }
+      setTemplate({
+        jobGrade: "",
+        roleName: selectedRole,
+        department: selectedDept,
+        categories: []
+      });
+    } else {
+      setTemplate(null);
+    }
+  }, [selectedDept, selectedRole, getTemplate]);
+  const totalWeight = template?.categories?.reduce((s, c) => s + c.weight, 0) || 0;
+  const totalKpis = template?.categories?.reduce((s, c) => s + c.kpis.length, 0) || 0;
+  const addCategory = () => {
+    setTemplate((t) => ({
+      ...t,
+      categories: [...t.categories, {
+        id: newId(),
+        name: "New Category",
+        weight: 0,
+        kpis: []
+      }]
+    }));
+  };
+  const updateCategory = (catId, updates) => {
+    setTemplate((t) => ({
+      ...t,
+      categories: t.categories.map((c) => c.id === catId ? {
+        ...c,
+        ...updates
+      } : c)
+    }));
+  };
+  const removeCategory = (catId) => {
+    setTemplate((t) => ({
+      ...t,
+      categories: t.categories.filter((c) => c.id !== catId)
+    }));
+  };
+  const addKPI = (catId) => {
+    setTemplate((t) => ({
+      ...t,
+      categories: t.categories.map((c) => c.id === catId ? {
+        ...c,
+        kpis: [...c.kpis, {
+          id: newId(),
+          description: "New KPI",
+          metric: "%",
+          target: 0,
+          weight: 0
+        }]
+      } : c)
+    }));
+  };
+  const updateKPI = (catId, kpiId, updates) => {
+    setTemplate((t) => ({
+      ...t,
+      categories: t.categories.map((c) => c.id === catId ? {
+        ...c,
+        kpis: c.kpis.map((k) => k.id === kpiId ? {
+          ...k,
+          ...updates
+        } : k)
+      } : c)
+    }));
+  };
+  const removeKPI = (catId, kpiId) => {
+    setTemplate((t) => ({
+      ...t,
+      categories: t.categories.map((c) => c.id === catId ? {
+        ...c,
+        kpis: c.kpis.filter((k) => k.id !== kpiId)
+      } : c)
+    }));
+  };
+  const validate = () => {
+    if (!template || !selectedDept || !selectedRole) return false;
+    if (totalWeight !== 100 && template.categories.length > 0) {
+      showToast.error("Invalid Weights", `Category weights must sum to 100%. Currently: ${totalWeight}%.`);
+      return false;
+    }
+    for (const cat of template.categories) {
+      if (cat.kpis.length === 0) continue;
+      const kpiWeight = cat.kpis.reduce((s, k) => s + (k.weight || 0), 0);
+      if (Math.abs(kpiWeight - 100) > 0.01) {
+        showToast.error("Invalid KPI Weights", `In "${cat.name}", KPI weights must sum to 100%. Currently: ${kpiWeight}%.`);
+        return false;
+      }
+    }
+    return true;
+  };
+  const handleSave = () => {
+    if (!validate()) return;
+    saveTemplate(template);
+    showToast.success("Template Saved", `${selectedDept} · ${selectedRole}`);
+  };
+  const handleExport = () => {
+    if (isSingleMode) {
+      if (!template) return;
+      exportTemplateToExcel(template, selectedDept, selectedRole);
+      showToast.success("Downloaded", `${selectedDept} · ${selectedRole}`);
+    } else {
+      const all = getAllTemplates();
+      const count = Object.keys(all).length;
+      if (count === 0) {
+        showToast.error("Nothing to export", "No templates have been saved yet.");
+        return;
+      }
+      exportAllTemplatesToExcel(all);
+      showToast.success("Downloaded", `${count} template${count === 1 ? "" : "s"} exported.`);
+    }
+  };
+  const handleImportClick = () => {
+    if (isSingleMode) {
+      setExcelImportOpen(true);
+    } else {
+      setBulkImportOpen(true);
+    }
+  };
+  const handleImportApply = (imported) => {
+    setTemplate(imported);
+    saveTemplate(imported);
+    showToast.success("Imported from Excel", "Template loaded. Review and push when ready.");
+  };
+  const handleBulkApply = async (imported) => {
+    for (const t of imported) {
+      saveTemplate(t);
+    }
+    showToast.success(`Imported ${imported.length} template${imported.length === 1 ? "" : "s"}`, "All KPIs saved. Review and push when ready.");
+  };
+  const handlePushClick = async () => {
+    if (isSingleMode) {
+      await handlePushSingle();
+    } else {
+      await handlePushAllPreview();
+    }
+  };
+  const handlePushSingle = async () => {
+    if (!validate()) return;
+    if (!template || !selectedDept || !selectedRole) return;
+    saveTemplate(template);
+    await new Promise((r) => setTimeout(r, 50));
+    const rawPreview = previewTemplateDiff(selectedDept, selectedRole, template);
+    const affectedIds = Object.keys(rawPreview);
+    if (affectedIds.length === 0) {
+      showToast.success("No changes", "Every employee is already up to date.");
+      return;
+    }
+    const enriched = affectedIds.map((empId) => {
+      const emp = employees.find((e) => e.id === empId);
+      const diffs = rawPreview[empId];
+      const existing = emp?.categories || [];
+      let beforeSum = 0;
+      let beforeW = 0;
+      for (const cat of existing) {
+        let catSum = 0;
+        let kw = 0;
+        for (const k of cat.kpis) {
+          const ratio = (k.target || 1) > 0 ? (k.actual || 0) / (k.target || 1) : 0;
+          const w = k.weight || 1;
+          catSum += ratio * w;
+          kw += w;
+        }
+        const catScore = kw > 0 ? catSum / kw : 0;
+        const cw = (cat.weight || 0) / 100;
+        beforeSum += catScore * cw;
+        beforeW += cw;
+      }
+      const beforeScore = beforeW > 0 ? beforeSum / beforeW : 0;
+      const afterScore = beforeScore;
+      return {
+        employeeId: empId,
+        name: emp?.name || "Unknown",
+        email: emp?.email || "",
+        department: emp?.department || selectedDept,
+        role: emp?.role || selectedRole,
+        changeCount: diffs.length,
+        beforeScore,
+        afterScore,
+        diffs
+      };
+    });
+    const totalChanges = enriched.reduce((s, e) => s + e.changeCount, 0);
+    setPushPreview({
+      affectedCount: enriched.length,
+      totalChanges,
+      employees: enriched
+    });
+    setPushDialogOpen(true);
+  };
+  const confirmPushSingle = async () => {
+    if (!template || !selectedDept || !selectedRole) return;
+    setPushing(true);
+    try {
+      const result = await pushTemplateToEmployees(selectedDept, selectedRole, template);
+      showToast.success("Pushed", `${result.created} of ${result.affected} employee${result.affected > 1 ? "s" : ""} notified.`);
+      setPushDialogOpen(false);
+      setPushPreview(null);
+    } catch (err) {
+      showToast.error("Push failed", err.message || "Something went wrong.");
+    } finally {
+      setPushing(false);
+    }
+  };
+  const handlePushAllPreview = async () => {
+    const all = getAllTemplates();
+    const keys = Object.keys(all);
+    if (keys.length === 0) {
+      showToast.error("No templates", "Save some templates first.");
+      return;
+    }
+    const aggregated = /* @__PURE__ */ new Map();
+    let totalTemplates = 0;
+    let totalChanges = 0;
+    for (const key of keys) {
+      const t = all[key];
+      const rawPreview = previewTemplateDiff(t.department, t.roleName, t);
+      const affectedIds = Object.keys(rawPreview);
+      if (affectedIds.length === 0) continue;
+      totalTemplates++;
+      for (const empId of affectedIds) {
+        const emp = employees.find((e) => e.id === empId);
+        if (!emp) continue;
+        const diffs = rawPreview[empId];
+        totalChanges += diffs.length;
+        aggregated.set(empId, {
+          employeeId: empId,
+          name: emp.name,
+          email: emp.email,
+          department: emp.department,
+          role: emp.role,
+          changeCount: diffs.length
+        });
+      }
+    }
+    if (aggregated.size === 0) {
+      showToast.success("No changes", "Every employee is already up to date.");
+      return;
+    }
+    setPushAllPreview({
+      templateCount: totalTemplates,
+      affectedCount: aggregated.size,
+      totalChanges,
+      employees: Array.from(aggregated.values())
+    });
+    setPushAllDialogOpen(true);
+  };
+  const confirmPushAll = async () => {
+    setPushingAll(true);
+    try {
+      const all = getAllTemplates();
+      let totalCreated = 0;
+      let templatesPushed = 0;
+      for (const key of Object.keys(all)) {
+        const t = all[key];
+        const result = await pushTemplateToEmployees(t.department, t.roleName, t);
+        totalCreated += result.created;
+        if (result.created > 0) templatesPushed++;
+      }
+      showToast.success("Pushed all", `${templatesPushed} template${templatesPushed === 1 ? "" : "s"} · ${totalCreated} employee${totalCreated === 1 ? "" : "s"} notified.`);
+      setPushAllDialogOpen(false);
+      setPushAllPreview(null);
+    } catch (err) {
+      showToast.error("Push failed", err.message || "Something went wrong.");
+    } finally {
+      setPushingAll(false);
+    }
+  };
+  const weightStatus = totalWeight === 100 ? {
+    color: "emerald",
+    label: "Complete",
+    icon: CircleCheckBig
+  } : totalWeight > 100 ? {
+    color: "red",
+    label: "Over 100%",
+    icon: TriangleAlert
+  } : {
+    color: "blue",
+    label: `${100 - totalWeight}% remaining`,
+    icon: Info
+  };
+  const WeightIcon = weightStatus.icon;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs(motion.div, { initial: "hidden", animate: "show", variants: staggerContainer, className: "space-y-6", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx(PageHeader, { title: isSingleMode ? `Editing: ${selectedDept} / ${selectedRole}` : "KPI Framework", description: isSingleMode ? "Edit the template below, then save and push to employees." : "Bulk operations across every department and role. Pick a specific template below to edit it.", icon: /* @__PURE__ */ jsxRuntimeExports.jsx(FileSpreadsheet, { className: "h-6 w-6" }), actions: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 flex-wrap", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(Button, { variant: "outline", size: "sm", onClick: handleExport, className: "gap-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Download, { className: "h-3.5 w-3.5" }),
+        isSingleMode ? "Export Template" : "Export All"
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(Button, { variant: "outline", size: "sm", onClick: handleImportClick, className: "gap-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Upload, { className: "h-3.5 w-3.5" }),
+        isSingleMode ? "Import Template" : "Bulk Import"
+      ] }),
+      isSingleMode && template && /* @__PURE__ */ jsxRuntimeExports.jsxs(Button, { variant: "outline", size: "sm", onClick: handleSave, className: "gap-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Save, { className: "h-3.5 w-3.5" }),
+        " Save"
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(Button, { size: "sm", onClick: handlePushClick, disabled: isSingleMode && (pushing || totalWeight !== 100) || !isSingleMode && pushingAll, className: "gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20 disabled:opacity-50", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Send, { className: "h-3.5 w-3.5" }),
+        isSingleMode ? "Push to Employees" : "Push All"
+      ] })
+    ] }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(motion.div, { variants: fadeUp, children: /* @__PURE__ */ jsxRuntimeExports.jsx(Card, { className: "p-5", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(Label, { className: "text-xs text-muted-foreground flex items-center gap-1.5 mb-1.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Building2, { className: "h-3.5 w-3.5" }),
+          " Department"
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(Select, { value: selectedDept, onValueChange: (v) => {
+          setSelectedDept(v);
+          setSelectedRole("");
+        }, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(SelectTrigger, { className: "h-10", children: /* @__PURE__ */ jsxRuntimeExports.jsx(SelectValue, { placeholder: "Select department (or leave empty for bulk)" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(SelectContent, { children: departments.map((d, i) => /* @__PURE__ */ jsxRuntimeExports.jsx(SelectItem, { value: d, children: d }, `dept-${i}-${d}`)) })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(Label, { className: "text-xs text-muted-foreground flex items-center gap-1.5 mb-1.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(UserCog, { className: "h-3.5 w-3.5" }),
+          " Role"
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(Select, { value: selectedRole, onValueChange: setSelectedRole, disabled: !selectedDept, children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(SelectTrigger, { className: "h-10", children: /* @__PURE__ */ jsxRuntimeExports.jsx(SelectValue, { placeholder: selectedDept ? "Select role" : "Select department first" }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(SelectContent, { children: roles.map((r, i) => /* @__PURE__ */ jsxRuntimeExports.jsx(SelectItem, { value: r, children: r }, `role-${i}-${r}`)) })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { className: "text-xs text-muted-foreground mb-1.5", children: isSingleMode ? "Template Status" : "Mode" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center gap-2 h-10 px-3 rounded-md border border-border bg-muted/30 text-sm", children: isSingleMode && template ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(Badge, { variant: "outline", className: `bg-${weightStatus.color}-500/10 text-${weightStatus.color}-700 dark:text-${weightStatus.color}-400 border-${weightStatus.color}-500/30 gap-1 text-[10px] h-5`, children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(WeightIcon, { className: "h-3 w-3" }),
+            weightStatus.label
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-[11px] text-muted-foreground ml-auto", children: [
+            template.categories.length,
+            " cat · ",
+            totalKpis,
+            " KPI"
+          ] })
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[11px] text-muted-foreground", children: "Bulk mode — actions affect every template" }) }),
+        isSingleMode && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => {
+          setSelectedDept("");
+          setSelectedRole("");
+        }, className: "text-[10px] text-muted-foreground hover:text-foreground mt-1.5 underline", children: "← Back to bulk view" })
+      ] })
+    ] }) }) }),
+    isSingleMode && template ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4", children: [
+      template.categories.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx(motion.div, { variants: fadeUp, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(Card, { className: `p-4 flex items-center gap-3 bg-${weightStatus.color}-500/5 border-${weightStatus.color}-500/20`, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(WeightIcon, { className: `h-5 w-5 text-${weightStatus.color}-600 dark:text-${weightStatus.color}-400` }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2 text-sm font-semibold text-foreground", children: [
+            "Category Total Weight: ",
+            totalWeight,
+            "%",
+            totalWeight === 100 && /* @__PURE__ */ jsxRuntimeExports.jsx(CircleCheckBig, { className: "h-4 w-4 text-emerald-500" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-muted-foreground mt-0.5", children: totalWeight === 100 ? "Category weights balanced. Now ensure each category's KPI weights sum to 100%." : totalWeight > 100 ? `Reduce category weights by ${totalWeight - 100}% to reach 100%.` : `Add ${100 - totalWeight}% more to reach 100%.` })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-32 h-2 bg-muted rounded-full overflow-hidden shrink-0", children: /* @__PURE__ */ jsxRuntimeExports.jsx(motion.div, { initial: {
+          width: 0
+        }, animate: {
+          width: `${Math.min(100, totalWeight)}%`
+        }, transition: {
+          duration: 0.6
+        }, className: `h-full bg-${weightStatus.color}-500` }) })
+      ] }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx(motion.div, { variants: fadeUp, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Layers, { className: "h-4 w-4 text-muted-foreground" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-sm font-semibold text-foreground", children: "Categories" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(Button, { size: "sm", variant: "outline", onClick: addCategory, className: "gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(FolderPlus, { className: "h-4 w-4" }),
+          " Add Category"
+        ] })
+      ] }) }),
+      template.categories.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx(motion.div, { variants: fadeUp, children: /* @__PURE__ */ jsxRuntimeExports.jsx(Card, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(EmptyState, { icon: /* @__PURE__ */ jsxRuntimeExports.jsx(Layers, { className: "h-6 w-6" }), title: "No categories yet", description: "Add your first KPI category to start building this template.", action: /* @__PURE__ */ jsxRuntimeExports.jsxs(Button, { onClick: addCategory, className: "gap-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(FolderPlus, { className: "h-4 w-4" }),
+        " Add Category"
+      ] }) }) }) }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-4", children: template.categories.map((cat, catIdx) => {
+        const kpiWeight = cat.kpis.reduce((s, k) => s + (k.weight || 0), 0);
+        const kpiWeightOk = Math.abs(kpiWeight - 100) < 0.01;
+        const kpiWeightOver = kpiWeight > 100;
+        return /* @__PURE__ */ jsxRuntimeExports.jsx(motion.div, { variants: fadeUp, layout: true, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(Card, { className: "overflow-hidden", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 border-b border-border/50 bg-gradient-to-r from-muted/40 to-transparent", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap items-center gap-3", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0", children: catIdx + 1 }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex-1 min-w-[180px]", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { className: "text-[10px] uppercase tracking-wider font-semibold text-muted-foreground", children: "Category Name" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Input, { value: cat.name, onChange: (e) => updateCategory(cat.id, {
+                  name: e.target.value
+                }), placeholder: "Category name", className: "mt-1 h-9 font-medium" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-32", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { className: "text-[10px] uppercase tracking-wider font-semibold text-muted-foreground", children: "Category Weight %" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Input, { type: "number", value: cat.weight, onChange: (e) => updateCategory(cat.id, {
+                  weight: Number(e.target.value)
+                }), placeholder: "0", className: "mt-1 h-9 font-mono" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Button, { variant: "ghost", size: "sm", className: "h-9 w-9 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10 self-end", onClick: () => removeCategory(cat.id), title: "Delete category", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Trash2, { className: "h-4 w-4" }) })
+            ] }),
+            cat.kpis.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `mt-3 rounded-md px-3 py-2 text-[11px] flex items-center gap-2 ${kpiWeightOver ? "bg-red-50 border border-red-200 text-red-700 dark:bg-red-950/30 dark:text-red-400" : kpiWeightOk ? "bg-green-50 border border-green-200 text-green-700 dark:bg-green-950/30 dark:text-green-400" : "bg-amber-50 border border-amber-200 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"}`, children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(CircleAlert, { className: "h-3.5 w-3.5 shrink-0" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+                kpiWeightOver ? "⚠️ KPI weights over 100%! " : kpiWeightOk ? "✅ KPI weights balanced. " : "📊 ",
+                "KPI Total: ",
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("strong", { children: [
+                  kpiWeight,
+                  "%"
+                ] }),
+                !kpiWeightOver && !kpiWeightOk && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+                  " · Need ",
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("strong", { children: [
+                    100 - kpiWeight,
+                    "%"
+                  ] }),
+                  " more"
+                ] })
+              ] })
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "p-4 space-y-3", children: [
+            cat.kpis.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-muted-foreground text-center py-6 border border-dashed border-border/50 rounded-lg", children: "No KPIs yet — add one below" }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "hidden md:grid grid-cols-14 gap-3 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-1", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "col-span-5", children: "KPI Description" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "col-span-2", children: "Metric" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "col-span-2", children: "Target" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "col-span-2", children: "Weight %" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "col-span-3 text-right", children: "Action" })
+              ] }),
+              cat.kpis.map((kpi, kpiIdx) => /* @__PURE__ */ jsxRuntimeExports.jsxs(motion.div, { layout: true, initial: {
+                opacity: 0,
+                x: -8
+              }, animate: {
+                opacity: 1,
+                x: 0
+              }, transition: {
+                delay: kpiIdx * 0.03
+              }, className: "grid grid-cols-1 md:grid-cols-14 gap-3 items-center p-2 rounded-lg hover:bg-accent/30 transition-colors", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "md:col-span-5", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { className: "text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden mb-1 block", children: "Description" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(GripVertical, { className: "hidden md:block h-4 w-4 text-muted-foreground/40 shrink-0" }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(Input, { value: kpi.description, onChange: (e) => updateKPI(cat.id, kpi.id, {
+                      description: e.target.value
+                    }), placeholder: "KPI description", className: "h-9" })
+                  ] })
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "md:col-span-2", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { className: "text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden mb-1 block", children: "Metric" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs(Select, { value: kpi.metric, onValueChange: (v) => updateKPI(cat.id, kpi.id, {
+                    metric: v
+                  }), children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(SelectTrigger, { className: "h-9 font-mono", children: /* @__PURE__ */ jsxRuntimeExports.jsx(SelectValue, {}) }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(SelectContent, { children: METRICS.map((m, i) => /* @__PURE__ */ jsxRuntimeExports.jsx(SelectItem, { value: m, children: m }, `metric-${i}-${m}`)) })
+                  ] })
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "md:col-span-2", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { className: "text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden mb-1 block", children: "Target" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Input, { type: "number", value: kpi.target, onChange: (e) => updateKPI(cat.id, kpi.id, {
+                    target: Number(e.target.value)
+                  }), className: "h-9 font-mono" })
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "md:col-span-2", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { className: "text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden mb-1 block", children: "Weight %" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Input, { type: "number", min: 0, max: 100, value: kpi.weight || 0, onChange: (e) => updateKPI(cat.id, kpi.id, {
+                    weight: Number(e.target.value)
+                  }), placeholder: "0", className: "h-9 font-mono" })
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "md:col-span-3 flex justify-end", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Button, { variant: "ghost", size: "sm", className: "h-9 w-9 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10", onClick: () => removeKPI(cat.id, kpi.id), title: "Delete KPI", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Trash2, { className: "h-4 w-4" }) }) })
+              ] }, kpi.id))
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(Button, { size: "sm", variant: "outline", onClick: () => addKPI(cat.id), className: "gap-2 mt-2", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { className: "h-4 w-4" }),
+              " Add KPI to ",
+              cat.name
+            ] })
+          ] })
+        ] }) }, cat.id);
+      }) }),
+      template.categories.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx(motion.div, { variants: fadeUp, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(Card, { className: "p-4 flex flex-wrap items-center justify-between gap-3 bg-muted/30", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-3 text-sm", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(ListChecks, { className: "h-4 w-4 text-muted-foreground" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-muted-foreground text-[13px]", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { className: "text-foreground", children: template.categories.length }),
+            " categories ·",
+            " ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { className: "text-foreground", children: totalKpis }),
+            " KPIs ·",
+            " ",
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("strong", { className: totalWeight === 100 ? "text-emerald-600" : "text-amber-600", children: [
+              totalWeight,
+              "%"
+            ] }),
+            " ",
+            "category weight"
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(Button, { size: "sm", onClick: handleSave, variant: "outline", className: "gap-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Save, { className: "h-3.5 w-3.5" }),
+            " Save"
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(Button, { size: "sm", onClick: handlePushClick, disabled: pushing || totalWeight !== 100, className: "gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20 disabled:opacity-50", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Send, { className: "h-3.5 w-3.5" }),
+            "Push to Employees"
+          ] })
+        ] })
+      ] }) })
+    ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx(motion.div, { variants: fadeUp, children: /* @__PURE__ */ jsxRuntimeExports.jsx(Card, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(EmptyState, { icon: /* @__PURE__ */ jsxRuntimeExports.jsx(FileSpreadsheet, { className: "h-6 w-6" }), title: isSingleMode ? "Loading template…" : "Bulk mode", description: isSingleMode ? "Loading the KPI template for this department and role." : "Use the buttons above to export, import, or push all templates at once. Or pick a specific department and role to edit it." }) }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(Dialog, { open: pushDialogOpen, onOpenChange: setPushDialogOpen, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogContent, { className: "max-w-2xl max-h-[85vh] flex flex-col p-5", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogHeader, { className: "space-y-1.5", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogTitle, { className: "flex items-center gap-2 text-base", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Send, { className: "h-4 w-4 text-primary" }),
+          "Push KPI changes to employees?"
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(DialogDescription, { className: "text-[11px] leading-relaxed", children: pushPreview && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          "Changes apply ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { className: "text-foreground", children: "immediately" }),
+          " to",
+          " ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { className: "text-foreground", children: pushPreview.affectedCount }),
+          " ",
+          pushPreview.affectedCount === 1 ? "employee" : "employees",
+          " —",
+          " ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { className: "text-foreground", children: pushPreview.totalChanges }),
+          " total",
+          " ",
+          pushPreview.totalChanges === 1 ? "change" : "changes",
+          ".",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("br", {}),
+          "Each employee will be notified and can comment if they have concerns."
+        ] }) })
+      ] }),
+      pushPreview && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 overflow-y-auto -mx-5 px-5 py-1 space-y-2.5", children: pushPreview.employees.map((emp) => /* @__PURE__ */ jsxRuntimeExports.jsxs(Card, { className: "p-3", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start justify-between gap-3 mb-2.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-medium text-[13px] truncate", children: emp.name }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "text-[11px] text-muted-foreground truncate", children: emp.email })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(Badge, { variant: "outline", className: "shrink-0 text-[10px] h-5 px-1.5 font-medium", children: [
+            emp.changeCount,
+            " ",
+            emp.changeCount === 1 ? "change" : "changes"
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1", children: [
+          emp.diffs.slice(0, 5).map((d, i) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[11px] flex items-center gap-2 text-muted-foreground leading-relaxed", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "w-1 h-1 rounded-full bg-primary shrink-0" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-foreground shrink-0", children: labelForDiffKind(d.kind) }),
+            d.kpiDescription && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "truncate", children: [
+              "· ",
+              d.kpiDescription
+            ] }),
+            d.categoryName && !d.kpiDescription && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "truncate", children: [
+              "· ",
+              d.categoryName
+            ] })
+          ] }, i)),
+          emp.diffs.length > 5 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[10px] text-muted-foreground pl-3 italic", children: [
+            "+ ",
+            emp.diffs.length - 5,
+            " more change",
+            emp.diffs.length - 5 === 1 ? "" : "s"
+          ] })
+        ] })
+      ] }, emp.employeeId)) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogFooter, { className: "flex-row justify-end gap-2 pt-3 border-t", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Button, { variant: "outline", size: "sm", onClick: () => {
+          setPushDialogOpen(false);
+          setPushPreview(null);
+        }, disabled: pushing, children: "Cancel" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Button, { size: "sm", onClick: confirmPushSingle, disabled: pushing, className: "gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white", children: pushing ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { className: "h-3.5 w-3.5 animate-spin" }),
+          "Pushing…"
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Send, { className: "h-3.5 w-3.5" }),
+          "Push changes"
+        ] }) })
+      ] })
+    ] }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(Dialog, { open: pushAllDialogOpen, onOpenChange: setPushAllDialogOpen, children: /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogContent, { className: "max-w-2xl max-h-[85vh] flex flex-col p-5", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogHeader, { className: "space-y-1.5", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogTitle, { className: "flex items-center gap-2 text-base", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Send, { className: "h-4 w-4 text-primary" }),
+          "Push all KPI changes to every employee?"
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(DialogDescription, { className: "text-[11px] leading-relaxed", children: pushAllPreview && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { className: "text-foreground", children: pushAllPreview.templateCount }),
+          " template",
+          pushAllPreview.templateCount === 1 ? "" : "s",
+          " will be pushed to",
+          " ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { className: "text-foreground", children: pushAllPreview.affectedCount }),
+          " employee",
+          pushAllPreview.affectedCount === 1 ? "" : "s",
+          " —",
+          " ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { className: "text-foreground", children: pushAllPreview.totalChanges }),
+          " total change",
+          pushAllPreview.totalChanges === 1 ? "" : "s",
+          ".",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("br", {}),
+          "Each employee will be notified and can comment if they have concerns."
+        ] }) })
+      ] }),
+      pushAllPreview && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex-1 overflow-y-auto -mx-5 px-5 py-1 space-y-2", children: pushAllPreview.employees.map((emp) => /* @__PURE__ */ jsxRuntimeExports.jsx(Card, { className: "p-3", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-3", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "font-medium text-[13px] truncate", children: emp.name }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-[11px] text-muted-foreground truncate", children: [
+            emp.email,
+            " · ",
+            emp.department,
+            " / ",
+            emp.role
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(Badge, { variant: "outline", className: "shrink-0 text-[10px] h-5 px-1.5 font-medium", children: [
+          emp.changeCount,
+          " change",
+          emp.changeCount === 1 ? "" : "s"
+        ] })
+      ] }) }, emp.employeeId)) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogFooter, { className: "flex-row justify-end gap-2 pt-3 border-t", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Button, { variant: "outline", size: "sm", onClick: () => {
+          setPushAllDialogOpen(false);
+          setPushAllPreview(null);
+        }, disabled: pushingAll, children: "Cancel" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Button, { size: "sm", onClick: confirmPushAll, disabled: pushingAll, className: "gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white", children: pushingAll ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { className: "h-3.5 w-3.5 animate-spin" }),
+          "Pushing all…"
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Send, { className: "h-3.5 w-3.5" }),
+          "Push all changes"
+        ] }) })
+      ] })
+    ] }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(ExcelImportDialog, { open: excelImportOpen, onOpenChange: setExcelImportOpen, department: selectedDept, role: selectedRole, onApply: handleImportApply }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(BulkExcelImportDialog, { open: bulkImportOpen, onOpenChange: setBulkImportOpen, onApply: handleBulkApply })
+  ] });
+}
+function labelForDiffKind(kind) {
+  switch (kind) {
+    case "category_added":
+      return "New category";
+    case "category_removed":
+      return "Category removed";
+    case "category_weight_changed":
+      return "Category weight changed";
+    case "category_name_changed":
+      return "Category renamed";
+    case "kpi_added":
+      return "New KPI";
+    case "kpi_removed":
+      return "KPI removed";
+    case "kpi_target_changed":
+      return "Target changed";
+    case "kpi_metric_changed":
+      return "Metric changed";
+    case "kpi_weight_changed":
+      return "KPI weight changed";
+    case "kpi_description_changed":
+      return "KPI renamed";
+    default:
+      return kind;
+  }
+}
+export {
+  KPIFrameworkPage as component
+};
