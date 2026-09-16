@@ -55,6 +55,9 @@ function EmployeePortal() {
     employees, setEmployees, getMonthlyHistory, submitAppraisal, saveKPIProof,
   } = useP4P();
 
+  // ⭐ Page tour — fires once, first visit
+  usePageTour(PAGE_TOURS["/employee"]);
+
   const [loading, setLoading] = useState(true);
   const [employee, setEmployee] = useState<any>(null);
   const [editingActuals, setEditingActuals] = useState<Record<string, number>>({});
@@ -392,29 +395,32 @@ function EmployeePortal() {
       variants={staggerContainer}
       className="space-y-6"
     >
-      <PageHeader
-        title="My KPIs"
-        description={`${employee.name} · ${employee.department} · ${employee.role}`}
-        icon={<Target className="h-6 w-6" />}
-        actions={
-          !hasNoKpis ? (
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">
-                  {viewMode === "year" ? `Year ${selectedYear} Avg` : "Overall Score"}
+      {/* ⭐ Tour anchor: page header */}
+      <div data-tour="performance-header">
+        <PageHeader
+          title="My KPIs"
+          description={`${employee.name} · ${employee.department} · ${employee.role}`}
+          icon={<Target className="h-6 w-6" />}
+          actions={
+            !hasNoKpis ? (
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">
+                    {viewMode === "year" ? `Year ${selectedYear} Avg` : "Overall Score"}
+                  </div>
+                  <div className={`text-3xl font-bold ${band.color}`}>
+                    {fmtNum(overallPercent, 1)}%
+                  </div>
                 </div>
-                <div className={`text-3xl font-bold ${band.color}`}>
-                  {fmtNum(overallPercent, 1)}%
+                <div className={`px-4 py-2.5 rounded-xl text-sm font-bold border-2 flex items-center gap-2 ${band.bg} ${band.color} pulse-${band.pulse}`}>
+                  <BandIcon className="h-4 w-4" />
+                  {band.full}
                 </div>
               </div>
-              <div className={`px-4 py-2.5 rounded-xl text-sm font-bold border-2 flex items-center gap-2 ${band.bg} ${band.color} pulse-${band.pulse}`}>
-                <BandIcon className="h-4 w-4" />
-                {band.full}
-              </div>
-            </div>
-          ) : undefined
-        }
-      />
+            ) : undefined
+          }
+        />
+      </div>
 
       {hasNoKpis ? (
         <>
@@ -634,81 +640,82 @@ function EmployeePortal() {
             </SectionCard>
           )}
 
-          {displayCategories.length > 0 && (
-            <div className="space-y-4">
-              {displayCategories.map((category: any, idx: number) => {
-                let catScore = 0;
-                let totalWeight = 0;
-                const kpiDetails = category.kpis.map((kpi: any) => {
-                  const target = kpi.target || 0;
-                  const actual = editingActuals[kpi.id] ?? 0;
-                  const comment = kpiComments[kpi.id] ?? "";
-                  const proof = kpiProofs[kpi.id] || [];
-                  const ratio = target > 0 ? actual / target : 0;
-                  const achievement = ratio * 100;
-                  const weight = kpi.weight || 0;
-                  if (target > 0 && weight > 0) {
-                    catScore += ratio * weight;
-                    totalWeight += weight;
-                  }
-                  return { ...kpi, actual, achievement, comment, proof, weight };
-                });
+          {/* ⭐ Tour anchor: KPI categories list */}
+          <div data-tour="performance-categories">
+            {displayCategories.length > 0 && (
+              <div className="space-y-4">
+                {displayCategories.map((category: any, idx: number) => {
+                  let catScore = 0;
+                  let totalWeight = 0;
+                  const kpiDetails = category.kpis.map((kpi: any) => {
+                    const target = kpi.target || 0;
+                    const actual = editingActuals[kpi.id] ?? 0;
+                    const comment = kpiComments[kpi.id] ?? "";
+                    const proof = kpiProofs[kpi.id] || [];
+                    const ratio = target > 0 ? actual / target : 0;
+                    const achievement = ratio * 100;
+                    const weight = kpi.weight || 0;
+                    if (target > 0 && weight > 0) {
+                      catScore += ratio * weight;
+                      totalWeight += weight;
+                    }
+                    return { ...kpi, actual, achievement, comment, proof, weight };
+                  });
 
-                const finalScore = totalWeight > 0 ? (catScore / totalWeight) * 100 : 0;
-                const statusColor =
-                  finalScore >= 100 ? "emerald"
-                    : finalScore >= 70 ? "blue"
-                    : finalScore >= 50 ? "amber"
-                    : "red";
+                  const finalScore = totalWeight > 0 ? (catScore / totalWeight) * 100 : 0;
+                  const statusColor =
+                    finalScore >= 100 ? "emerald"
+                      : finalScore >= 70 ? "blue"
+                      : finalScore >= 50 ? "amber"
+                      : "red";
 
-                return (
-                  <motion.div key={idx} variants={fadeUp}>
-                    <Card className="overflow-hidden">
-                      <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-border/50 bg-gradient-to-r from-muted/40 to-transparent">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-10 h-10 rounded-xl bg-${statusColor}-500/10 text-${statusColor}-600 dark:text-${statusColor}-400 flex items-center justify-center font-bold text-sm shrink-0`}>
-                            {idx + 1}
+                  return (
+                    <motion.div key={idx} variants={fadeUp}>
+                      <Card className="overflow-hidden">
+                        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-border/50 bg-gradient-to-r from-muted/40 to-transparent">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-10 h-10 rounded-xl bg-${statusColor}-500/10 text-${statusColor}-600 dark:text-${statusColor}-400 flex items-center justify-center font-bold text-sm shrink-0`}>
+                              {idx + 1}
+                            </div>
+                            <div className="min-w-0">
+                              <h3 className="font-semibold text-base text-foreground truncate">
+                                {category.name}
+                              </h3>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {category.kpis.length} KPIs · Category weight {category.weight}%
+                              </p>
+                            </div>
                           </div>
-                          <div className="min-w-0">
-                            <h3 className="font-semibold text-base text-foreground truncate">
-                              {category.name}
-                            </h3>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {category.kpis.length} KPIs · Category weight {category.weight}%
-                            </p>
+                          <div className="flex items-center gap-3 shrink-0">
+                            {hasApprovedData && (
+                              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 gap-1 text-[10px]">
+                                <CheckCircle className="h-3 w-3" /> Approved
+                              </Badge>
+                            )}
+                            <div className={`text-2xl font-bold text-${statusColor}-600 dark:text-${statusColor}-400`}>
+                              {fmtNum(finalScore, 1)}%
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          {hasApprovedData && (
-                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 gap-1 text-[10px]">
-                              <CheckCircle className="h-3 w-3" /> Approved
-                            </Badge>
-                          )}
-                          <div className={`text-2xl font-bold text-${statusColor}-600 dark:text-${statusColor}-400`}>
-                            {fmtNum(finalScore, 1)}%
-                          </div>
+
+                        <div className="w-full bg-muted h-1.5 overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(100, finalScore)}%` }}
+                            transition={{ duration: 0.8 }}
+                            className={`h-full bg-${statusColor}-500`}
+                          />
                         </div>
-                      </div>
 
-                      <div className="w-full bg-muted h-1.5 overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${Math.min(100, finalScore)}%` }}
-                          transition={{ duration: 0.8 }}
-                          className={`h-full bg-${statusColor}-500`}
-                        />
-                      </div>
-
-                      <div className="divide-y divide-border/50">
-                        {kpiDetails.map((kpi: any) => {
-                          const isUploading = uploadingFiles[kpi.id] || false;
-                          const isExpanded = expandedKpi === kpi.id;
-                          const achColor =
-                            kpi.achievement >= 100 ? "text-emerald-600 dark:text-emerald-400"
-                              : kpi.achievement >= 70 ? "text-blue-600 dark:text-blue-400"
-                              : kpi.achievement >= 50 ? "text-amber-600 dark:text-amber-400"
-                              : "text-red-600 dark:text-red-400";
-
+                        <div className="divide-y divide-border/50">
+                          {kpiDetails.map((kpi: any) => {
+                            const isUploading = uploadingFiles[kpi.id] || false;
+                            const isExpanded = expandedKpi === kpi.id;
+const achColor =
+  kpi.achievement >= 100 ? "text-emerald-600 dark:text-emerald-400"
+    : kpi.achievement >= 70 ? "text-blue-600 dark:text-blue-400"
+    : kpi.achievement >= 50 ? "text-amber-600 dark:text-amber-400"
+    : "text-red-600 dark:text-red-400";
                           return (
                             <div key={kpi.id} className="p-5 hover:bg-accent/30 transition-colors">
                               <div className="grid grid-cols-12 gap-3 items-start">
@@ -860,6 +867,7 @@ function EmployeePortal() {
               })}
             </div>
           )}
+          </div>
 
           <motion.div variants={fadeUp}>
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border/50">
