@@ -39,9 +39,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/p4p-app-v2/favicon.ico", sizes: "any" },
-      { rel: "icon", type: "image/png", href: "/p4p-app-v2/logo-mark.png" },
-      { rel: "apple-touch-icon", href: "/p4p-app-v2/logo-mark.png" },
+      { rel: "icon", href: "/p4p-app-v2/favicon.ico" },
+      { rel: "apple-touch-icon", href: "/p4p-app-v2/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootShell,
