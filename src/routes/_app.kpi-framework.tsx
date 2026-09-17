@@ -475,6 +475,8 @@ function KPIFrameworkPage() {
       variants={staggerContainer}
       className="space-y-6"
     >
+      {/* 👈 ADDED data-tour wrapper */}
+      <div data-tour="framework-header">
       <PageHeader
         title={isSingleMode ? `Editing: ${selectedDept} / ${selectedRole}` : "KPI Framework"}
         description={
@@ -484,7 +486,7 @@ function KPIFrameworkPage() {
         }
         icon={<FileSpreadsheet className="h-6 w-6" />}
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap" data-tour="framework-actions">
             <Button
               variant="outline"
               size="sm"
@@ -526,9 +528,10 @@ function KPIFrameworkPage() {
           </div>
         }
       />
+      </div>
 
       {/* Department / Role selector */}
-      <motion.div variants={fadeUp}>
+      <motion.div variants={fadeUp} data-tour="framework-selector">
         <Card className="p-5">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>

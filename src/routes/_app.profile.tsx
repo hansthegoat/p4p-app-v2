@@ -9,6 +9,7 @@ import { useUser } from "@/lib/p4p/user-context";
 import { supabase } from "@/lib/supabase";
 import { showToast } from "@/lib/toast";
 import { TourReplayButton } from "@/components/p4p/TourReplayButton";
+import { ChangePasswordModal } from "@/components/p4p/ChangePasswordModal";
 import {
   KeyRound, LogOut, Mail, Building2, UserCog, Calendar,
   Target, Award, CheckCircle,
@@ -25,6 +26,7 @@ function ProfilePage() {
   const { logout } = useUser();
   const [me, setMe] = useState<Employee | null>(null);
   const [authEmail, setAuthEmail] = useState<string>("");
+  const [pwModalOpen, setPwModalOpen] = useState(false);  // 👈 ADDED
 
   useEffect(() => {
     let cancelled = false;
@@ -56,11 +58,14 @@ function ProfilePage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <PageHeader
-        title="My Profile"
-        description="Your account and performance summary."
-        icon={<Award className="h-6 w-6" />}
-      />
+      {/* 👈 ADDED data-tour wrapper */}
+      <div data-tour="profile-header">
+        <PageHeader
+          title="My Profile"
+          description="Your account and performance summary."
+          icon={<Award className="h-6 w-6" />}
+        />
+      </div>
 
       <Card className="p-6">
         <div className="flex items-center gap-4">
@@ -81,7 +86,8 @@ function ProfilePage() {
         </div>
       </Card>
 
-      <Card className="p-5 space-y-3">
+      {/* 👈 ADDED data-tour */}
+      <Card className="p-5 space-y-3" data-tour="profile-details">
         <h3 className="text-sm font-semibold">Work information</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <InfoRow icon={<Building2 className="h-3.5 w-3.5" />} label="Department" value={me?.department || "—"} />
@@ -134,14 +140,15 @@ function ProfilePage() {
         </Card>
       )}
 
-<Card className="p-5 space-y-2">
-  <h3 className="text-sm font-semibold mb-3">Account</h3>
+      {/* 👈 ADDED data-tour */}
+      <Card className="p-5 space-y-2" data-tour="profile-account">
+        <h3 className="text-sm font-semibold mb-3">Account</h3>
 
   <TourReplayButton role={me?.roleType || "employee"} />
 
-  <Button
-    variant="outline"
-    onClick={() => navigate({ to: "/change-password" })}
+        <Button
+          variant="outline"
+          onClick={() => setPwModalOpen(true)}
           className="w-full justify-start gap-2"
         >
           <KeyRound className="h-4 w-4" /> Change password
@@ -154,6 +161,12 @@ function ProfilePage() {
           <LogOut className="h-4 w-4" /> Sign out
         </Button>
       </Card>
+
+      {/* 👈 ADDED — password change modal */}
+      <ChangePasswordModal
+        open={pwModalOpen}
+        onClose={() => setPwModalOpen(false)}
+      />
     </div>
   );
 }

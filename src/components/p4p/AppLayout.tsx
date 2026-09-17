@@ -3,9 +3,7 @@ import { Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { useUser } from "@/lib/p4p/user-context";
 import { useP4P } from "@/lib/p4p/store";
 import { supabase, getCurrentUser } from "@/lib/supabase";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { LogoutConfirmModal } from "@/components/p4p/LogoutConfirmModal";
-import { NotificationBell } from "@/components/p4p/NotificationBell";
 import { Logo } from "@/components/p4p/Logo";
 import { showToast } from "@/lib/toast";
 import {
@@ -24,10 +22,10 @@ import {
   Calculator,
   RefreshCw,
   History,
-  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { usePageTour } from "@/hooks/usePageTour";
+import { getPageTourForPath, isTourDone } from "@/lib/p4p/tours";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -39,25 +37,31 @@ interface NavItem {
   icon: any;
   roles: string[];
   showOnlyIfPending?: boolean;
+  group?: "main" | "team" | "admin";
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard, roles: ["employee", "hr", "admin"] },
-  { label: "My Performance", to: "/employee", icon: Target, roles: ["employee", "hr", "admin"] },
-  { label: "My Calculation", to: "/my-calculation", icon: Calculator, roles: ["employee", "hr", "admin"] },
-  { label: "My Profile", to: "/profile", icon: User, roles: ["employee", "hr", "admin"] },
-  { label: "Appraisals", to: "/appraisals", icon: ClipboardCheck, roles: ["employee", "hr", "admin"] },
-  { label: "KPI Updates", to: "/kpi-updates", icon: RefreshCw, roles: ["employee", "hr", "admin"], showOnlyIfPending: true },
-  { label: "Review Appraisals", to: "/appraisals-review", icon: ClipboardCheck, roles: ["employee", "hr", "admin"] },
-  { label: "Employees", to: "/employees", icon: Users, roles: ["hr", "admin"] },
-  { label: "KPI Framework", to: "/kpi-framework", icon: FileSpreadsheet, roles: ["hr", "admin"] },
-  { label: "Monthly Performance", to: "/monthly", icon: TrendingUp, roles: ["hr", "admin"] },
-  { label: "Audit Log", to: "/audit-log", icon: History, roles: ["hr", "admin"] },
-  { label: "Calculation Trace", to: "/trace", icon: FileText, roles: ["hr", "admin"] },
-  { label: "Supervisors", to: "/supervisors", icon: UserCheck, roles: ["hr", "admin"] },
-  { label: "Grade Points", to: "/grades", icon: Target, roles: ["hr", "admin"] },
-  { label: "Change Password", to: "/change-password", icon: KeyRound, roles: ["employee", "hr", "admin"] },
+  { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard, roles: ["employee", "hr", "admin"], group: "main" },
+  { label: "My Performance", to: "/employee", icon: Target, roles: ["employee", "hr", "admin"], group: "main" },
+  { label: "My Calculation", to: "/my-calculation", icon: Calculator, roles: ["employee", "hr", "admin"], group: "main" },
+  { label: "My Profile", to: "/profile", icon: User, roles: ["employee", "hr", "admin"], group: "main" },
+  { label: "Appraisals", to: "/appraisals", icon: ClipboardCheck, roles: ["employee", "hr", "admin"], group: "main" },
+  { label: "KPI Updates", to: "/kpi-updates", icon: RefreshCw, roles: ["employee", "hr", "admin"], showOnlyIfPending: true, group: "main" },
+  { label: "Review Appraisals", to: "/appraisals-review", icon: ClipboardCheck, roles: ["employee", "hr", "admin"], group: "main" },
+  { label: "Employees", to: "/employees", icon: Users, roles: ["hr", "admin"], group: "team" },
+  { label: "Supervisors", to: "/supervisors", icon: UserCheck, roles: ["hr", "admin"], group: "team" },
+  { label: "KPI Framework", to: "/kpi-framework", icon: FileSpreadsheet, roles: ["hr", "admin"], group: "admin" },
+  { label: "Grade Points", to: "/grades", icon: Target, roles: ["hr", "admin"], group: "admin" },
+  { label: "Monthly Performance", to: "/monthly", icon: TrendingUp, roles: ["hr", "admin"], group: "admin" },
+  { label: "Audit Log", to: "/audit-log", icon: History, roles: ["hr", "admin"], group: "admin" },
+  { label: "Calculation Trace", to: "/trace", icon: FileText, roles: ["hr", "admin"], group: "admin" },
 ];
+
+const GROUP_LABELS: Record<string, string> = {
+  main: "Overview",
+  team: "People",
+  admin: "Administration",
+};
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { user, role: contextRole, logout } = useUser();
@@ -69,7 +73,15 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
 
-  // Auto-detect role
+  const pageTour = getPageTourForPath(location.pathname);
+  const welcomeDone =
+    isTourDone("employee_welcome") || isTourDone("hr_welcome");
+
+  // 👈 Skip the dashboard page tour in AppLayout — the dashboard file
+  // handles it directly so it can chain after the welcome tour.
+  const isDashboard = location.pathname === "/dashboard";
+  usePageTour(pageTour, welcomeDone && !isDashboard);
+
   useEffect(() => {
     const detectRole = async () => {
       try {
@@ -79,28 +91,19 @@ export function AppLayout({ children }: AppLayoutProps) {
           return;
         }
         setAuthUserId(currentUser.id);
-
-        // Shared HR email — always HR
         if (currentUser.email === "hr@aoholdings.net") {
           setDetectedRole("hr");
           return;
         }
-
-        // Context role takes priority
         if (contextRole && ["employee", "hr", "admin"].includes(contextRole)) {
           setDetectedRole(contextRole);
           return;
         }
-
-        // Look up by email or auth id
         const emp =
           employees.find((e) => e.email === currentUser.email) ||
           employees.find((e) => e.authUserId === currentUser.id);
-        if (emp?.roleType) {
-          setDetectedRole(emp.roleType);
-        } else {
-          setDetectedRole("employee");
-        }
+        if (emp?.roleType) setDetectedRole(emp.roleType);
+        else setDetectedRole("employee");
       } catch {
         if (!contextRole) setDetectedRole("employee");
       }
@@ -110,7 +113,6 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const role = detectedRole || contextRole || "employee";
 
-  // Pending KPI updates for the current user
   const me = employees.find(
     (e) => e.authUserId === authUserId || (user?.email && e.email === user.email)
   );
@@ -126,9 +128,17 @@ export function AppLayout({ children }: AppLayoutProps) {
     return true;
   });
 
-  const requestLogout = () => {
-    setLogoutModalOpen(true);
-  };
+  const groupedItems = visibleItems.reduce<Record<string, NavItem[]>>(
+    (acc, item) => {
+      const g = item.group || "main";
+      if (!acc[g]) acc[g] = [];
+      acc[g].push(item);
+      return acc;
+    },
+    {}
+  );
+
+  const requestLogout = () => setLogoutModalOpen(true);
 
   const handleLogout = async () => {
     try {
@@ -139,12 +149,19 @@ export function AppLayout({ children }: AppLayoutProps) {
       navigate({ to: "/login" });
     } catch (err: any) {
       console.error("Logout error:", err);
-      showToast.error("Logout Failed", err.message || "Something went wrong. Please try again.");
+      showToast.error("Logout Failed", err.message || "Something went wrong.");
     }
   };
 
-  const isActive = (path: string) => {
-    return location.pathname === path || location.pathname.startsWith(path + "/");
+  const isActive = (path: string) =>
+    location.pathname === path || location.pathname.startsWith(path + "/");
+
+  const tourAnchorMap: Record<string, string> = {
+    "/employee": "nav-my-performance",
+    "/profile": "nav-my-profile",
+    "/kpi-framework": "nav-kpi-framework",
+    "/employees": "nav-employees",
+    "/audit-log": "nav-audit-log",
   };
 
   const renderNavLink = (item: NavItem, onClick?: () => void) => {
@@ -152,30 +169,36 @@ export function AppLayout({ children }: AppLayoutProps) {
     const active = isActive(item.to);
     const showBadge = item.to === "/kpi-updates" && pendingKpiUpdates > 0;
 
-    const tourAnchorMap: Record<string, string> = {
-      "/employee": "nav-my-performance",
-      "/profile": "nav-my-profile",
-      "/kpi-framework": "nav-kpi-framework",
-      "/employees": "nav-employees",
-      "/audit-log": "nav-audit-log",
-    };
-
     return (
       <Link
         key={item.to}
         to={item.to}
         onClick={onClick}
         data-tour={tourAnchorMap[item.to] || undefined}
-        className={`relative flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+        className={`group relative flex items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] font-medium transition-all duration-150 ${
           active
-            ? "bg-primary text-primary-foreground"
-            : "hover:bg-accent hover:text-accent-foreground"
+            ? "bg-blue-500/15 text-blue-100 dark:text-blue-50"
+            : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/60"
         }`}
       >
-        <Icon className="h-4 w-4 shrink-0" />
+        {active && (
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.7)]" />
+        )}
+
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${
+            active
+              ? "bg-blue-500/25 text-blue-100"
+              : "bg-slate-800/60 text-slate-400 group-hover:text-slate-100 group-hover:bg-slate-700/60"
+          }`}
+        >
+          <Icon className="h-[15px] w-[15px]" />
+        </span>
+
         <span className="truncate">{item.label}</span>
+
         {showBadge && (
-          <span className="ml-auto bg-amber-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5">
+          <span className="ml-auto bg-amber-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1.5 shadow-sm">
             {pendingKpiUpdates}
           </span>
         )}
@@ -183,106 +206,126 @@ export function AppLayout({ children }: AppLayoutProps) {
     );
   };
 
+  /** Full sidebar body — reused for desktop and mobile */
+  const sidebarContent = (onItemClick?: () => void) => (
+    <div className="flex h-full flex-col bg-slate-900 dark:bg-slate-950">
+      {/* 👈 Brand block — top of sidebar */}
+      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-slate-800/60 px-4">
+        <Link
+          to="/dashboard"
+          className="group flex items-center gap-2.5 min-w-0"
+          onClick={onItemClick}
+        >
+          <div className="shrink-0 rounded-lg bg-white p-1 shadow-sm">
+            <Logo
+              size={28}
+              variant="mark"
+              theme="dark"
+              className="transition-transform group-hover:scale-105"
+            />
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-[14px] font-bold leading-tight text-slate-100">
+              P4P Platform
+            </div>
+            <div className="truncate text-[10.5px] font-medium leading-tight text-slate-500">
+              Pay for Performance 
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      {/* Nav groups */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {Object.entries(groupedItems).map(([group, items]) => (
+          <div key={group} className="space-y-1">
+            <div className="px-3 pb-1.5 text-[10.5px] font-semibold tracking-wide text-slate-500">
+              {GROUP_LABELS[group] || group}
+            </div>
+            {items.map((item) => renderNavLink(item, onItemClick))}
+          </div>
+        ))}
+      </nav>
+
+      {/* 👈 Bottom rail — user card with logout beside email */}
+      <div className="shrink-0 border-t border-slate-800/60 px-3 py-3">
+        {user && (
+          <div className="flex items-center gap-2.5 rounded-lg bg-slate-800/40 p-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-[12px] font-bold text-white shadow-sm">
+              {(user.name || user.email || "?").charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-[12.5px] font-medium text-slate-200">
+                  {user.name || user.email?.split("@")[0] || "User"}
+                </span>
+                <button
+                  onClick={requestLogout}
+                  className="shrink-0 rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-red-400"
+                  title="Logout"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="truncate text-[10.5px] capitalize text-slate-500">
+                {role}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-14 items-center gap-4 px-4 lg:px-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden h-8 w-8"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </Button>
-
-          {/* Logo — white card so it's visible in dark mode */}
-          <Link to="/dashboard" className="flex items-center gap-2.5 group shrink-0">
-            <div className="bg-white rounded-lg p-1 shadow-sm">
-              <Logo
-                size={32}
-                variant="mark"
-                theme="dark"
-                className="transition-transform group-hover:scale-105"
-              />
-            </div>
-            <span className="font-bold text-base hidden sm:inline-block tracking-tight whitespace-nowrap">
-              P4P Platform
-            </span>
-          </Link>
-
-          <div className="flex-1" />
-
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <div data-tour="notifications">
-              <NotificationBell />
-            </div>
-
-            {user && (
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted">
-                <span className="text-sm font-medium truncate max-w-[150px]">
-                  {user.name || user.email}
-                </span>
-                {role && (
-                  <Badge variant="outline" className="text-[10px] capitalize">
-                    {role}
-                  </Badge>
-                )}
-              </div>
-            )}
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={requestLogout}
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+      {/* Mobile top bar (only visible on small screens) */}
+      <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-slate-900 px-4 dark:bg-slate-950 lg:hidden">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 text-slate-300 hover:bg-slate-800 hover:text-white"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        >
+          {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </Button>
+        <Link to="/dashboard" className="flex items-center gap-2.5 group shrink-0">
+          <div className="bg-white rounded-lg p-1 shadow-sm">
+            <Logo size={28} variant="mark" theme="dark" />
           </div>
-        </div>
+          <span className="font-bold text-[15px] text-slate-100 tracking-tight whitespace-nowrap">
+            P4P Platform
+          </span>
+        </Link>
       </header>
 
-      {/* Body */}
-      <div className="flex items-start">
-        {/* Desktop Sidebar */}
-<aside data-tour="sidebar" className="hidden lg:flex lg:flex-col w-64 border-r bg-background sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto">
-          <nav className="flex-1 p-3 space-y-1">
-            {visibleItems.length === 0 ? (
-              <p className="text-xs text-muted-foreground px-3 py-2">
-                No navigation available for this role.
-              </p>
-            ) : (
-              visibleItems.map((item) => renderNavLink(item))
-            )}
-          </nav>
+      {/* Body — sidebar is full height on desktop */}
+      <div className="flex">
+        {/* Desktop full-height sidebar */}
+        <aside
+          data-tour="sidebar"
+          className="hidden lg:flex lg:flex-col w-64 border-r border-slate-800 sticky top-0 h-screen overflow-hidden"
+        >
+          {sidebarContent()}
         </aside>
 
-        {/* Mobile Sidebar */}
+        {/* Mobile drawer */}
         {mobileMenuOpen && (
           <>
             <div
-              className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+              className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm"
               onClick={() => setMobileMenuOpen(false)}
             />
-            <aside className="fixed top-14 left-0 bottom-0 w-64 border-r bg-background z-40 overflow-y-auto lg:hidden">
-              <nav className="flex-1 p-3 space-y-1">
-                {visibleItems.map((item) =>
-                  renderNavLink(item, () => setMobileMenuOpen(false))
-                )}
-              </nav>
+            <aside className="fixed top-14 left-0 bottom-0 w-64 border-r border-slate-800 z-50 lg:hidden">
+              {sidebarContent(() => setMobileMenuOpen(false))}
             </aside>
           </>
         )}
 
-        {/* Main Content */}
-        <main className="flex-1 p-4 lg:p-6 min-w-0">{children}</main>
+        {/* Main content */}
+        <main className="flex-1 p-4 lg:p-8 min-w-0">{children}</main>
       </div>
 
-      {/* Logout Confirmation Modal */}
       <LogoutConfirmModal
         open={logoutModalOpen}
         onClose={() => setLogoutModalOpen(false)}

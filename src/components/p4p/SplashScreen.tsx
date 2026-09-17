@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 const STATUS_MESSAGES = [
   "Loading your workspace…",
@@ -11,10 +12,16 @@ export function SplashScreen() {
   const [fading, setFading] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [messageIndex, setMessageIndex] = useState(0);
+  const [mounted, setMounted] = useState(false);
+
+  // 👈 Only render the portal after mount (SSR-safe)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
-    const fadeTimer = window.setTimeout(() => setFading(true), 1300);
-    const hideTimer = window.setTimeout(() => setHidden(true), 1800);
+    const fadeTimer = window.setTimeout(() => setFading(true), 1800);
+    const hideTimer = window.setTimeout(() => setHidden(true), 2400);
     return () => {
       window.clearTimeout(fadeTimer);
       window.clearTimeout(hideTimer);
@@ -29,13 +36,14 @@ export function SplashScreen() {
     return () => window.clearInterval(interval);
   }, [hidden]);
 
-  if (hidden) return null;
+  if (hidden || !mounted) return null;
 
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
 
-  return (
+  // 👈 Render via portal to escape any transformed ancestors (Framer Motion wrappers)
+  return createPortal(
     <div
-      className={`fixed inset-0 z-[200] flex flex-col items-center justify-center transition-opacity ${
+      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity ${
         fading ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}
       style={{
@@ -45,7 +53,7 @@ export function SplashScreen() {
       }}
     >
       <div className="relative z-10 flex flex-col items-center">
-        {/* Logo + sweeping arcs */}
+        {/* Logo + sweeping arcs — SAME SIZE AS BEFORE */}
         <div className="relative flex items-center justify-center w-[28rem] h-[28rem] sm:w-[32rem] sm:h-[32rem]">
           {/* Primary sweep — navy */}
           <svg
@@ -89,11 +97,11 @@ export function SplashScreen() {
             />
           </svg>
 
-          {/* Logo */}
+          {/* Logo — SAME SIZE AS BEFORE */}
           <img
             src={logoSrc}
             alt="P4P Platform"
-            className="relative w-80 sm:w-[26rem] h-auto object-contain animate-[splashFadeIn_1.4s_cubic-bezier(0.22,1,0.36,1)_forwards]"
+            className="relative w-80 sm:w-[26rem] h-auto object-contain animate-[splashLogo_1.4s_cubic-bezier(0.22,1,0.36,1)_forwards]"
             draggable={false}
           />
         </div>
@@ -102,13 +110,14 @@ export function SplashScreen() {
         <div className="h-6 mt-4 flex items-center justify-center overflow-hidden">
           <p
             key={messageIndex}
-            className="text-[13px] tracking-wide animate-[splashTagline_0.4s_ease-out_forwards]"
+            className="text-[13px] tracking-wide animate-[splashFade_0.4s_ease-out_forwards]"
             style={{ color: "#0B2545", opacity: 0.65 }}
           >
             {STATUS_MESSAGES[messageIndex]}
           </p>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body   // 👈 key line — renders to body, not inside transformed parents
   );
 }

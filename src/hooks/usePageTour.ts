@@ -18,9 +18,6 @@ function filterAvailableSteps(steps: TourStep[]): TourStep[] {
   });
 }
 
-/**
- * Re-triggers the popover entrance animation on every step change.
- */
 function replayPopoverAnimation() {
   const popover = document.querySelector(".p4p-tour-popover") as HTMLElement | null;
   if (!popover) return;
@@ -29,24 +26,20 @@ function replayPopoverAnimation() {
   popover.classList.add("p4p-tour-enter");
 }
 
-/**
- * Multi-colored celebration: 2 side bursts + continuous rain for ~2.5s.
- */
 function fireCelebration() {
   const colors = [
-    "#FF6B6B", // coral red
-    "#FFD93D", // yellow
-    "#6BCB77", // green
-    "#4D96FF", // blue
-    "#B983FF", // purple
-    "#FF9F1C", // orange
-    "#00D9C0", // teal
-    "#FF6FB5", // pink
-    "#0B2545", // brand navy
-    "#22C55E", // brand green
+    "#FF6B6B",
+    "#FFD93D",
+    "#6BCB77",
+    "#4D96FF",
+    "#B983FF",
+    "#FF9F1C",
+    "#00D9C0",
+    "#FF6FB5",
+    "#0B2545",
+    "#22C55E",
   ];
 
-  // Side bursts — left and right
   confetti({
     particleCount: 80,
     angle: 60,
@@ -64,7 +57,6 @@ function fireCelebration() {
     scalar: 1.1,
   });
 
-  // Continuous rain from top
   const duration = 2500;
   const end = Date.now() + duration;
 
@@ -88,8 +80,18 @@ function fireCelebration() {
   }, 120);
 }
 
-export function usePageTour(tour: Tour | null, enabled = true) {
+export function usePageTour(
+  tour: Tour | null,
+  enabled = true,
+  onComplete?: () => void   // 👈 NEW — fires after the tour finishes or is closed
+) {
   const hasRunRef = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+
+  // Keep the callback ref fresh without re-triggering the effect
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
     if (!tour || !enabled) return;
@@ -105,12 +107,13 @@ export function usePageTour(tour: Tour | null, enabled = true) {
 
       if (available.length === 0) {
         markTourDone(tour.key);
+        // Even if the tour was empty, let the caller know it's finished
+        onCompleteRef.current?.();
         return;
       }
 
       hasRunRef.current = true;
 
-      // Declare first, assign after — lets callbacks reference the instance
       let driverObj: ReturnType<typeof driver>;
 
       driverObj = driver({
@@ -128,24 +131,25 @@ export function usePageTour(tour: Tour | null, enabled = true) {
           requestAnimationFrame(replayPopoverAnimation);
         },
         onDoneClick: () => {
-          // Close the tour first so confetti lands on a clean page
           driverObj.destroy();
           fireCelebration();
         },
         onDestroyed: () => {
           markTourDone(tour.key);
+          // 👈 Fire the completion callback
+          onCompleteRef.current?.();
         },
       });
 
       driverObj.drive();
     };
 
-    const t1 = window.setTimeout(tryRun, 800);
-    const t2 = window.setTimeout(() => {
-      if (!hasRunRef.current && !isTourDone(tour.key) && !cancelled) {
-        tryRun();
-      }
-    }, 1400);
+const t1 = window.setTimeout(tryRun, 1200);  // 👈 800 → 1200
+const t2 = window.setTimeout(() => {
+  if (!hasRunRef.current && !isTourDone(tour.key) && !cancelled) {
+    tryRun();
+  }
+}, 2200);                                     // 👈 1400 → 2200
 
     return () => {
       cancelled = true;

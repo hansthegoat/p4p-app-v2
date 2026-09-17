@@ -28,6 +28,43 @@ const searchSchema = z.object({
   email: z.string().optional(),
 });
 
+/** Small reusable strength bar (used only under the Password field) */
+function StrengthBar({ value }: { value: string }) {
+  const check = checkPassword(value);
+  if (!value) return null;
+
+  return (
+    <>
+      <div className="flex gap-1 mt-1.5">
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className={`h-1 flex-1 rounded-full transition-colors ${
+              i < check.score ? passwordColor(check.score) : "bg-muted"
+            }`}
+          />
+        ))}
+      </div>
+      <div className="mt-1 flex items-start justify-between gap-2">
+        <div className="text-[10px] text-muted-foreground leading-tight">
+          {check.errors.length > 0 ? (
+            <ul className="space-y-0.5">
+              {check.errors.map((err, i) => (
+                <li key={i}>• {err}</li>
+              ))}
+            </ul>
+          ) : (
+            <span className="text-emerald-600 dark:text-emerald-400">
+              ✓ Password is {check.label.toLowerCase()}
+            </span>
+          )}
+        </div>
+        <span className="text-[10px] font-medium shrink-0">{check.label}</span>
+      </div>
+    </>
+  );
+}
+
 function RegisterForm() {
   const navigate = useNavigate();
   const { upsertEmployee, getTemplate } = useP4P();
@@ -78,12 +115,6 @@ function RegisterForm() {
     try {
       const template = getTemplate(department, role);
       const hasTemplate = !!template;
-
-      if (!hasTemplate) {
-        console.warn(
-          `No KPI template for ${department} / ${role}. Employee will be created with empty KPIs.`
-        );
-      }
 
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -194,12 +225,10 @@ function RegisterForm() {
 
       showToast.success("Account Created!", "You're now logged in.");
 
-      // New accounts get the onboarding tour once
-      if (!localStorage.getItem("p4p_onboarding_done")) {
-        navigate({ to: "/onboarding" });
-      } else {
-        navigate({ to: "/dashboard" });
-      }
+      // 👈 Fresh signup → always onboarding, and queue the welcome tour
+      localStorage.removeItem("p4p_onboarding_done");
+      localStorage.setItem("p4p_welcome_tour_pending", "true");
+      navigate({ to: "/onboarding" });
     } catch (err: any) {
       console.error("Registration error:", err);
       setError(err.message || "Registration failed. Please try again.");
@@ -212,195 +241,176 @@ function RegisterForm() {
     !loading && department && role && pwCheck.ok && passwordsMatch;
 
   return (
-    <Card className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-1">Create your account</h1>
-        <p className="text-sm text-muted-foreground">
+    <Card className="p-5">
+      <div className="mb-4">
+        <h1 className="text-xl font-bold mb-0.5">Create your account</h1>
+        <p className="text-xs text-muted-foreground">
           Register to access your performance dashboard
         </p>
       </div>
 
       {error && (
-        <div className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400 p-3 rounded mb-4">
+        <div className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400 p-2.5 rounded mb-3">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label>Full Name</Label>
-          <Input
-            type="text"
-            placeholder="Your full name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            disabled={loading}
-          />
-        </div>
-
-        <div>
-          <Label>Email</Label>
-          <Input
-            type="email"
-            placeholder="you@company.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            disabled={loading}
-          />
-        </div>
-
-        {/* Password with show/hide */}
-        <div>
-          <Label>Password</Label>
-          <div className="relative">
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {/* Name + Email side by side */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs">Full Name</Label>
             <Input
-              type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setPwCheck(checkPassword(e.target.value));
-              }}
+              type="text"
+              placeholder="Your full name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               required
               disabled={loading}
-              autoComplete="new-password"
-              className="pr-10"
+              className="h-9 mt-1"
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              tabIndex={-1}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
           </div>
-
-          {password.length > 0 && (
-            <>
-              <div className="flex gap-1 mt-2">
-                {[0, 1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className={`h-1 flex-1 rounded-full transition-colors ${
-                      i < pwCheck.score ? passwordColor(pwCheck.score) : "bg-muted"
-                    }`}
-                  />
-                ))}
-              </div>
-
-              <div className="mt-1.5 flex items-start justify-between gap-2">
-                <div className="text-[11px] text-muted-foreground">
-                  {pwCheck.errors.length > 0 ? (
-                    <ul className="space-y-0.5">
-                      {pwCheck.errors.map((err, i) => (
-                        <li key={i}>• {err}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <span className="text-emerald-600 dark:text-emerald-400">
-                      ✓ Password is {pwCheck.label.toLowerCase()}
-                    </span>
-                  )}
-                </div>
-                <span className="text-[11px] font-medium shrink-0">{pwCheck.label}</span>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Confirm Password with show/hide + match check */}
-        <div>
-          <Label>Confirm Password</Label>
-          <div className="relative">
+          <div>
+            <Label className="text-xs">Email</Label>
             <Input
-              type={showConfirm ? "text" : "password"}
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              type="email"
+              placeholder="you@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
               disabled={loading}
-              autoComplete="new-password"
-              className={`pr-16 ${
-                passwordsMatch
-                  ? "border-emerald-500/50 focus-visible:ring-emerald-500/30"
-                  : passwordsMismatch
-                  ? "border-red-500/50 focus-visible:ring-red-500/30"
-                  : ""
-              }`}
+              className="h-9 mt-1"
             />
-            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-              {confirmPassword.length > 0 && (
-                <>
-                  {passwordsMatch ? (
-                    <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  ) : (
-                    <X className="h-4 w-4 text-red-600 dark:text-red-400" />
-                  )}
-                </>
-              )}
+          </div>
+        </div>
+
+        {/* Password + Confirm — password has strength bar, confirm shows only match */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+          {/* Password column */}
+          <div>
+            <Label className="text-xs">Password</Label>
+            <div className="relative mt-1">
+              <Input
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setPwCheck(checkPassword(e.target.value));
+                }}
+                required
+                disabled={loading}
+                autoComplete="new-password"
+                className="pr-9 h-9"
+              />
               <button
                 type="button"
-                onClick={() => setShowConfirm((v) => !v)}
+                onClick={() => setShowPassword((v) => !v)}
                 tabIndex={-1}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label={showConfirm ? "Hide password" : "Show password"}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
               </button>
             </div>
+            <StrengthBar value={password} />
           </div>
 
-          {passwordsMismatch && (
-            <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5">
-              Passwords don't match
-            </p>
-          )}
-          {passwordsMatch && (
-            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1.5">
-              ✓ Passwords match
-            </p>
-          )}
-        </div>
-
-        <div>
-          <Label>Department</Label>
-          <Select value={department} onValueChange={setDepartment} disabled={loading}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select your department" />
-            </SelectTrigger>
-            <SelectContent>
-              {departments.map((dept) => (
-                <SelectItem key={dept} value={dept}>
-                  {dept}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label>Role</Label>
-          <Select value={role} onValueChange={setRole} disabled={!department || loading}>
-            <SelectTrigger>
-              <SelectValue
-                placeholder={department ? "Select your role" : "Select department first"}
+          {/* Confirm Password column */}
+          <div>
+            <Label className="text-xs">Confirm Password</Label>
+            <div className="relative mt-1">
+              <Input
+                type={showConfirm ? "text" : "password"}
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                disabled={loading}
+                autoComplete="new-password"
+                className={`pr-14 h-9 ${
+                  passwordsMatch
+                    ? "border-emerald-500/50 focus-visible:ring-emerald-500/30"
+                    : passwordsMismatch
+                    ? "border-red-500/50 focus-visible:ring-red-500/30"
+                    : ""
+                }`}
               />
-            </SelectTrigger>
-            <SelectContent>
-              {roles.map((r) => (
-                <SelectItem key={r} value={r}>
-                  {r}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {confirmPassword.length > 0 && (
+                  <>
+                    {passwordsMatch ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <X className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                    )}
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((v) => !v)}
+                  tabIndex={-1}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showConfirm ? "Hide password" : "Show password"}
+                >
+                  {showConfirm ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            </div>
+            {/* 👈 Reserve the same vertical space as the password column's bar row */}
+            <div className="mt-1.5 min-h-[26px]">
+              {confirmPassword.length > 0 && (
+                <p
+                  className={`text-[10px] ${
+                    passwordsMatch
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-red-600 dark:text-red-400"
+                  }`}
+                >
+                  {passwordsMatch ? "✓ Passwords match" : "Passwords don't match"}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
-        <Button type="submit" className="w-full" disabled={!canSubmit}>
+        {/* Department + Role side by side */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs">Department</Label>
+            <Select value={department} onValueChange={setDepartment} disabled={loading}>
+              <SelectTrigger className="h-9 mt-1">
+                <SelectValue placeholder="Select department" />
+              </SelectTrigger>
+              <SelectContent>
+                {departments.map((dept, idx) => (
+                  <SelectItem key={`dept-${idx}-${dept}`} value={dept}>
+                    {dept}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Role</Label>
+            <Select value={role} onValueChange={setRole} disabled={!department || loading}>
+              <SelectTrigger className="h-9 mt-1">
+                <SelectValue
+                  placeholder={department ? "Select role" : "Select dept first"}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((r, idx) => (
+                  <SelectItem key={`role-${idx}-${r}`} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <Button type="submit" className="w-full h-9 mt-2" disabled={!canSubmit}>
           {loading ? "Creating Account..." : "Register"}
         </Button>
       </form>

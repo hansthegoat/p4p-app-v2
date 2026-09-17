@@ -22,14 +22,12 @@ import { Route as AppTraceRouteImport } from './routes/_app.trace'
 import { Route as AppSupervisorsRouteImport } from './routes/_app.supervisors'
 import { Route as AppProfileRouteImport } from './routes/_app.profile'
 import { Route as AppMyCalculationRouteImport } from './routes/_app.my-calculation'
-import { Route as AppMonthlyRouteImport } from './routes/_app.monthly'
 import { Route as AppKpiUpdatesRouteImport } from './routes/_app.kpi-updates'
 import { Route as AppKpiFrameworkRouteImport } from './routes/_app.kpi-framework'
 import { Route as AppGradesRouteImport } from './routes/_app.grades'
 import { Route as AppEmployeesRouteImport } from './routes/_app.employees'
 import { Route as AppEmployeeRouteImport } from './routes/_app.employee'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
-import { Route as AppChangePasswordRouteImport } from './routes/_app.change-password'
 import { Route as AppAuditLogRouteImport } from './routes/_app.audit-log'
 import { Route as AppAppraisalsReviewRouteImport } from './routes/_app.appraisals-review'
 import { Route as AppAppraisalsRouteImport } from './routes/_app.appraisals'
@@ -97,11 +95,6 @@ const AppMyCalculationRoute = AppMyCalculationRouteImport.update({
   path: '/my-calculation',
   getParentRoute: () => AppRoute,
 } as any)
-const AppMonthlyRoute = AppMonthlyRouteImport.update({
-  id: '/monthly',
-  path: '/monthly',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppKpiUpdatesRoute = AppKpiUpdatesRouteImport.update({
   id: '/kpi-updates',
   path: '/kpi-updates',
@@ -132,11 +125,6 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
-const AppChangePasswordRoute = AppChangePasswordRouteImport.update({
-  id: '/change-password',
-  path: '/change-password',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppAuditLogRoute = AppAuditLogRouteImport.update({
   id: '/audit-log',
   path: '/audit-log',
@@ -162,14 +150,12 @@ export interface FileRoutesByFullPath {
   '/appraisals': typeof AppAppraisalsRoute
   '/appraisals-review': typeof AppAppraisalsReviewRoute
   '/audit-log': typeof AppAuditLogRoute
-  '/change-password': typeof AppChangePasswordRoute
   '/dashboard': typeof AppDashboardRoute
   '/employee': typeof AppEmployeeRoute
   '/employees': typeof AppEmployeesRoute
   '/grades': typeof AppGradesRoute
   '/kpi-framework': typeof AppKpiFrameworkRoute
   '/kpi-updates': typeof AppKpiUpdatesRoute
-  '/monthly': typeof AppMonthlyRoute
   '/my-calculation': typeof AppMyCalculationRoute
   '/profile': typeof AppProfileRoute
   '/supervisors': typeof AppSupervisorsRoute
@@ -186,14 +172,12 @@ export interface FileRoutesByTo {
   '/appraisals': typeof AppAppraisalsRoute
   '/appraisals-review': typeof AppAppraisalsReviewRoute
   '/audit-log': typeof AppAuditLogRoute
-  '/change-password': typeof AppChangePasswordRoute
   '/dashboard': typeof AppDashboardRoute
   '/employee': typeof AppEmployeeRoute
   '/employees': typeof AppEmployeesRoute
   '/grades': typeof AppGradesRoute
   '/kpi-framework': typeof AppKpiFrameworkRoute
   '/kpi-updates': typeof AppKpiUpdatesRoute
-  '/monthly': typeof AppMonthlyRoute
   '/my-calculation': typeof AppMyCalculationRoute
   '/profile': typeof AppProfileRoute
   '/supervisors': typeof AppSupervisorsRoute
@@ -213,14 +197,12 @@ export interface FileRoutesById {
   '/_app/appraisals': typeof AppAppraisalsRoute
   '/_app/appraisals-review': typeof AppAppraisalsReviewRoute
   '/_app/audit-log': typeof AppAuditLogRoute
-  '/_app/change-password': typeof AppChangePasswordRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/employee': typeof AppEmployeeRoute
   '/_app/employees': typeof AppEmployeesRoute
   '/_app/grades': typeof AppGradesRoute
   '/_app/kpi-framework': typeof AppKpiFrameworkRoute
   '/_app/kpi-updates': typeof AppKpiUpdatesRoute
-  '/_app/monthly': typeof AppMonthlyRoute
   '/_app/my-calculation': typeof AppMyCalculationRoute
   '/_app/profile': typeof AppProfileRoute
   '/_app/supervisors': typeof AppSupervisorsRoute
@@ -239,14 +221,12 @@ export interface FileRouteTypes {
     | '/appraisals'
     | '/appraisals-review'
     | '/audit-log'
-    | '/change-password'
     | '/dashboard'
     | '/employee'
     | '/employees'
     | '/grades'
     | '/kpi-framework'
     | '/kpi-updates'
-    | '/monthly'
     | '/my-calculation'
     | '/profile'
     | '/supervisors'
@@ -263,14 +243,12 @@ export interface FileRouteTypes {
     | '/appraisals'
     | '/appraisals-review'
     | '/audit-log'
-    | '/change-password'
     | '/dashboard'
     | '/employee'
     | '/employees'
     | '/grades'
     | '/kpi-framework'
     | '/kpi-updates'
-    | '/monthly'
     | '/my-calculation'
     | '/profile'
     | '/supervisors'
@@ -289,14 +267,12 @@ export interface FileRouteTypes {
     | '/_app/appraisals'
     | '/_app/appraisals-review'
     | '/_app/audit-log'
-    | '/_app/change-password'
     | '/_app/dashboard'
     | '/_app/employee'
     | '/_app/employees'
     | '/_app/grades'
     | '/_app/kpi-framework'
     | '/_app/kpi-updates'
-    | '/_app/monthly'
     | '/_app/my-calculation'
     | '/_app/profile'
     | '/_app/supervisors'
@@ -408,13 +384,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMyCalculationRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/monthly': {
-      id: '/_app/monthly'
-      path: '/monthly'
-      fullPath: '/monthly'
-      preLoaderRoute: typeof AppMonthlyRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/kpi-updates': {
       id: '/_app/kpi-updates'
       path: '/kpi-updates'
@@ -455,13 +424,6 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/change-password': {
-      id: '/_app/change-password'
-      path: '/change-password'
-      fullPath: '/change-password'
-      preLoaderRoute: typeof AppChangePasswordRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/audit-log': {
@@ -506,14 +468,12 @@ interface AppRouteChildren {
   AppAppraisalsRoute: typeof AppAppraisalsRoute
   AppAppraisalsReviewRoute: typeof AppAppraisalsReviewRoute
   AppAuditLogRoute: typeof AppAuditLogRoute
-  AppChangePasswordRoute: typeof AppChangePasswordRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppEmployeeRoute: typeof AppEmployeeRoute
   AppEmployeesRoute: typeof AppEmployeesRoute
   AppGradesRoute: typeof AppGradesRoute
   AppKpiFrameworkRoute: typeof AppKpiFrameworkRoute
   AppKpiUpdatesRoute: typeof AppKpiUpdatesRoute
-  AppMonthlyRoute: typeof AppMonthlyRoute
   AppMyCalculationRoute: typeof AppMyCalculationRoute
   AppProfileRoute: typeof AppProfileRoute
   AppSupervisorsRoute: typeof AppSupervisorsRoute
@@ -524,14 +484,12 @@ const AppRouteChildren: AppRouteChildren = {
   AppAppraisalsRoute: AppAppraisalsRoute,
   AppAppraisalsReviewRoute: AppAppraisalsReviewRoute,
   AppAuditLogRoute: AppAuditLogRoute,
-  AppChangePasswordRoute: AppChangePasswordRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppEmployeeRoute: AppEmployeeRoute,
   AppEmployeesRoute: AppEmployeesRoute,
   AppGradesRoute: AppGradesRoute,
   AppKpiFrameworkRoute: AppKpiFrameworkRoute,
   AppKpiUpdatesRoute: AppKpiUpdatesRoute,
-  AppMonthlyRoute: AppMonthlyRoute,
   AppMyCalculationRoute: AppMyCalculationRoute,
   AppProfileRoute: AppProfileRoute,
   AppSupervisorsRoute: AppSupervisorsRoute,

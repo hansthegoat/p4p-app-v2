@@ -105,19 +105,22 @@ function SupervisorsPage() {
       variants={staggerContainer}
       className="space-y-6"
     >
-      <PageHeader
-        title="Supervisor Assignment"
-        description="Assign managers to employees for appraisal reviews and team oversight."
-        icon={<UserCog className="h-6 w-6" />}
-        actions={
-          <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="gap-2">
-            <RefreshCw className="h-4 w-4" /> Refresh
-          </Button>
-        }
-      />
+      {/* 👈 ADDED data-tour wrapper */}
+      <div data-tour="supervisors-header">
+        <PageHeader
+          title="Supervisor Assignment"
+          description="Assign managers to employees for appraisal reviews and team oversight."
+          icon={<UserCog className="h-6 w-6" />}
+          actions={
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="gap-2">
+              <RefreshCw className="h-4 w-4" /> Refresh
+            </Button>
+          }
+        />
+      </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Stats — 👈 ADDED data-tour */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="supervisors-stats">
         <StatCard
           icon={<Users className="h-4 w-4" />}
           label="Total Employees"
@@ -150,8 +153,8 @@ function SupervisorsPage() {
         />
       </div>
 
-      {/* Managers list */}
-      <motion.div variants={fadeUp}>
+      {/* Managers list — 👈 ADDED data-tour */}
+      <motion.div variants={fadeUp} data-tour="supervisors-managers">
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -203,8 +206,8 @@ function SupervisorsPage() {
         </Card>
       </motion.div>
 
-      {/* Employee table */}
-      <motion.div variants={fadeUp}>
+      {/* Employee table — 👈 ADDED data-tour */}
+      <motion.div variants={fadeUp} data-tour="supervisors-list">
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <Table>

@@ -120,6 +120,8 @@ function AppraisalsPage() {
 
   return (
     <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
+      {/* 👈 ADDED data-tour wrapper */}
+      <div data-tour="appraisals-header">
       <PageHeader
         title="My Appraisals"
         description="Submit your KPIs for review and track approval status."
@@ -127,15 +129,16 @@ function AppraisalsPage() {
         badge={pendingCount > 0 ? <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 gap-1"><Clock className="h-3 w-3" />{pendingCount} pending</Badge> : undefined}
         actions={<Button variant="outline" size="sm" onClick={() => { setAppraisals(getEmployeeAppraisals(employee.id)); showToast.success("Refreshed", "Appraisal list updated."); }} className="gap-2"><RefreshCw className="h-4 w-4" /> Refresh</Button>}
       />
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      </div>
+      {/* 👈 ADDED data-tour */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="appraisals-stats">
         <StatCard icon={<FileText className="h-4 w-4" />} label="Total Appraisals" value={appraisals.length} accent="primary" size="large" />
         <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Approved" value={approvedCount} accent="success" size="large" />
         <StatCard icon={<Edit3 className="h-4 w-4" />} label="Needs Revision" value={revisionCount} accent="warning" size="large" />
         <StatCard icon={<XCircle className="h-4 w-4" />} label="Rejected" value={rejectedCount} accent="danger" size="large" />
       </div>
 
-      <motion.div variants={fadeUp}>
+      <motion.div variants={fadeUp} data-tour="appraisals-submit">
         <SectionCard title="Submit New Appraisal" description="Your current KPI data will be sent to your manager for review" icon={<Send className="h-4 w-4" />}>
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
@@ -155,7 +158,7 @@ function AppraisalsPage() {
         </SectionCard>
       </motion.div>
 
-      <Tabs defaultValue="all" className="w-full">
+      <Tabs defaultValue="all" className="w-full" data-tour="appraisals-list">
         <TabsList className="grid w-full max-w-md grid-cols-3">
           <TabsTrigger value="all" className="gap-2"><FileText className="h-4 w-4" /> All ({appraisals.length})</TabsTrigger>
           <TabsTrigger value="pending" className="gap-2"><Clock className="h-4 w-4" /> Pending ({pendingAppraisals.length})</TabsTrigger>

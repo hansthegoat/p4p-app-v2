@@ -6,8 +6,6 @@ import { fmtGHS, fmtNum } from "@/lib/p4p/calc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { usePageTour } from "@/hooks/usePageTour";
-import { PAGE_TOURS } from "@/lib/p4p/tours";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
@@ -105,31 +103,34 @@ function EmployeesPage() {
       variants={staggerContainer}
       className="space-y-6"
     >
-      <PageHeader
-        title="Employees"
-        description="Manage employee records, KPIs, supervisors, and performance data."
-        icon={<Users className="h-6 w-6" />}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              onClick={() => {
-                setEditingEmployee(null);
-                setModalOpen(true);
-              }}
-              className="gap-2"
-            >
-              <UserPlus className="h-4 w-4" /> Add Employee
-            </Button>
-            <Button size="sm" variant="outline" onClick={handleLoadDemo} className="gap-2">
-              <FileSpreadsheet className="h-4 w-4" /> Demo
-            </Button>
-            <Button size="sm" variant="outline" onClick={handleClearAll} className="gap-2 text-red-600 hover:text-red-700 border-red-500/30 hover:bg-red-500/10">
-              <X className="h-4 w-4" /> Clear All
-            </Button>
-          </div>
-        }
-      />
+      {/* 👈 ADDED data-tour wrapper */}
+      <div data-tour="employees-header">
+        <PageHeader
+          title="Employees"
+          description="Manage employee records, KPIs, supervisors, and performance data."
+          icon={<Users className="h-6 w-6" />}
+          actions={
+            <div className="flex flex-wrap gap-2" data-tour="employees-actions">
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditingEmployee(null);
+                  setModalOpen(true);
+                }}
+                className="gap-2"
+              >
+                <UserPlus className="h-4 w-4" /> Add Employee
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleLoadDemo} className="gap-2">
+                <FileSpreadsheet className="h-4 w-4" /> Demo
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleClearAll} className="gap-2 text-red-600 hover:text-red-700 border-red-500/30 hover:bg-red-500/10">
+                <X className="h-4 w-4" /> Clear All
+              </Button>
+            </div>
+          }
+        />
+      </div>
 
       {/* Alert banner for missing KPIs */}
       {needsKpiCount > 0 && (
@@ -150,8 +151,8 @@ function EmployeesPage() {
         </motion.div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Stats — 👈 ADDED data-tour */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="employees-stats">
         <StatCard
           icon={<Users className="h-4 w-4" />}
           label="Total Employees"
@@ -184,8 +185,8 @@ function EmployeesPage() {
         />
       </div>
 
-      {/* Search */}
-      <motion.div variants={fadeUp}>
+      {/* Search — 👈 ADDED data-tour */}
+      <motion.div variants={fadeUp} data-tour="employees-search">
         <Card className="p-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -199,8 +200,8 @@ function EmployeesPage() {
         </Card>
       </motion.div>
 
-      {/* Table */}
-      <motion.div variants={fadeUp}>
+      {/* Table — 👈 ADDED data-tour */}
+      <motion.div variants={fadeUp} data-tour="employees-list">
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <Table>

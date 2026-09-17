@@ -102,7 +102,11 @@ function KpiUpdatesPage() {
 
   return (
     <div className="p-3 sm:p-6 max-w-3xl mx-auto">
-      <div className="mb-5 sm:mb-6 flex items-start sm:items-center gap-2 sm:gap-3">
+      {/* 👈 ADDED data-tour */}
+      <div
+        className="mb-5 sm:mb-6 flex items-start sm:items-center gap-2 sm:gap-3"
+        data-tour="kpi-updates-header"
+      >
         <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/dashboard" })}>
           <ArrowLeft className="h-3.5 w-3.5 mr-1" />
           Back
@@ -115,8 +119,9 @@ function KpiUpdatesPage() {
         </div>
       </div>
 
+      {/* 👈 ADDED data-tour */}
       {needsAck.length === 0 && history.length === 0 && (
-        <Card className="p-8 text-center">
+        <Card className="p-8 text-center" data-tour="kpi-updates-empty">
           <CheckCircle className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
           <h2 className="text-sm font-semibold mb-1">All caught up</h2>
           <p className="text-xs text-muted-foreground">
@@ -125,8 +130,9 @@ function KpiUpdatesPage() {
         </Card>
       )}
 
+      {/* 👈 ADDED data-tour */}
       {needsAck.length > 0 && (
-        <div className="space-y-4 mb-8">
+        <div className="space-y-4 mb-8" data-tour="kpi-updates-needs-ack">
           <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
             Needs your acknowledgment ({needsAck.length})
           </h2>
@@ -153,8 +159,9 @@ function KpiUpdatesPage() {
         </div>
       )}
 
+      {/* 👈 ADDED data-tour */}
       {history.length > 0 && (
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="kpi-updates-history">
           <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
             History ({history.length})
           </h2>

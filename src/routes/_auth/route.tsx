@@ -13,12 +13,7 @@ function AuthLayoutWrapper() {
 
   return (
     <AuthLayout mode={mode}>
-      <div
-        key={pathname}
-        className="animate-[fadeSlide_0.32s_cubic-bezier(0.22,1,0.36,1)_forwards]"
-      >
-        <Outlet />
-      </div>
+      <Outlet />
     </AuthLayout>
   );
 }

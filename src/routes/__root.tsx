@@ -4,11 +4,13 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 import { useEffect, type ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -62,7 +64,6 @@ function RootShell({ children }: { children: ReactNode }) {
                   var theme = localStorage.getItem('p4p-theme') || 'light';
                   var root = document.documentElement;
                   root.classList.remove('light', 'dark');
-                  // Only apply dark if the user has explicitly chosen it
                   if (theme === 'dark') {
                     root.classList.add('dark');
                   } else {
@@ -85,7 +86,6 @@ function RootShell({ children }: { children: ReactNode }) {
 function ThemedToaster() {
   const { theme } = useTheme();
 
-  // Theme is now either "light" or "dark" (no system detection)
   return (
     <Toaster
       position="top-right"
@@ -93,6 +93,42 @@ function ThemedToaster() {
       closeButton
       theme={theme === "dark" ? "dark" : "light"}
     />
+  );
+}
+
+/** 👈 NEW — wraps the Outlet in a page-transition animation */
+function AnimatedOutlet() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  // 👈 Auth routes do NOT get the global fade.
+  // The auth layout handles its own in-place animation so the
+  // left image, pill, and logo never fade out.
+  const isAuthRoute =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/verify-otp") ||
+    pathname.startsWith("/forgot-password");
+
+  if (isAuthRoute) {
+    return <Outlet />;
+  }
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={pathname}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -12 }}
+        transition={{
+          duration: 0.32,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        style={{ willChange: "opacity, transform" }}
+      >
+        <Outlet />
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
@@ -105,7 +141,9 @@ function RootComponent() {
         <P4PProvider>
           <UserProvider>
             <SplashScreen />
-            <Outlet />
+            {/* 👈 replaced <Outlet /> with <AnimatedOutlet /> */}
+            {/*<SplashScreen/>*/}
+            <AnimatedOutlet />
             <ThemedToaster />
           </UserProvider>
         </P4PProvider>

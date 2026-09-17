@@ -143,11 +143,8 @@ export function AuthLayout({ children, mode }: AuthLayoutProps) {
             </div>
           </div>
 
-          {/* Form (from child routes) */}
-          <div
-            key={mode}
-            className="animate-[authRouteIn_0.32s_cubic-bezier(0.22,1,0.36,1)_forwards]"
-          >
+          {/* Form (from child routes) — only this cross-fades, nothing else */}
+          <div key={mode} className="auth-form-enter">
             {children}
           </div>
         </div>

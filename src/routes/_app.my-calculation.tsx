@@ -128,9 +128,11 @@ function MyCalculationPage() {
 
   return (
     <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
+      {/* 👈 ADDED data-tour wrapper */}
+      <div data-tour="calculation-header">
       <PageHeader
         title="My Calculation"
-        description="Understand exactly how your bonus is calculated — from company revenue to your final payout."
+        description="Understand exactly how your bonus is calculated from company revenue to your final payout."
         icon={<Calculator className="h-6 w-6" />}
         actions={
           <div className={`px-4 py-2.5 rounded-xl text-sm font-bold border-2 flex items-center gap-2 ${band.bg} ${band.color}`}>
@@ -138,9 +140,10 @@ function MyCalculationPage() {
           </div>
         }
       />
+      </div>
 
       {/* Big bonus */}
-      <motion.div variants={fadeUp}>
+      <motion.div variants={fadeUp} data-tour="calculation-bonus">
         <Card className="p-6 bg-gradient-to-br from-emerald-500/10 via-background to-background border-emerald-500/20 overflow-hidden relative">
           <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-emerald-500/10 blur-3xl" />
           <div className="relative flex flex-wrap items-center justify-between gap-6">
@@ -169,7 +172,7 @@ function MyCalculationPage() {
       </motion.div>
 
       {/* Step 0 */}
-      <motion.div variants={fadeUp}>
+      <motion.div variants={fadeUp} data-tour="calculation-steps">
         <SectionCard title="Step 0 · Where the Money Comes From" description="Before we calculate your bonus, here's the big picture" icon={<Building2 className="h-4 w-4" />}>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -394,7 +397,7 @@ function MyCalculationPage() {
       </motion.div>
 
       {/* What If */}
-      <motion.div variants={fadeUp}>
+      <motion.div variants={fadeUp} data-tour="calculation-whatif">
         <SectionCard title="What If You Improved?" description="See how changes to your performance would affect your bonus" icon={<Sparkles className="h-4 w-4" />}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-4 rounded-xl bg-muted/30 border border-border/60">

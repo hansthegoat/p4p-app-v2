@@ -246,13 +246,15 @@ function VerifyOtpPage() {
       setSuccess(true);
       showToast.success("Email Verified!", "Your account is ready.");
 
+      // 👈 Fresh signup — ALWAYS show onboarding.
+      // Also set the welcome tour flag NOW (before navigating) so the tour
+      // fires even if the user skips onboarding.
+      localStorage.removeItem("p4p_onboarding_done");
+      localStorage.setItem("p4p_welcome_tour_pending", "true");
+
       setTimeout(() => {
-        if (!localStorage.getItem("p4p_onboarding_done")) {
-          navigate({ to: "/onboarding" });
-        } else {
-          navigate({ to: "/dashboard" });
-        }
-      }, 1200);
+        navigate({ to: "/onboarding" });
+      }, 1100);
     } catch (err: any) {
       console.error("Verify error:", err);
       setError(err.message || "Invalid or expired code. Please try again.");

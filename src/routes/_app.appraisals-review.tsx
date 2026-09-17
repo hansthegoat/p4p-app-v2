@@ -182,21 +182,25 @@ function AppraisalsReviewPage() {
 
   return (
     <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
+      {/* 👈 ADDED data-tour wrapper */}
+      <div data-tour="review-header">
       <PageHeader
         title="Review Appraisals"
         description={isManager ? `Review appraisals from your team (${directReportIds.length} direct reports)` : "Review and approve employee appraisal submissions."}
         icon={<ClipboardCheck className="h-6 w-6" />}
         actions={<Button variant="outline" size="sm" onClick={() => loadAppraisals()} className="gap-2"><RefreshCw className="h-4 w-4" /> Refresh</Button>}
       />
+      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* 👈 ADDED data-tour */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="review-stats">
         <StatCard icon={<Clock className="h-4 w-4" />} label="Pending" value={pendingAppraisals.length} accent="primary" size="large" pulse={pendingAppraisals.length > 0 ? "blue" : "none"} />
         <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Approved" value={approvedCount} accent="success" size="large" />
         <StatCard icon={<Edit3 className="h-4 w-4" />} label="Needs Revision" value={revisionCount} accent="warning" size="large" />
         <StatCard icon={<XCircle className="h-4 w-4" />} label="Rejected" value={rejectedCount} accent="danger" size="large" />
       </div>
 
-      <Tabs defaultValue="pending" onValueChange={setActiveTab}>
+      <Tabs defaultValue="pending" onValueChange={setActiveTab} data-tour="review-tabs">
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="pending" className="gap-2"><Clock className="h-4 w-4" /> Pending ({pendingAppraisals.length})</TabsTrigger>
           <TabsTrigger value="history" className="gap-2"><FileText className="h-4 w-4" /> History</TabsTrigger>

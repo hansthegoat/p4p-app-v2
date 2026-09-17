@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { AnimatedNumber } from "@/components/p4p/AnimatedNumber";
 import { useP4P } from "@/lib/p4p/store";
@@ -22,8 +22,14 @@ import { KpiUpdatesBanner } from "@/components/p4p/KpiUpdatesBanner";
 import { NeedsAttention } from "@/components/p4p/NeedsAttention";
 import { BonusGate } from "@/components/p4p/BonusGate";
 import { DepartmentLeaderboard } from "@/components/p4p/DepartmentLeaderboard";
+import { NotificationBell } from "@/components/p4p/NotificationBell";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { usePageTour } from "@/hooks/usePageTour";
-import { getWelcomeTourForRole, type Tour } from "@/lib/p4p/tours";
+import {
+  getWelcomeTourForRole,
+  getDashboardTourForRole,
+  type Tour,
+} from "@/lib/p4p/tours";
 import {
   TrendingUp, Wallet, Users, UserCheck, DollarSign,
   Sparkles, Target, Calendar, Award, AlertTriangle,
@@ -78,13 +84,18 @@ function Dashboard() {
 
   const [detectedRole, setDetectedRole] = useState<string>("employee");
   const [welcomeTour, setWelcomeTour] = useState<Tour | null>(null);
+  const [chainDashboardTour, setChainDashboardTour] = useState(false);
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [authUserId, setAuthUserId] = useState<string | null>(null);
 
-  // ⭐ Fix #1: Capture auth user ID immediately, and retry the employee lookup
-  // every time `employees` changes (so the record appears without a refresh).
+  // 👈 Track whether the welcome tour was queued on THIS mount.
+  // If it was, the dashboard tour must wait for the welcome to finish
+  // before chaining in. If it wasn't (returning user), fire directly.
+  const welcomeShownRef = useRef(false);
+
+  // Employee lookup
   useEffect(() => {
     let cancelled = false;
 
@@ -98,7 +109,6 @@ function Dashboard() {
         if (cancelled) return;
         setAuthUserId(user.id);
 
-        // Match by authUserId (preferred) OR email (fallback)
         const emp =
           employees.find((e) => e.authUserId === user.id) ||
           employees.find((e) => e.email === user.email) ||
@@ -135,18 +145,52 @@ function Dashboard() {
   const role = detectedRole || contextRole || "employee";
   const isAdmin = role === "admin" || role === "hr";
 
-  // ⭐ Fix #2: Welcome tour fires based on role, not on the employee record.
-  // It points at sidebar + notifications, which always exist on the dashboard.
+  // ⭐ Welcome tour queue — reads the pending flag set by onboarding.
+  // Note: we DO NOT remove the flag here. It's removed in the welcome
+  // tour's onComplete callback, so the flag accurately reflects whether
+  // the welcome tour is still "in flight".
   useEffect(() => {
     if (typeof window === "undefined") return;
     const pending = localStorage.getItem("p4p_welcome_tour_pending");
     if (pending === "true" && role) {
+      welcomeShownRef.current = true;
       setWelcomeTour(getWelcomeTourForRole(role));
-      localStorage.removeItem("p4p_welcome_tour_pending");
     }
   }, [role]);
 
-  usePageTour(welcomeTour, !!role && !!employee);
+  // ⭐ Welcome tour — fires first for new users.
+  // Its onComplete chains the dashboard tour after a short delay.
+  // 👈 Fires whenever role is known (not gated on employee record),
+  // so HR/admin users without an employee profile still see it.
+  usePageTour(
+    welcomeTour,
+    !!role,
+    () => {
+      // Welcome is done — clear the flag and chain the dashboard tour
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("p4p_welcome_tour_pending");
+      }
+      setTimeout(() => {
+        setChainDashboardTour(true);
+      }, 1200);
+    }
+  );
+
+  // ⭐ Dashboard page tour — either chains after welcome, or fires directly
+  // for returning users who've already finished the welcome tour.
+  const dashboardPageTour = role ? getDashboardTourForRole(role) : null;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!role) return;
+    // Only fire the dashboard tour directly if the welcome was NOT queued
+    // on this mount. Otherwise, the welcome's onComplete handles chaining.
+    if (!welcomeShownRef.current) {
+      setChainDashboardTour(true);
+    }
+  }, [role]);
+
+  usePageTour(dashboardPageTour, chainDashboardTour);
 
   const [localGlobals, setLocalGlobals] = useState({
     totalRevenue: globals.totalRevenue,
@@ -343,12 +387,22 @@ function Dashboard() {
       <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
         <KpiUpdatesBanner />
 
-        <PageHeader
-          title="P4P Dashboard"
-          description="Live overview of pools, payouts, performance signals, and monthly trends."
-          icon={<Sparkles className="h-6 w-6" />}
-          badge={<Badge variant="outline" className="gap-1.5"><Calendar className="h-3 w-3" />{monthlyData.length} data points</Badge>}
-        />
+        <div data-tour="dashboard-header">
+          <PageHeader
+            title="P4P Dashboard"
+            description="Live overview of pools, payouts, performance signals, and monthly trends."
+            icon={<Sparkles className="h-6 w-6" />}
+            badge={<Badge variant="outline" className="gap-1.5"><Calendar className="h-3 w-3" />{monthlyData.length} data points</Badge>}
+            actions={
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <div data-tour="notifications">
+                  <NotificationBell />
+                </div>
+              </div>
+            }
+          />
+        </div>
 
         <div data-tour="needs-attention">
           <NeedsAttention />
@@ -401,37 +455,43 @@ function Dashboard() {
           </div>
         </Card>
 
-        <SectionCard title="Global P4P Settings" description="Controls revenue, pool allocation, and thresholds" icon={<Settings className="h-4 w-4" />}
-          action={<Button size="sm" onClick={handleSaveGlobals} disabled={saving} className="gap-1.5">{saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}Save</Button>}
-        >
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {[
-              { key: "totalRevenue", label: "Revenue (GHS)", step: undefined },
-              { key: "p4pPercent", label: "P4P %", step: undefined },
-              { key: "adjunctPercent", label: "Adjunct %", step: undefined },
-              { key: "floor", label: "Floor", step: "0.01" },
-              { key: "cap", label: "Cap", step: "0.01" },
-              { key: "salesMultiplier", label: "Sales Mult.", step: "0.01" },
-            ].map((f) => (
-              <div key={f.key}>
-                <Label className="text-xs text-muted-foreground">{f.label}</Label>
-                <Input type="number" step={f.step} className="mt-1 h-9" value={(localGlobals as any)[f.key]} onChange={(e) => setLocalGlobals((prev) => ({ ...prev, [f.key]: Number(e.target.value) }))} />
-              </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-border/50 text-xs text-muted-foreground">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={localGlobals.prorationOn} onChange={(e) => setLocalGlobals((prev) => ({ ...prev, prorationOn: e.target.checked }))} className="h-3.5 w-3.5 rounded accent-primary" />
-              Proration On
-            </label>
-            <span className="ml-auto flex items-center gap-4">
-              <span>P4P Pool: <strong className="text-foreground">{fmtGHS(calc.totalPool)}</strong></span>
-              <span>Employee Pool: <strong className="text-foreground">{fmtGHS(calc.employeePool)}</strong></span>
-            </span>
-          </div>
-        </SectionCard>
+        {/* 👈 data-tour only on the wrapper div (not the SectionCard) */}
+        <div data-tour="global-settings">
+          <SectionCard
+            title="Global P4P Settings"
+            description="Controls revenue, pool allocation, and thresholds"
+            icon={<Settings className="h-4 w-4" />}
+            action={<Button size="sm" onClick={handleSaveGlobals} disabled={saving} className="gap-1.5">{saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}Save</Button>}
+          >
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                { key: "totalRevenue", label: "Revenue (GHS)", step: undefined },
+                { key: "p4pPercent", label: "P4P %", step: undefined },
+                { key: "adjunctPercent", label: "Adjunct %", step: undefined },
+                { key: "floor", label: "Floor", step: "0.01" },
+                { key: "cap", label: "Cap", step: "0.01" },
+                { key: "salesMultiplier", label: "Sales Mult.", step: "0.01" },
+              ].map((f) => (
+                <div key={f.key}>
+                  <Label className="text-xs text-muted-foreground">{f.label}</Label>
+                  <Input type="number" step={f.step} className="mt-1 h-9" value={(localGlobals as any)[f.key]} onChange={(e) => setLocalGlobals((prev) => ({ ...prev, [f.key]: Number(e.target.value) }))} />
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-border/50 text-xs text-muted-foreground">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={localGlobals.prorationOn} onChange={(e) => setLocalGlobals((prev) => ({ ...prev, prorationOn: e.target.checked }))} className="h-3.5 w-3.5 rounded accent-primary" />
+                Proration On
+              </label>
+              <span className="ml-auto flex items-center gap-4">
+                <span>P4P Pool: <strong className="text-foreground">{fmtGHS(calc.totalPool)}</strong></span>
+                <span>Employee Pool: <strong className="text-foreground">{fmtGHS(calc.employeePool)}</strong></span>
+              </span>
+            </div>
+          </SectionCard>
+        </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" data-tour="dashboard-stats">
           <StatCard icon={<DollarSign className="h-4 w-4" />} label="Revenue" value={fmtGHS(globals.totalRevenue)} sub={`${globals.p4pPercent}% to P4P`} accent="primary" />
           <StatCard icon={<Wallet className="h-4 w-4" />} label="Total Pool" value={fmtGHS(calc.totalPool)} accent="purple" />
           <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Adjunct Pool" value={fmtGHS(calc.adjunctPool)} sub={`${globals.adjunctPercent}% share`} accent="warning" />
@@ -440,7 +500,7 @@ function Dashboard() {
           <StatCard icon={<UserCheck className="h-4 w-4" />} label="Avg Bonus" value={fmtGHS(calc.avgBonus)} accent="default" />
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-4">
+        <div className="grid lg:grid-cols-3 gap-4" data-tour="dashboard-trend">
           <div className="lg:col-span-2">
             <SectionCard title="Monthly Performance Trend" description={`${monthlyTrendData.length} months tracked`} icon={<Activity className="h-4 w-4" />} noPadding>
               <div className="p-4 h-72">
@@ -550,25 +610,31 @@ function Dashboard() {
     <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
       <KpiUpdatesBanner />
 
-      <PageHeader
-        title="My Performance"
-        description={`${employee.name} · ${employee.department} · ${employee.role}`}
-        icon={<Award className="h-6 w-6" />}
-        actions={
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">Current Score</div>
-              <div className={`text-xl font-bold ${band.color}`}>
-                <AnimatedNumber value={currentMonthScore} decimals={1} suffix="%" />
+      <div data-tour="dashboard-header">
+        <PageHeader
+          title="My Performance"
+          description={`${employee.name} · ${employee.department} · ${employee.role}`}
+          icon={<Award className="h-6 w-6" />}
+          actions={
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">Current Score</div>
+                <div className={`text-xl font-bold ${band.color}`}>
+                  <AnimatedNumber value={currentMonthScore} decimals={1} suffix="%" />
+                </div>
+              </div>
+              <Badge variant="outline" className={`px-3 py-1.5 ${band.color} border-current/30`}>
+                <band.icon className="h-3.5 w-3.5 mr-1.5" />
+                {band.label}
+              </Badge>
+              <ThemeToggle />
+              <div data-tour="notifications" className="flex items-center">
+                <NotificationBell />
               </div>
             </div>
-            <Badge variant="outline" className={`px-3 py-1.5 ${band.color} border-current/30`}>
-              <band.icon className="h-3.5 w-3.5 mr-1.5" />
-              {band.label}
-            </Badge>
-          </div>
-        }
-      />
+          }
+        />
+      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div data-tour="kpi-score">
@@ -579,6 +645,7 @@ function Dashboard() {
         <StatCard icon={<Calendar className="h-4 w-4" />} label="Months Tracked" value={employeeHistory.length} sub={employeeHistory.length > 0 ? `${new Date().getFullYear()}` : "Start your first submission"} accent="purple" />
       </div>
 
+      <div data-tour="dashboard-tabs">
       <Tabs defaultValue="overview" onValueChange={setActiveTab}>
         <TabsList className="grid w-full max-w-md grid-cols-3">
           <TabsTrigger value="overview" className="gap-2"><BarChart3 className="h-4 w-4" /> Overview</TabsTrigger>
@@ -644,7 +711,9 @@ function Dashboard() {
               </SectionCard>
             </div>
 
-            <DepartmentLeaderboard />
+            <div data-tour="dashboard-leaderboard">
+              <DepartmentLeaderboard />
+            </div>
           </motion.div>
         </TabsContent>
 
@@ -759,7 +828,8 @@ function Dashboard() {
             </SectionCard>
           </motion.div>
         </TabsContent>
-      </Tabs>
+         </Tabs>
+      </div>
     </motion.div>
   );
 }
