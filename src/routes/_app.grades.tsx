@@ -56,7 +56,6 @@ function GradesPage() {
   };
 
   const handleSave = () => {
-    // Validation
     const hasEmpty = editingGrades.some((g) => !g.code.trim() || !g.name.trim());
     if (hasEmpty) {
       showToast.error("Invalid Grade", "Code and Name are required for all grades.");
@@ -91,7 +90,6 @@ function GradesPage() {
     showToast.success("Refreshed", "Changes discarded.");
   };
 
-  // Stats
   const totalGrades = editingGrades.length;
   const highestPoints = Math.max(...editingGrades.map((g) => g.points), 0);
   const lowestPoints = Math.min(...editingGrades.map((g) => g.points), 0);
@@ -100,7 +98,6 @@ function GradesPage() {
       ? editingGrades.reduce((s, g) => s + g.points, 0) / totalGrades
       : 0;
 
-  // Count employees per grade
   const employeesByGrade: Record<string, number> = {};
   employees.forEach((e) => {
     if (e.jobGrade) {
@@ -115,42 +112,44 @@ function GradesPage() {
       variants={staggerContainer}
       className="space-y-6"
     >
-      <PageHeader
-        title="Grade Points"
-        description="Manage the point values assigned to each job grade. These determine bonus calculation weights."
-        icon={<Award className="h-6 w-6" />}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={!hasChanges}
-              className="gap-2"
-            >
-              <RefreshCw className="h-4 w-4" /> Discard
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReset}
-              className="gap-2"
-            >
-              <RefreshCw className="h-4 w-4" /> Reset Default
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={!hasChanges}
-              className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20"
-            >
-              <Save className="h-4 w-4" /> Save Changes
-            </Button>
-          </div>
-        }
-      />
+      {/* 👈 ADDED data-tour wrapper */}
+      <div data-tour="grades-header">
+        <PageHeader
+          title="Grade Points"
+          description="Manage the point values assigned to each job grade. These determine bonus calculation weights."
+          icon={<Award className="h-6 w-6" />}
+          actions={
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={!hasChanges}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" /> Discard
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReset}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" /> Reset Default
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={!hasChanges}
+                className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20"
+              >
+                <Save className="h-4 w-4" /> Save Changes
+              </Button>
+            </div>
+          }
+        />
+      </div>
 
-      {/* Unsaved changes banner */}
       {hasChanges && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
@@ -172,8 +171,8 @@ function GradesPage() {
         </motion.div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Stats — 👈 ADDED data-tour */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="grades-stats">
         <StatCard
           icon={<Award className="h-4 w-4" />}
           label="Total Grades"
@@ -205,8 +204,8 @@ function GradesPage() {
         />
       </div>
 
-      {/* Grades table */}
-      <motion.div variants={fadeUp}>
+      {/* Grades table — 👈 ADDED data-tour */}
+      <motion.div variants={fadeUp} data-tour="grades-table">
         <SectionCard
           title="Grade Points Table"
           description="Edit codes, names, and point values. Codes must be unique."
@@ -231,7 +230,6 @@ function GradesPage() {
             />
           ) : (
             <div className="divide-y divide-border/50">
-              {/* Table header */}
               <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-muted/30 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
                 <div className="col-span-2">Code</div>
                 <div className="col-span-5">Grade Name</div>
@@ -240,7 +238,6 @@ function GradesPage() {
                 <div className="col-span-1 text-right">Action</div>
               </div>
 
-              {/* Rows */}
               {editingGrades.map((grade, idx) => {
                 const employeeCount = employeesByGrade[grade.code] || 0;
                 return (
@@ -251,7 +248,6 @@ function GradesPage() {
                     transition={{ delay: Math.min(idx * 0.03, 0.3) }}
                     className="grid grid-cols-12 gap-3 px-5 py-3 items-center hover:bg-accent/30 transition-colors group"
                   >
-                    {/* Code */}
                     <div className="col-span-12 md:col-span-2">
                       <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden block mb-1">
                         Code
@@ -265,7 +261,6 @@ function GradesPage() {
                       />
                     </div>
 
-                    {/* Name */}
                     <div className="col-span-12 md:col-span-5">
                       <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden block mb-1">
                         Name
@@ -278,7 +273,6 @@ function GradesPage() {
                       />
                     </div>
 
-                    {/* Points */}
                     <div className="col-span-6 md:col-span-2">
                       <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden block mb-1">
                         Points
@@ -292,7 +286,6 @@ function GradesPage() {
                       />
                     </div>
 
-                    {/* Employees using this grade */}
                     <div className="col-span-5 md:col-span-2 flex justify-center">
                       {employeeCount > 0 ? (
                         <Badge
@@ -307,7 +300,6 @@ function GradesPage() {
                       )}
                     </div>
 
-                    {/* Delete */}
                     <div className="col-span-1 flex justify-end">
                       <Button
                         size="sm"
@@ -327,8 +319,8 @@ function GradesPage() {
         </SectionCard>
       </motion.div>
 
-      {/* Info card */}
-      <motion.div variants={fadeUp}>
+      {/* Info card — 👈 ADDED data-tour */}
+      <motion.div variants={fadeUp} data-tour="grades-info">
         <Card className="p-5 bg-blue-500/5 border-blue-500/20">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
@@ -361,7 +353,7 @@ function GradesPage() {
         </Card>
       </motion.div>
 
-      {/* Suggested grade hierarchy (informational) */}
+      {/* Suggested hierarchy */}
       <motion.div variants={fadeUp}>
         <SectionCard
           title="Suggested Grade Hierarchy"

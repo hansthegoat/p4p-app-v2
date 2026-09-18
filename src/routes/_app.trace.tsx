@@ -109,19 +109,22 @@ function TracePage() {
       variants={staggerContainer}
       className="space-y-6"
     >
-      <PageHeader
-        title="Calculation Trace"
-        description="Full breakdown of how each employee's bonus is calculated — from grade points to final payout."
-        icon={<Calculator className="h-6 w-6" />}
-        actions={
-          <Button variant="outline" size="sm" onClick={exportTrace} className="gap-2">
-            <Download className="h-4 w-4" /> Export CSV
-          </Button>
-        }
-      />
+      {/* 👈 ADDED data-tour wrapper */}
+      <div data-tour="trace-header">
+        <PageHeader
+          title="Calculation Trace"
+          description="Full breakdown of how each employee's bonus is calculated — from grade points to final payout."
+          icon={<Calculator className="h-6 w-6" />}
+          actions={
+            <Button variant="outline" size="sm" onClick={exportTrace} className="gap-2">
+              <Download className="h-4 w-4" /> Export CSV
+            </Button>
+          }
+        />
+      </div>
 
-      {/* Pool Overview */}
-      <motion.div variants={fadeUp}>
+      {/* Pool Overview — 👈 ADDED data-tour */}
+      <motion.div variants={fadeUp} data-tour="trace-pool">
         <Card className="p-5 bg-gradient-to-r from-primary/5 via-background to-background border-primary/20">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
@@ -170,8 +173,8 @@ function TracePage() {
         </Card>
       </motion.div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Stats — 👈 ADDED data-tour */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="trace-stats">
         <StatCard
           icon={<Users className="h-4 w-4" />}
           label="Employees Traced"
@@ -202,8 +205,8 @@ function TracePage() {
         />
       </div>
 
-      {/* Filters */}
-      <motion.div variants={fadeUp}>
+      {/* Filters — 👈 ADDED data-tour */}
+      <motion.div variants={fadeUp} data-tour="trace-filters">
         <Card className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="md:col-span-2">
@@ -240,8 +243,8 @@ function TracePage() {
         </Card>
       </motion.div>
 
-      {/* Trace list */}
-      <motion.div variants={fadeUp}>
+      {/* Trace list — 👈 ADDED data-tour */}
+      <motion.div variants={fadeUp} data-tour="trace-list">
         <SectionCard
           title="Employee Calculation Traces"
           description="Click any row to see the full breakdown"
@@ -268,7 +271,6 @@ function TracePage() {
                     transition={{ delay: Math.min(idx * 0.02, 0.3) }}
                     className="border border-border/60 rounded-xl overflow-hidden"
                   >
-                    {/* Row header */}
                     <button
                       onClick={() => setExpandedId(isExpanded ? null : emp.id)}
                       className="w-full p-4 flex items-center justify-between gap-3 hover:bg-accent/40 transition-colors text-left"
@@ -321,7 +323,6 @@ function TracePage() {
                       </div>
                     </button>
 
-                    {/* Expanded trace */}
                     <AnimatePresence>
                       {isExpanded && (
                         <motion.div
@@ -332,7 +333,6 @@ function TracePage() {
                           className="overflow-hidden"
                         >
                           <div className="p-5 border-t border-border/50 bg-muted/20 space-y-5">
-                            {/* Step 1: Base calculation */}
                             <TraceStep
                               step={1}
                               title="Grade & Weight"
@@ -364,7 +364,6 @@ function TracePage() {
                               </div>
                             </TraceStep>
 
-                            {/* Step 2: Performance */}
                             <TraceStep
                               step={2}
                               title="Performance Multiplier"
@@ -407,7 +406,6 @@ function TracePage() {
                               </div>
                             </TraceStep>
 
-                            {/* Step 3: Category breakdown */}
                             {empCalc.categoryBreakdown && empCalc.categoryBreakdown.length > 0 && (
                               <TraceStep
                                 step={3}
@@ -475,7 +473,6 @@ function TracePage() {
                               </TraceStep>
                             )}
 
-                            {/* Step 4: Final formula */}
                             <TraceStep
                               step={4}
                               title="Final Bonus Calculation"
@@ -525,8 +522,8 @@ function TracePage() {
         </SectionCard>
       </motion.div>
 
-      {/* Info footer */}
-      <motion.div variants={fadeUp}>
+      {/* Info footer — 👈 ADDED data-tour */}
+      <motion.div variants={fadeUp} data-tour="trace-info">
         <Card className="p-5 bg-blue-500/5 border-blue-500/20">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
@@ -570,7 +567,6 @@ function TracePage() {
   );
 }
 
-// ===== Helper: Trace Step Card =====
 function TraceStep({
   step,
   title,
@@ -598,7 +594,6 @@ function TraceStep({
   );
 }
 
-// ===== Helper: Trace Stat =====
 function TraceStat({
   label,
   value,

@@ -613,6 +613,52 @@ const SUPERVISORS_TOUR: Tour = {
     },
   ],
 };
+// 👈 NEW — Grade Points tour
+const GRADES_TOUR: Tour = {
+  key: "page_grades",
+  steps: [
+    {
+      element: '[data-tour="grades-header"]',
+      popover: {
+        title: "Grade Points",
+        description:
+          "Each job grade has a point value that determines an employee's share of the bonus pool. Higher points = larger bonus.",
+        side: "bottom",
+        align: "center",
+      },
+    },
+    {
+      element: '[data-tour="grades-stats"]',
+      popover: {
+        title: "Your grade structure",
+        description:
+          "Total grades, highest point value, average points, and how many employees are graded. Updates live as you edit.",
+        side: "bottom",
+        align: "center",
+      },
+    },
+    {
+      element: '[data-tour="grades-table"]',
+      popover: {
+        title: "Edit the grade table",
+        description:
+          "Change codes, names, or point values. Click Add Grade to create a new tier. Save Changes applies — nothing recalculates until you save.",
+        side: "top",
+        align: "center",
+      },
+    },
+    {
+      element: '[data-tour="grades-info"]',
+      popover: {
+        title: "How it works",
+        description:
+          "A quick refresher on how grade points feed into the bonus formula. If anything is unclear, check here first.",
+        side: "top",
+        align: "center",
+      },
+    },
+  ],
+};
 
 /* ============================================================
    REGISTRY + HELPERS
@@ -629,6 +675,65 @@ export const PAGE_TOURS: Record<string, Tour> = {
   "/employees": EMPLOYEES_TOUR,
   "/kpi-updates": KPI_UPDATES_TOUR,
   "/supervisors": SUPERVISORS_TOUR,
+  "/grades": GRADES_TOUR,   // 👈 ADD THIS LINE
+  "/trace": TRACE_TOUR,   // 👈 ADD THIS LINE
+};
+
+// 👈 NEW — Calculation Trace tour
+const TRACE_TOUR: Tour = {
+  key: "page_trace",
+  steps: [
+    {
+      element: '[data-tour="trace-header"]',
+      popover: {
+        title: "Calculation Trace",
+        description:
+          "This is the audit view — every employee's bonus traced from grade points to final payout. Nothing hidden.",
+        side: "bottom",
+        align: "center",
+      },
+    },
+    {
+      element: '[data-tour="trace-pool"]',
+      popover: {
+        title: "The pool at the top",
+        description:
+          "Revenue → P4P pool → employee pool → value per point. Everything downstream derives from these four numbers.",
+        side: "bottom",
+        align: "center",
+      },
+    },
+    {
+      element: '[data-tour="trace-stats"]',
+      popover: {
+        title: "Who's being traced",
+        description:
+          "Count, total bonus, average multiplier, and total grade points across the current filter. Updates live.",
+        side: "bottom",
+        align: "center",
+      },
+    },
+    {
+      element: '[data-tour="trace-filters"]',
+      popover: {
+        title: "Narrow the list",
+        description:
+          "Search by name, department, or role. Or filter by department to focus on one team at a time.",
+        side: "bottom",
+        align: "center",
+      },
+    },
+    {
+      element: '[data-tour="trace-list"]',
+      popover: {
+        title: "Click any row to expand",
+        description:
+          "Each row opens a full breakdown — Grade & Weight, Performance Multiplier, Category Breakdown, and the final formula. Great for answering 'why is my bonus this number?'",
+        side: "top",
+        align: "center",
+      },
+    },
+  ],
 };
 
 export function getWelcomeTourForRole(role: string): Tour {
