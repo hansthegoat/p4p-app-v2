@@ -44,10 +44,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard, roles: ["employee", "hr", "admin"], group: "main" },
   { label: "My Performance", to: "/employee", icon: Target, roles: ["employee", "hr", "admin"], group: "main" },
   { label: "My Calculation", to: "/my-calculation", icon: Calculator, roles: ["employee", "hr", "admin"], group: "main" },
-  { label: "My Profile", to: "/profile", icon: User, roles: ["employee", "hr", "admin"], group: "main" },
   { label: "Appraisals", to: "/appraisals", icon: ClipboardCheck, roles: ["employee", "hr", "admin"], group: "main" },
   { label: "KPI Updates", to: "/kpi-updates", icon: RefreshCw, roles: ["employee", "hr", "admin"], showOnlyIfPending: true, group: "main" },
   { label: "Review Appraisals", to: "/appraisals-review", icon: ClipboardCheck, roles: ["employee", "hr", "admin"], group: "main" },
+  { label: "My Profile", to: "/profile", icon: User, roles: ["employee", "hr", "admin"], group: "main" },   // 👈 moved to bottom
   { label: "Employees", to: "/employees", icon: Users, roles: ["hr", "admin"], group: "team" },
   { label: "Supervisors", to: "/supervisors", icon: UserCheck, roles: ["hr", "admin"], group: "team" },
   { label: "KPI Framework", to: "/kpi-framework", icon: FileSpreadsheet, roles: ["hr", "admin"], group: "admin" },
