@@ -91,11 +91,14 @@ function Dashboard() {
   const [authUserId, setAuthUserId] = useState<string | null>(null);
 
   // 👈 Track whether the welcome tour was queued on THIS mount.
-  // If it was, the dashboard tour must wait for the welcome to finish
-  // before chaining in. If it wasn't (returning user), fire directly.
   const welcomeShownRef = useRef(false);
 
-  // Employee lookup
+  // 👈 Auth user id stored in a ref so the lookup effect doesn't depend on state
+  const authUserIdRef = useRef<string | null>(null);
+
+  // 👈 Employee lookup — re-runs when `employees` changes, which happens
+  // automatically when the store rehydrates from Supabase or localStorage.
+  // No phantom `p4p.refresh()` calls.
   useEffect(() => {
     let cancelled = false;
 
@@ -107,6 +110,8 @@ function Dashboard() {
           return;
         }
         if (cancelled) return;
+
+        authUserIdRef.current = user.id;
         setAuthUserId(user.id);
 
         const emp =
@@ -115,7 +120,21 @@ function Dashboard() {
           null;
 
         setEmployee(emp);
-        setLoading(false);
+
+        // 👈 Keep the loading spinner visible until we either find the
+        // employee, or give the store time to hydrate. Only stop loading
+        // once we've either matched or waited a bit.
+        if (emp) {
+          setLoading(false);
+        } else {
+          // Give the store ~1.5s to hydrate from cloud before showing
+          // "No Employee Record". If `employees` updates during this
+          // window, this effect re-runs and matches immediately.
+          const t = window.setTimeout(() => {
+            if (!cancelled) setLoading(false);
+          }, 1500);
+          return () => window.clearTimeout(t);
+        }
       } catch {
         if (!cancelled) setLoading(false);
       }
@@ -146,9 +165,6 @@ function Dashboard() {
   const isAdmin = role === "admin" || role === "hr";
 
   // ⭐ Welcome tour queue — reads the pending flag set by onboarding.
-  // Note: we DO NOT remove the flag here. It's removed in the welcome
-  // tour's onComplete callback, so the flag accurately reflects whether
-  // the welcome tour is still "in flight".
   useEffect(() => {
     if (typeof window === "undefined") return;
     const pending = localStorage.getItem("p4p_welcome_tour_pending");
@@ -159,14 +175,10 @@ function Dashboard() {
   }, [role]);
 
   // ⭐ Welcome tour — fires first for new users.
-  // Its onComplete chains the dashboard tour after a short delay.
-  // 👈 Fires whenever role is known (not gated on employee record),
-  // so HR/admin users without an employee profile still see it.
   usePageTour(
     welcomeTour,
     !!role,
     () => {
-      // Welcome is done — clear the flag and chain the dashboard tour
       if (typeof window !== "undefined") {
         localStorage.removeItem("p4p_welcome_tour_pending");
       }
@@ -183,8 +195,6 @@ function Dashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!role) return;
-    // Only fire the dashboard tour directly if the welcome was NOT queued
-    // on this mount. Otherwise, the welcome's onComplete handles chaining.
     if (!welcomeShownRef.current) {
       setChainDashboardTour(true);
     }
@@ -455,7 +465,6 @@ function Dashboard() {
           </div>
         </Card>
 
-        {/* 👈 data-tour only on the wrapper div (not the SectionCard) */}
         <div data-tour="global-settings">
           <SectionCard
             title="Global P4P Settings"
@@ -646,189 +655,189 @@ function Dashboard() {
       </div>
 
       <div data-tour="dashboard-tabs">
-      <Tabs defaultValue="overview" onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-3">
-          <TabsTrigger value="overview" className="gap-2"><BarChart3 className="h-4 w-4" /> Overview</TabsTrigger>
-          <TabsTrigger value="categories" className="gap-2"><PieChart className="h-4 w-4" /> Categories</TabsTrigger>
-          <TabsTrigger value="insights" className="gap-2"><Zap className="h-4 w-4" /> Insights</TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue="overview" onValueChange={setActiveTab}>
+          <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsTrigger value="overview" className="gap-2"><BarChart3 className="h-4 w-4" /> Overview</TabsTrigger>
+            <TabsTrigger value="categories" className="gap-2"><PieChart className="h-4 w-4" /> Categories</TabsTrigger>
+            <TabsTrigger value="insights" className="gap-2"><Zap className="h-4 w-4" /> Insights</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="overview" className="mt-4">
-          <motion.div key="overview" variants={tabContent} initial="hidden" animate="show" className="space-y-4">
-            <SectionCard title="Performance Trend" description="Last 12 months" icon={<Activity className="h-4 w-4" />} noPadding>
-              <div className="p-4 h-72">
-                {timelineData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={timelineData}>
-                      <defs><linearGradient id="empTrend" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COLORS.primary} stopOpacity={0.3} /><stop offset="100%" stopColor={COLORS.primary} stopOpacity={0.02} /></linearGradient></defs>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.1} vertical={false} />
-                      <XAxis dataKey="month" fontSize={11} axisLine={false} tickLine={false} />
-                      <YAxis domain={[0, 150]} fontSize={11} axisLine={false} tickLine={false} width={30} />
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
-                      <Area type="monotone" dataKey="score" stroke={COLORS.primary} strokeWidth={2.5} fill="url(#empTrend)" dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 6 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState icon={<Activity className="h-6 w-6" />} title="No data yet" description="Submit your first appraisal to see your performance trend." />
-                )}
-              </div>
-            </SectionCard>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <SectionCard title="Category Performance" description="Weighted scores" icon={<PieChart className="h-4 w-4" />} noPadding>
-                <div className="p-4 h-64">
-                  {categoryScores.length > 0 ? (
+          <TabsContent value="overview" className="mt-4">
+            <motion.div key="overview" variants={tabContent} initial="hidden" animate="show" className="space-y-4">
+              <SectionCard title="Performance Trend" description="Last 12 months" icon={<Activity className="h-4 w-4" />} noPadding>
+                <div className="p-4 h-72">
+                  {timelineData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={categoryScores} layout="vertical" margin={{ left: 8, right: 16 }}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.1} horizontal={false} />
-                        <XAxis type="number" domain={[0, 100]} fontSize={11} axisLine={false} tickLine={false} />
-                        <YAxis type="category" dataKey="name" fontSize={11} axisLine={false} tickLine={false} width={90} />
+                      <AreaChart data={timelineData}>
+                        <defs><linearGradient id="empTrend" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COLORS.primary} stopOpacity={0.3} /><stop offset="100%" stopColor={COLORS.primary} stopOpacity={0.02} /></linearGradient></defs>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.1} vertical={false} />
+                        <XAxis dataKey="month" fontSize={11} axisLine={false} tickLine={false} />
+                        <YAxis domain={[0, 150]} fontSize={11} axisLine={false} tickLine={false} width={30} />
                         <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
-                        <Bar dataKey="score" fill={COLORS.primary} radius={[0, 6, 6, 0]} />
-                      </BarChart>
+                        <Area type="monotone" dataKey="score" stroke={COLORS.primary} strokeWidth={2.5} fill="url(#empTrend)" dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 6 }} />
+                      </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories" />
+                    <EmptyState icon={<Activity className="h-6 w-6" />} title="No data yet" description="Submit your first appraisal to see your performance trend." />
                   )}
                 </div>
               </SectionCard>
 
-              <SectionCard title="KPI Status Breakdown" icon={<Target className="h-4 w-4" />} noPadding>
-                <div className="p-4 h-64">
-                  {kpiStatusData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RePieChart>
-                        <Pie data={kpiStatusData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={4} dataKey="value" label={(entry: any) => `${entry.name} ${entry.value}`} labelLine={false}>
-                          {kpiStatusData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={0} />)}
-                        </Pie>
-                        <Tooltip contentStyle={tooltipStyle} />
-                      </RePieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <EmptyState icon={<Target className="h-6 w-6" />} title="No KPIs" />
-                  )}
-                </div>
-              </SectionCard>
-            </div>
-
-            <div data-tour="dashboard-leaderboard">
-              <DepartmentLeaderboard />
-            </div>
-          </motion.div>
-        </TabsContent>
-
-        <TabsContent value="categories" className="mt-4">
-          <motion.div key="categories" variants={tabContent} initial="hidden" animate="show">
-            {categoryScores.length > 0 ? (
               <div className="grid md:grid-cols-2 gap-4">
-                {categoryScores.map((cat: any, i: number) => {
-                  const status = cat.score >= 100 ? "Exceeded" : cat.score >= 70 ? "On Track" : cat.score >= 50 ? "At Risk" : "Missed";
-                  const color = status === "Exceeded" ? "emerald" : status === "On Track" ? "blue" : status === "At Risk" ? "amber" : "red";
-                  const totalKpiWeight = cat.kpis.reduce((s: number, k: any) => s + (k.weight || 0), 0);
-                  return (
-                    <motion.div key={i} variants={fadeUp} layout {...cardHover}>
-                      <Card className={`p-5 border-l-4 border-l-${color}-500`}>
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div className="min-w-0">
-                            <h4 className="font-semibold text-sm truncate">{cat.name}</h4>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {cat.kpiCount} KPIs · Category weight {cat.weight}%
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className={`text-2xl font-bold text-${color}-600 dark:text-${color}-400`}>{fmtNum(cat.score, 1)}%</div>
-                            <Badge variant="outline" className={`text-[10px] mt-1 text-${color}-600 border-${color}-500/30`}>{status}</Badge>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5 mt-3 pt-3 border-t border-border/40">
-                          <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2 flex items-center justify-between">
-                            <span>KPIs (weight within category)</span>
-                            <span className={totalKpiWeight === 100 ? "text-emerald-600" : "text-amber-600"}>{totalKpiWeight}% total</span>
-                          </div>
-                          {cat.kpis.map((kpi: any, kIdx: number) => (
-                            <div key={kIdx} className="flex items-center justify-between text-xs gap-2">
-                              <span className="truncate text-muted-foreground">{kpi.description}</span>
-                              <span className="font-mono font-semibold shrink-0 ml-2">{kpi.weight}%</span>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden mt-3">
-                          <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, cat.score)}%` }} transition={{ duration: 0.8, delay: i * 0.1 }} className={`h-full rounded-full bg-${color}-500`} />
-                        </div>
-                      </Card>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            ) : (
-              <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories yet" description="Categories will appear once you have KPIs assigned." />
-            )}
-          </motion.div>
-        </TabsContent>
-
-        <TabsContent value="insights" className="mt-4">
-          <motion.div key="insights" variants={tabContent} initial="hidden" animate="show" className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <SectionCard title="Strengths" description="KPIs you've exceeded" icon={<CheckCircle className="h-4 w-4 text-emerald-600" />}>
-                <div className="space-y-2">
-                  {kpiAchievementData.filter((k) => k.achievement >= 100).slice(0, 5).map((k, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">{k.name}</div>
-                        <div className="text-[10px] text-muted-foreground">Weight {k.weight}%</div>
-                      </div>
-                      <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">{fmtNum(k.achievement, 0)}%</span>
-                    </div>
-                  ))}
-                  {kpiAchievementData.filter((k) => k.achievement >= 100).length === 0 && (
-                    <p className="text-sm text-muted-foreground py-4 text-center">No exceeded KPIs yet. Keep pushing!</p>
-                  )}
-                </div>
-              </SectionCard>
-
-              <SectionCard title="Areas for Improvement" description="KPIs needing attention" icon={<AlertTriangle className="h-4 w-4 text-red-600" />}>
-                <div className="space-y-2">
-                  {kpiAchievementData.filter((k) => k.achievement < 70).sort((a, b) => a.achievement - b.achievement).slice(0, 5).map((k, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm p-2.5 rounded-lg bg-red-500/5 border border-red-500/20 gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">{k.name}</div>
-                        <div className="text-[10px] text-muted-foreground">Weight {k.weight}%</div>
-                      </div>
-                      <span className="font-bold text-red-600 dark:text-red-400 shrink-0">{fmtNum(k.achievement, 0)}%</span>
-                    </div>
-                  ))}
-                  {kpiAchievementData.filter((k) => k.achievement < 70).length === 0 && (
-                    <p className="text-sm text-muted-foreground py-4 text-center">All KPIs are on track! 🎉</p>
-                  )}
-                </div>
-              </SectionCard>
-            </div>
-
-            <SectionCard title="Performance Summary" icon={<Info className="h-4 w-4" />}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Card className="p-4 bg-muted/30 border-border/50">
-                  <div className="text-xs text-muted-foreground mb-1">Overall Status</div>
-                  <div className={`text-lg font-bold ${band.color}`}>{band.label}</div>
-                </Card>
-                <Card className="p-4 bg-muted/30 border-border/50">
-                  <div className="text-xs text-muted-foreground mb-1">KPIs on Target</div>
-                  <div className="text-lg font-bold">{kpiAchievementData.filter((k) => k.achievement >= 70).length} / {kpiAchievementData.length}</div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {kpiAchievementData.length > 0 ? Math.round((kpiAchievementData.filter((k) => k.achievement >= 70).length / kpiAchievementData.length) * 100) : 0}% success rate
+                <SectionCard title="Category Performance" description="Weighted scores" icon={<PieChart className="h-4 w-4" />} noPadding>
+                  <div className="p-4 h-64">
+                    {categoryScores.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={categoryScores} layout="vertical" margin={{ left: 8, right: 16 }}>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.1} horizontal={false} />
+                          <XAxis type="number" domain={[0, 100]} fontSize={11} axisLine={false} tickLine={false} />
+                          <YAxis type="category" dataKey="name" fontSize={11} axisLine={false} tickLine={false} width={90} />
+                          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
+                          <Bar dataKey="score" fill={COLORS.primary} radius={[0, 6, 6, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories" />
+                    )}
                   </div>
-                </Card>
-                <Card className="p-4 bg-muted/30 border-border/50">
-                  <div className="text-xs text-muted-foreground mb-1">Est. Bonus</div>
-                  <div className="text-lg font-bold"><BonusGate value={estimatedBonus} /></div>
-                  <div className="text-xs text-muted-foreground mt-1">Based on current performance</div>
-                </Card>
+                </SectionCard>
+
+                <SectionCard title="KPI Status Breakdown" icon={<Target className="h-4 w-4" />} noPadding>
+                  <div className="p-4 h-64">
+                    {kpiStatusData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RePieChart>
+                          <Pie data={kpiStatusData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={4} dataKey="value" label={(entry: any) => `${entry.name} ${entry.value}`} labelLine={false}>
+                            {kpiStatusData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={0} />)}
+                          </Pie>
+                          <Tooltip contentStyle={tooltipStyle} />
+                        </RePieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <EmptyState icon={<Target className="h-6 w-6" />} title="No KPIs" />
+                    )}
+                  </div>
+                </SectionCard>
               </div>
-            </SectionCard>
-          </motion.div>
-        </TabsContent>
-         </Tabs>
+
+              <div data-tour="dashboard-leaderboard">
+                <DepartmentLeaderboard />
+              </div>
+            </motion.div>
+          </TabsContent>
+
+          <TabsContent value="categories" className="mt-4">
+            <motion.div key="categories" variants={tabContent} initial="hidden" animate="show">
+              {categoryScores.length > 0 ? (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {categoryScores.map((cat: any, i: number) => {
+                    const status = cat.score >= 100 ? "Exceeded" : cat.score >= 70 ? "On Track" : cat.score >= 50 ? "At Risk" : "Missed";
+                    const color = status === "Exceeded" ? "emerald" : status === "On Track" ? "blue" : status === "At Risk" ? "amber" : "red";
+                    const totalKpiWeight = cat.kpis.reduce((s: number, k: any) => s + (k.weight || 0), 0);
+                    return (
+                      <motion.div key={i} variants={fadeUp} layout {...cardHover}>
+                        <Card className={`p-5 border-l-4 border-l-${color}-500`}>
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="min-w-0">
+                              <h4 className="font-semibold text-sm truncate">{cat.name}</h4>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {cat.kpiCount} KPIs · Category weight {cat.weight}%
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className={`text-2xl font-bold text-${color}-600 dark:text-${color}-400`}>{fmtNum(cat.score, 1)}%</div>
+                              <Badge variant="outline" className={`text-[10px] mt-1 text-${color}-600 border-${color}-500/30`}>{status}</Badge>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5 mt-3 pt-3 border-t border-border/40">
+                            <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2 flex items-center justify-between">
+                              <span>KPIs (weight within category)</span>
+                              <span className={totalKpiWeight === 100 ? "text-emerald-600" : "text-amber-600"}>{totalKpiWeight}% total</span>
+                            </div>
+                            {cat.kpis.map((kpi: any, kIdx: number) => (
+                              <div key={kIdx} className="flex items-center justify-between text-xs gap-2">
+                                <span className="truncate text-muted-foreground">{kpi.description}</span>
+                                <span className="font-mono font-semibold shrink-0 ml-2">{kpi.weight}%</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden mt-3">
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, cat.score)}%` }} transition={{ duration: 0.8, delay: i * 0.1 }} className={`h-full rounded-full bg-${color}-500`} />
+                          </div>
+                        </Card>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories yet" description="Categories will appear once you have KPIs assigned." />
+              )}
+            </motion.div>
+          </TabsContent>
+
+          <TabsContent value="insights" className="mt-4">
+            <motion.div key="insights" variants={tabContent} initial="hidden" animate="show" className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <SectionCard title="Strengths" description="KPIs you've exceeded" icon={<CheckCircle className="h-4 w-4 text-emerald-600" />}>
+                  <div className="space-y-2">
+                    {kpiAchievementData.filter((k) => k.achievement >= 100).slice(0, 5).map((k, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium">{k.name}</div>
+                          <div className="text-[10px] text-muted-foreground">Weight {k.weight}%</div>
+                        </div>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">{fmtNum(k.achievement, 0)}%</span>
+                      </div>
+                    ))}
+                    {kpiAchievementData.filter((k) => k.achievement >= 100).length === 0 && (
+                      <p className="text-sm text-muted-foreground py-4 text-center">No exceeded KPIs yet. Keep pushing!</p>
+                    )}
+                  </div>
+                </SectionCard>
+
+                <SectionCard title="Areas for Improvement" description="KPIs needing attention" icon={<AlertTriangle className="h-4 w-4 text-red-600" />}>
+                  <div className="space-y-2">
+                    {kpiAchievementData.filter((k) => k.achievement < 70).sort((a, b) => a.achievement - b.achievement).slice(0, 5).map((k, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm p-2.5 rounded-lg bg-red-500/5 border border-red-500/20 gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium">{k.name}</div>
+                          <div className="text-[10px] text-muted-foreground">Weight {k.weight}%</div>
+                        </div>
+                        <span className="font-bold text-red-600 dark:text-red-400 shrink-0">{fmtNum(k.achievement, 0)}%</span>
+                      </div>
+                    ))}
+                    {kpiAchievementData.filter((k) => k.achievement < 70).length === 0 && (
+                      <p className="text-sm text-muted-foreground py-4 text-center">All KPIs are on track! 🎉</p>
+                    )}
+                  </div>
+                </SectionCard>
+              </div>
+
+              <SectionCard title="Performance Summary" icon={<Info className="h-4 w-4" />}>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <Card className="p-4 bg-muted/30 border-border/50">
+                    <div className="text-xs text-muted-foreground mb-1">Overall Status</div>
+                    <div className={`text-lg font-bold ${band.color}`}>{band.label}</div>
+                  </Card>
+                  <Card className="p-4 bg-muted/30 border-border/50">
+                    <div className="text-xs text-muted-foreground mb-1">KPIs on Target</div>
+                    <div className="text-lg font-bold">{kpiAchievementData.filter((k) => k.achievement >= 70).length} / {kpiAchievementData.length}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {kpiAchievementData.length > 0 ? Math.round((kpiAchievementData.filter((k) => k.achievement >= 70).length / kpiAchievementData.length) * 100) : 0}% success rate
+                    </div>
+                  </Card>
+                  <Card className="p-4 bg-muted/30 border-border/50">
+                    <div className="text-xs text-muted-foreground mb-1">Est. Bonus</div>
+                    <div className="text-lg font-bold"><BonusGate value={estimatedBonus} /></div>
+                    <div className="text-xs text-muted-foreground mt-1">Based on current performance</div>
+                  </Card>
+                </div>
+              </SectionCard>
+            </motion.div>
+          </TabsContent>
+        </Tabs>
       </div>
     </motion.div>
   );

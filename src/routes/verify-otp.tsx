@@ -39,6 +39,7 @@ function VerifyOtpPage() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [fadingOut, setFadingOut] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(OTP_TTL_SECONDS);
   const inputs = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -248,7 +249,22 @@ function VerifyOtpPage() {
 
       // 👈 Fresh signup — ALWAYS show onboarding.
       // Also set the welcome tour flag NOW (before navigating) so the tour
+       setSuccess(true);
+      showToast.success("Email Verified!", "Your account is ready.");
+
+      // 👈 Fresh signup — ALWAYS show onboarding.
+      // Also set the welcome tour flag NOW (before navigating) so the tour
       // fires even if the user skips onboarding.
+      localStorage.removeItem("p4p_onboarding_done");
+      localStorage.setItem("p4p_welcome_tour_pending", "true");
+
+      // 👈 1) Hold "Verified!" for 1.4s, 2) fade it out over 0.8s, 3) navigate
+      setTimeout(() => {
+        setFadingOut(true);
+        setTimeout(() => {
+          navigate({ to: "/onboarding" });
+        }, 1600);
+      }, 1400);     // fires even if the user skips onboarding.
       localStorage.removeItem("p4p_onboarding_done");
       localStorage.setItem("p4p_welcome_tour_pending", "true");
 

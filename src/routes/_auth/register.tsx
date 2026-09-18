@@ -301,7 +301,11 @@ function RegisterForm() {
                 required
                 disabled={loading}
                 autoComplete="new-password"
-                className="pr-9 h-9"
+                className={`pr-9 h-9 ${
+                  password.length > 0 && pwCheck.ok
+                    ? "border-emerald-500/50 focus-visible:ring-emerald-500/30"
+                    : ""
+                }`}
               />
               <button
                 type="button"
@@ -357,20 +361,8 @@ function RegisterForm() {
                 </button>
               </div>
             </div>
-            {/* 👈 Reserve the same vertical space as the password column's bar row */}
-            <div className="mt-1.5 min-h-[26px]">
-              {confirmPassword.length > 0 && (
-                <p
-                  className={`text-[10px] ${
-                    passwordsMatch
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-red-600 dark:text-red-400"
-                  }`}
-                >
-                  {passwordsMatch ? "✓ Passwords match" : "Passwords don't match"}
-                </p>
-              )}
-            </div>
+            {/* 👈 Confirm password gets the full strength bar (same as Password) */}
+            <StrengthBar value={confirmPassword} />
           </div>
         </div>
 

@@ -255,22 +255,21 @@ export function AppLayout({ children }: AppLayoutProps) {
               {(user.name || user.email || "?").charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="truncate text-[12.5px] font-medium text-slate-200">
-                  {user.name || user.email?.split("@")[0] || "User"}
-                </span>
-                <button
-                  onClick={requestLogout}
-                  className="shrink-0 rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-red-400"
-                  title="Logout"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                </button>
+              <div className="truncate text-[12.5px] font-medium text-slate-200">
+                {user.name || user.email?.split("@")[0] || "User"}
               </div>
               <div className="truncate text-[10.5px] capitalize text-slate-500">
                 {role}
               </div>
             </div>
+            {/* 👈 logout pinned to the far right of the card */}
+            <button
+              onClick={requestLogout}
+              className="shrink-0 rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-red-400"
+              title="Logout"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
       </div>
