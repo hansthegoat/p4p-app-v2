@@ -12,7 +12,6 @@ export function AuthLayout({ children, mode }: AuthLayoutProps) {
     <div className="min-h-screen flex bg-background">
       {/* ─── LEFT: Image panel ──────────────────────────── */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-slate-950">
-        {/* Background image */}
         <img
           src={`${import.meta.env.BASE_URL}auth-bg.jpg`}
           alt=""
@@ -20,15 +19,10 @@ export function AuthLayout({ children, mode }: AuthLayoutProps) {
           draggable={false}
         />
 
-        {/* Dark mask for text readability */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-950/55 via-blue-950/35 to-slate-950/55" />
-
-        {/* Vignette */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(0,0,0,0.65)_100%)]" />
 
-        {/* Content */}
         <div className="relative z-10 flex flex-col justify-between w-full p-12 text-white">
-          {/* Top brand mark — white version via filter */}
           <div className="flex items-center gap-3">
             <img
               src={`${import.meta.env.BASE_URL}logo-mark.png`}
@@ -42,9 +36,7 @@ export function AuthLayout({ children, mode }: AuthLayoutProps) {
             </span>
           </div>
 
-          {/* Middle hero */}
           <div className="flex flex-col items-start gap-8 max-w-md">
-            {/* Orbit visual */}
             <div className="relative w-32 h-32">
               <svg
                 className="absolute inset-0 w-full h-full text-white/25 animate-[spin_30s_linear_infinite]"
@@ -102,12 +94,18 @@ export function AuthLayout({ children, mode }: AuthLayoutProps) {
       {/* ─── RIGHT: Form panel ─────────────────────────── */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 bg-background">
         <div className="w-full max-w-md">
-          {/* Logo — transparent, no white card */}
+          {/* Logo — swaps between light and dark themes */}
           <div className="flex flex-col items-center mb-6">
             <img
               src={`${import.meta.env.BASE_URL}logo.png`}
               alt="P4P Platform"
-              className="w-72 sm:w-80 h-auto object-contain"
+              className="w-72 sm:w-80 h-auto object-contain dark:hidden"
+              draggable={false}
+            />
+            <img
+              src={`${import.meta.env.BASE_URL}logo-light.png`}
+              alt="P4P Platform"
+              className="w-72 sm:w-80 h-auto object-contain hidden dark:block"
               draggable={false}
             />
           </div>

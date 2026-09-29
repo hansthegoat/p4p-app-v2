@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/lib/p4p/auth";
+import { SplashScreen } from "@/components/p4p/SplashScreen";
 import { checkLockout, recordFailure, clearThrottle } from "@/lib/p4p/login-throttle";
 import { AlertTriangle, Eye, EyeOff } from "lucide-react";
 
@@ -19,6 +20,7 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showSplash, setShowSplash] = useState(false);
   const [lockoutInfo, setLockoutInfo] = useState<{ locked: boolean; minutesLeft: number }>({
     locked: false,
     minutesLeft: 0,
@@ -39,7 +41,12 @@ function LoginPage() {
     try {
       await login(email, password);
       clearThrottle(email);
-      navigate({ to: "/dashboard" });
+
+      // 👈 Show splash, then navigate after it fades
+      setShowSplash(true);
+      window.setTimeout(() => {
+        navigate({ to: "/dashboard" });
+      }, 2000);
     } catch (err: any) {
       const result = recordFailure(email);
       if (result.locked) {
@@ -55,6 +62,11 @@ function LoginPage() {
       setLoading(false);
     }
   };
+
+  // 👈 Show the splash overlay while we hand off to the dashboard
+  if (showSplash) {
+    return <SplashScreen />;
+  }
 
   return (
     <Card className="p-6">
