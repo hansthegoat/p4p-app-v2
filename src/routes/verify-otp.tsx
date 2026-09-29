@@ -145,7 +145,21 @@ function VerifyOtpPage() {
           const pending = JSON.parse(pendingRaw);
 
           const { getTemplateByDepartmentAndRole } = await import("@/lib/p4p/kpi-templates");
-          const template = getTemplateByDepartmentAndRole(pending.department, pending.role);
+          const candidate = getTemplateByDepartmentAndRole(pending.department, pending.role);
+
+          // 👈 Detect placeholder fallback — HR hasn't built a real template yet.
+          // The fallback always has exactly one "Default Category" with one
+          // placeholder KPI. We treat it as "no template" so the new employee
+          // starts empty and can Request KPIs from HR instead of seeing a
+          // "Please configure" placeholder.
+          const looksLikePlaceholder =
+            candidate?.categories?.length === 1 &&
+            candidate.categories[0]?.kpis?.length === 1 &&
+            /default|please configure/i.test(
+              `${candidate.categories[0]?.name || ""} ${candidate.categories[0]?.kpis?.[0]?.description || ""}`
+            );
+
+          const template = looksLikePlaceholder ? undefined : candidate;
           const hasTemplate = !!template;
 
           const isManager = MANAGER_ROLES.some(
