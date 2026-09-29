@@ -98,38 +98,10 @@ function ThemedToaster() {
 
 /** 👈 NEW — wraps the Outlet in a page-transition animation */
 function AnimatedOutlet() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-
-  // 👈 Auth routes do NOT get the global fade.
-  // The auth layout handles its own in-place animation so the
-  // left image, pill, and logo never fade out.
-  const isAuthRoute =
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/register") ||
-    pathname.startsWith("/verify-otp") ||
-    pathname.startsWith("/forgot-password");
-
-  if (isAuthRoute) {
-    return <Outlet />;
-  }
-
-  return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={pathname}
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -12 }}
-        transition={{
-          duration: 0.32,
-          ease: [0.22, 1, 0.36, 1],
-        }}
-        style={{ willChange: "opacity, transform" }}
-      >
-        <Outlet />
-      </motion.div>
-    </AnimatePresence>
-  );
+  // 👈 The page transition now lives inside AppLayout — it wraps only the
+  // main content area. This keeps the sidebar out of any transformed
+  // ancestor so `position: sticky` works correctly.
+  return <Outlet />;
 }
 
 function RootComponent() {

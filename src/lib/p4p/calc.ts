@@ -2,6 +2,16 @@ import type { CalcResult, Employee, GradePoint, Globals, KPI, Category } from ".
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+/**
+ * 👈 Who participates in the bonus pool?
+ * - Adjuncts: get a fixed adjunct bonus (separate pool)
+ * - Employees + HR: get pool share based on grade points × multiplier
+ * - Admins: system/developer accounts — NOT in the bonus calculation
+ */
+function isPayrollParticipant(e: Employee): boolean {
+  return e.roleType !== "admin";
+}
+
 export function performanceMultiplierFromCategories(
   categories: Category[], 
   floor: number, 
@@ -76,8 +86,12 @@ export function calculate(
   const adjunctPool = totalPool * adjFrac;
   const employeePool = totalPool * (1 - adjFrac);
 
-  const adjuncts = employees.filter((e) => e.isAdjunct);
-  const nonAdjuncts = employees.filter((e) => !e.isAdjunct);
+  // 👈 Exclude admins only — HR is a real employee and is included
+  const participants = employees.filter(isPayrollParticipant);
+  const excludedCount = employees.length - participants.length;
+
+  const adjuncts = participants.filter((e) => e.isAdjunct);
+  const nonAdjuncts = participants.filter((e) => !e.isAdjunct);
 
   const perAdjunctBonus = adjuncts.length > 0 ? adjunctPool / adjuncts.length : 0;
 
@@ -188,7 +202,13 @@ export function calculate(
   }
 
   const totalBonusPaid = (sumWeights > 0 ? employeePool : 0) + (adjuncts.length > 0 ? adjunctPool : 0);
-  const avgBonus = employees.length > 0 ? totalBonusPaid / employees.length : 0;
+  // 👈 Average is across participants only (HR + employees + adjuncts, NOT admins)
+  const avgBonus = participants.length > 0 ? totalBonusPaid / participants.length : 0;
+
+  if (excludedCount > 0) {
+    // Informational — enable if you need to debug
+    // console.log(`[calc] Excluded ${excludedCount} admin account${excludedCount === 1 ? "" : "s"} from bonus pool.`);
+  }
 
   return {
     totalPool, adjunctPool, employeePool, perAdjunctBonus, sumWeights, valuePerUnit,

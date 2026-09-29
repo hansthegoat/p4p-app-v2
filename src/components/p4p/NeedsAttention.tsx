@@ -1,9 +1,10 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useP4P } from "@/lib/p4p/store";
 import { Card } from "@/components/ui/card";
+import { employeeNeedsKpis } from "@/lib/p4p/types";
 import {
   UserX, Target, ClipboardCheck, Bell, ChevronRight,
-  AlertCircle, CheckCircle2,
+  AlertCircle, CheckCircle2, FileSpreadsheet,
 } from "lucide-react";
 
 interface WidgetProps {
@@ -13,12 +14,13 @@ interface WidgetProps {
   description: string;
   ctaText: string;
   ctaTo: string;
+  ctaSearch?: Record<string, string>;
   tone: "amber" | "blue" | "rose" | "purple";
   priority?: "high" | "normal";
 }
 
 function Widget({
-  icon: Icon, label, count, description, ctaText, ctaTo, tone, priority = "normal",
+  icon: Icon, label, count, description, ctaText, ctaTo, ctaSearch, tone, priority = "normal",
 }: WidgetProps) {
   const navigate = useNavigate();
 
@@ -55,10 +57,27 @@ function Widget({
 
   const t = tones[tone];
 
+  // 👈 Handle ctaTo strings that include a ?query — TanStack Router needs
+  // `to` and `search` separately.
+  const handleClick = () => {
+    if (ctaTo.includes("?")) {
+      const [path, query] = ctaTo.split("?");
+      const search: Record<string, string> = {};
+      new URLSearchParams(query).forEach((v, k) => {
+        search[k] = v;
+      });
+      navigate({ to: path, search } as any);
+    } else if (ctaSearch) {
+      navigate({ to: ctaTo, search: ctaSearch } as any);
+    } else {
+      navigate({ to: ctaTo });
+    }
+  };
+
   return (
     <button
       type="button"
-      onClick={() => navigate({ to: ctaTo })}
+      onClick={handleClick}
       className={`w-full text-left rounded-lg border ${t.border} ${t.bg} p-4 transition-all duration-200 ${t.hover} hover:-translate-y-0.5 active:scale-[0.99] group cursor-pointer`}
     >
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -89,7 +108,7 @@ function Widget({
 }
 
 export function NeedsAttention() {
-  const { employees, appraisals, kpiUpdateRequests } = useP4P();
+  const { employees, appraisals, kpiUpdateRequests, kpiRequests } = useP4P();
 
   const activeEmployees = employees.filter(
     (e) => e.roleType === "employee" && !e.isAdjunct
@@ -99,9 +118,7 @@ export function NeedsAttention() {
     (e) => !e.supervisorId || e.supervisorId === ""
   );
 
-  const noKpis = activeEmployees.filter(
-    (e) => !e.categories || e.categories.length === 0
-  );
+  const noKpis = activeEmployees.filter((e) => employeeNeedsKpis(e));
 
   const pendingAppraisals = appraisals.filter((a) => a.status === "pending");
 
@@ -109,13 +126,15 @@ export function NeedsAttention() {
     (r) => r.status === "unacknowledged"
   );
 
+  const pendingKpiRequests = kpiRequests.filter((r) => r.status === "pending");
+
   const totalIssues =
     noSupervisor.length +
     noKpis.length +
     pendingAppraisals.length +
-    unackedUpdates.length;
+    unackedUpdates.length +
+    pendingKpiRequests.length;
 
-  // Always visible — even when nothing is wrong, show a status card
   if (totalIssues === 0) {
     return (
       <Card className="p-6 border-emerald-500/20 bg-emerald-500/5">
@@ -160,14 +179,15 @@ export function NeedsAttention() {
           />
         )}
 
+        {/* 👈 Fixed — this block was missing its Widget wrapper */}
         {noKpis.length > 0 && (
           <Widget
             icon={Target}
             label="No KPIs assigned"
             count={noKpis.length}
             description="These employees have empty KPI structures. Push a template."
-            ctaText="Open KPI Framework"
-            ctaTo="/kpi-framework"
+            ctaText="Open Missing KPIs"
+            ctaTo="/kpi-framework?view=missing"
             tone="amber"
           />
         )}
@@ -184,15 +204,30 @@ export function NeedsAttention() {
           />
         )}
 
+        {/* 👈 Fixed link — was /audit-log (broken), now points to KPI Updates tab */}
         {unackedUpdates.length > 0 && (
           <Widget
             icon={Bell}
             label="KPI updates not acknowledged"
             count={unackedUpdates.length}
             description="Employees haven't acknowledged recent KPI changes."
-            ctaText="View audit log"
-            ctaTo="/audit-log"
+            ctaText="View KPI changes"
+            ctaTo="/appraisals-review"
+            ctaSearch={{ tab: "kpi-updates" }}
             tone="purple"
+          />
+        )}
+
+        {pendingKpiRequests.length > 0 && (
+          <Widget
+            icon={FileSpreadsheet}
+            label="KPI requests from employees"
+            count={pendingKpiRequests.length}
+            description="Employees waiting for their KPI templates to be assigned."
+            ctaText="Open Missing KPIs"
+            ctaTo="/kpi-framework?view=missing"
+            tone="amber"
+            priority="high"
           />
         )}
       </div>

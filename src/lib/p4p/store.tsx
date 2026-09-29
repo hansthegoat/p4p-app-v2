@@ -20,6 +20,9 @@ import type {
   KPI,
   KpiUpdateRequest,
   KpiDiffItem,
+  KpiUpdateComment,   // 👈 ADD
+  KpiRequest,
+  CategoryTemplate,
 } from "./types";
 import { newId } from "./defaults";
 import { sendEmail } from "@/lib/email";
@@ -135,6 +138,32 @@ function saveKpiUpdateRequests(data: KpiUpdateRequest[]) {
   try { localStorage.setItem(KPI_UPDATES_KEY, JSON.stringify(data)); } catch {}
 }
 
+// 👈 NEW — KPI requests (localStorage only for now)
+const KPI_REQUESTS_KEY = "p4p_kpi_requests";
+
+function loadKpiRequests(): KpiRequest[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(KPI_REQUESTS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
+
+function saveKpiRequests(data: KpiRequest[]) {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(KPI_REQUESTS_KEY, JSON.stringify(data)); } catch {}
+}
+
+// 👈 Merge cloud employees with local — cloud wins for shared IDs,
+// local-only records (like a just-registered user) are preserved.
+function mergeEmployees(cloud: Employee[], local: Employee[]): Employee[] {
+  const byId = new Map<string, Employee>();
+  for (const e of local) byId.set(e.id, e);
+  for (const e of cloud) byId.set(e.id, e);
+  return Array.from(byId.values());
+}
+
 // ============================================
 // STATE TYPES
 // ============================================
@@ -148,6 +177,7 @@ interface State {
   appraisals: AppraisalRequest[];
   notifications: Notification[];
   kpiUpdateRequests: KpiUpdateRequest[];
+  kpiRequests: KpiRequest[];   // 👈 ADD
   bonusRevealed: boolean;
 }
 
@@ -205,9 +235,38 @@ interface Ctx extends State {
   getUnacknowledgedKpiUpdates: () => KpiUpdateRequest[];
   acknowledgeKpiUpdate: (id: string) => Promise<void>;
   commentKpiUpdate: (id: string, comment: string) => Promise<void>;
-
+  
   syncToCloud: () => Promise<void>;
   setBonusRevealed: (value: boolean) => Promise<void>;
+  refreshFromCloud: () => Promise<void>;
+
+    // 👈 NEW — KPI requests
+  submitKpiRequest: (employeeId: string, comment?: string) => Promise<{ id: string }>;
+  getKpiRequests: () => KpiRequest[];
+  getEmployeeKpiRequest: (employeeId: string) => KpiRequest | null;
+  cancelKpiRequest: (id: string) => Promise<void>;
+  fulfillKpiRequest: (id: string) => Promise<void>;
+
+  getSupervisorPendingKpiUpdates: (supervisorId: string) => KpiUpdateRequest[]; 
+  commentOnKpiUpdateRequest: (requestId: string, authorId: string, authorName: string, authorRole: "hr" | "admin" | "supervisor", text: string) => Promise<void>;
+  approveKpiUpdateAsSupervisor: (
+    requestId: string,
+    supervisorId: string,
+    supervisorName: string,
+    comment?: string,
+    updateTemplate?: boolean
+  ) => Promise<void>;
+  revertTemplateUpdate: (requestId: string) => Promise<void>;   // 👈 NEW
+  rejectKpiUpdateAsSupervisor: (requestId: string, supervisorId: string, supervisorName: string, reason: string) => Promise<void>;
+  getKpiUpdateComments: (requestId: string) => KpiUpdateComment[];
+
+    // 👈 ADD THIS if missing
+  supervisorUpdateEmployeeKpis: (
+    employeeId: string,
+    categories: Category[],
+    justification: string
+  ) => Promise<void>;
+
 }
 
 const C = createContext<Ctx | null>(null);
@@ -227,6 +286,7 @@ function loadInitial(): State {
       appraisals: [],
       notifications: [],
       kpiUpdateRequests: [],
+      kpiRequests: [],   // 👈 ADD
       bonusRevealed: false,
     };
   }
@@ -243,6 +303,7 @@ function loadInitial(): State {
         appraisals: loadAppraisals(),
         notifications: loadNotifications(),
         kpiUpdateRequests: loadKpiUpdateRequests(),
+        kpiRequests: loadKpiRequests(),   // 👈 ADD
         bonusRevealed: false,
       };
     }
@@ -256,6 +317,7 @@ function loadInitial(): State {
     appraisals: loadAppraisals(),
     notifications: loadNotifications(),
     kpiUpdateRequests: loadKpiUpdateRequests(),
+    kpiRequests: loadKpiRequests(),   // 👈 ADD
     bonusRevealed: false,
   };
 }
@@ -292,7 +354,9 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
         setState((s) => ({
           ...s,
-          employees: cloudEmployees.length > 0 ? cloudEmployees : s.employees,
+          employees: cloudEmployees.length > 0
+            ? mergeEmployees(cloudEmployees, s.employees)
+            : s.employees,
           kpiTemplates:
             Object.keys(cloudTemplates).length > 0 ? cloudTemplates : s.kpiTemplates,
           monthlyData: cloudMonthly.length > 0 ? cloudMonthly : s.monthlyData,
@@ -364,7 +428,9 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
         setState((s) => ({
           ...s,
-          employees: cloudHasData ? cloudEmployees : s.employees,
+          employees: cloudHasData
+            ? mergeEmployees(cloudEmployees, s.employees)
+            : s.employees,
           kpiTemplates:
             Object.keys(cloudTemplates).length > 0 ? cloudTemplates : s.kpiTemplates,
           monthlyData: cloudMonthly.length > 0 ? cloudMonthly : s.monthlyData,
@@ -426,6 +492,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     saveAppraisals(state.appraisals);
     saveNotifications(state.notifications);
     saveKpiUpdateRequests(state.kpiUpdateRequests);
+    saveKpiRequests(state.kpiRequests);   // 👈 ADD
   }, [state]);
 
   // ============================================
@@ -478,6 +545,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       appraisals: [],
       notifications: [],
       kpiUpdateRequests: [],
+      kpiRequests: [],   // 👈 ADD
       bonusRevealed: false,
     });
   }, []);
@@ -1580,7 +1648,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           pushedByName = me?.name || user.email || "HR";
         }
       } catch {
-        // Email and audit metadata are best-effort during a push.
+        // Best-effort during push
       }
 
       const now = new Date().toISOString();
@@ -1596,71 +1664,168 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         const beforeScore = computeScore(existing);
         const afterScore = computeScore(merged);
 
-        updatedEmployees.push({
-          ...emp,
-          categories: merged,
-          needsKpiSetup: false,
-        });
+        // 👈 NEW — resolve supervisor ONCE
+        const supervisor = emp.supervisorId
+          ? state.employees.find((e) => e.id === emp.supervisorId)
+          : null;
+        const needsSupervisorApproval = !!supervisor;
 
-        const req: KpiUpdateRequest = {
-          id: newId(),
-          employeeId: emp.id,
-          department,
-          role,
-          templateVersion: 1,
-          diffs,
-          proposedCategories: merged,
-          beforeScore,
-          afterScore,
-          status: "unacknowledged",
-          createdAt: now,
-          pushedBy,
-          pushedByName,
-        };
+        // 👈 NEW — if there's already a pending request for this employee,
+        // update it in place instead of creating a duplicate.
+        const existingPending = needsSupervisorApproval
+          ? state.kpiUpdateRequests.find(
+              (r) =>
+                r.employeeId === emp.id &&
+                (r.status === "pending_supervisor_review" ||
+                  r.status === "back_to_hr")
+            )
+          : null;
 
-        newRequests.push(req);
+        // If no supervisor gate → apply changes immediately
+        if (!needsSupervisorApproval) {
+          updatedEmployees.push({
+            ...emp,
+            categories: merged,
+            needsKpiSetup: false,
+          });
+        }
 
-        newNotifications.push({
-          id: newId(),
-          userId: emp.id,
-          type: "appraisal_needs_revision" as any,
-          message: `Your KPIs were updated — ${diffs.length} change${diffs.length > 1 ? "s" : ""} to review`,
-          link: "/kpi-updates",
-          read: false,
-          createdAt: now,
-        });
+               // 👈 FIX 1 — mark any pending KPI request from this employee as fulfilled
+        const pendingKpiReq = state.kpiRequests.find(
+          (r) => r.employeeId === emp.id && r.status === "pending"
+        );
+        if (pendingKpiReq) {
+          const fulfilledAt = new Date().toISOString();
+          setState((s) => ({
+            ...s,
+            kpiRequests: s.kpiRequests.map((r) =>
+              r.id === pendingKpiReq.id
+                ? { ...r, status: "fulfilled" as const, fulfilledAt }
+                : r
+            ),
+          }));
+        } 
 
-        if (emp.email) {
-          const baseUrl =
-            typeof window !== "undefined" ? window.location.origin : "";
-          sendEmail({
-            to: [emp.email],
-            subject: `Your KPIs were updated (${diffs.length} change${diffs.length > 1 ? "s" : ""})`,
-            html: kpiUpdateEmail({
-              employeeName: emp.name,
+        // 👈 NEW — reuse existing pending request if one exists
+        const req: KpiUpdateRequest = existingPending
+          ? {
+              ...existingPending,
               department,
               role,
-              changeCount: diffs.length,
+              templateVersion: existingPending.templateVersion + 1,
               diffs,
+              proposedCategories: merged,
               beforeScore,
               afterScore,
-              baseUrl,
-            }),
-          }).catch((err) =>
-            console.error("KPI update email failed for", emp.email, err)
-          );
+              status: "pending_supervisor_review",   // reset if it was back_to_hr
+              pushedBy,
+              pushedByName,
+              // keep: comments, assignedSupervisorId, assignedSupervisorName
+            }
+          : {
+              id: newId(),
+              employeeId: emp.id,
+              department,
+              role,
+              templateVersion: 1,
+              diffs,
+              proposedCategories: merged,
+              beforeScore,
+              afterScore,
+              status: needsSupervisorApproval
+                ? "pending_supervisor_review"
+                : "unacknowledged",
+              createdAt: now,
+              pushedBy,
+              pushedByName,
+              assignedSupervisorId: supervisor?.id,
+              assignedSupervisorName: supervisor?.name,
+              comments: [],
+              templateUpdateRequested: false,
+              templateUpdateApplied: false,
+            };
+
+        // If updating in place, don't double-add to newRequests
+        if (existingPending) {
+          // Track for the state update
+          newRequests.push(req);
+        } else {
+          newRequests.push(req);
+        }
+
+        if (needsSupervisorApproval && supervisor) {
+          // Notify supervisor (action needed)
+          newNotifications.push({
+            id: newId(),
+            userId: supervisor.id,
+            type: "appraisal_needs_revision" as any,
+            message: `HR pushed KPI changes for ${emp.name} — review before it reaches them`,
+            link: "/my-team",
+            read: false,
+            createdAt: now,
+          });
+          // FYI to employee
+          newNotifications.push({
+            id: newId(),
+            userId: emp.id,
+            type: "appraisal_needs_revision" as any,
+            message: `HR proposed KPI updates — awaiting your supervisor's review`,
+            link: "/employee",
+            read: false,
+            createdAt: now,
+          });
+        } else {
+          // No supervisor — employee gets it directly
+          newNotifications.push({
+            id: newId(),
+            userId: emp.id,
+            type: "appraisal_needs_revision" as any,
+            message: `Your KPIs were updated — ${diffs.length} change${diffs.length > 1 ? "s" : ""} to review`,
+            link: "/kpi-updates",
+            read: false,
+            createdAt: now,
+          });
+
+          if (emp.email) {
+            const baseUrl =
+              typeof window !== "undefined" ? window.location.origin : "";
+            sendEmail({
+              to: [emp.email],
+              subject: `Your KPIs were updated (${diffs.length} change${diffs.length > 1 ? "s" : ""})`,
+              html: kpiUpdateEmail({
+                employeeName: emp.name,
+                department,
+                role,
+                changeCount: diffs.length,
+                diffs,
+                beforeScore,
+                afterScore,
+                baseUrl,
+              }),
+            }).catch((err) =>
+              console.error("KPI update email failed for", emp.email, err)
+            );
+          }
         }
       }
 
-      setState((s) => ({
-        ...s,
-        employees: s.employees.map((emp) => {
-          const found = updatedEmployees.find((u) => u.id === emp.id);
-          return found || emp;
-        }),
-        kpiUpdateRequests: [...s.kpiUpdateRequests, ...newRequests],
-        notifications: [...s.notifications, ...newNotifications],
-      }));
+      setState((s) => {
+        // 👈 NEW — merge new requests with existing (replace if same ID, else append)
+        const existingIds = new Set(newRequests.map((r) => r.id));
+        const otherRequests = s.kpiUpdateRequests.filter(
+          (r) => !existingIds.has(r.id)
+        );
+
+        return {
+          ...s,
+          employees: s.employees.map((emp) => {
+            const found = updatedEmployees.find((u) => u.id === emp.id);
+            return found || emp;
+          }),
+          kpiUpdateRequests: [...otherRequests, ...newRequests],
+          notifications: [...s.notifications, ...newNotifications],
+        };
+      });
 
       try {
         if (updatedEmployees.length > 0) {
@@ -1678,13 +1843,20 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
       return { affected: affected.length, created: newRequests.length };
     },
-    [state.employees]
+    [state.employees, state.kpiRequests]
   );
 
   const getKpiUpdateRequests = useCallback(
     (employeeId: string): KpiUpdateRequest[] =>
       state.kpiUpdateRequests
-        .filter((r) => r.employeeId === employeeId)
+        // 👈 Hide supervisor-pending ones from the employee view
+        .filter(
+          (r) =>
+            r.employeeId === employeeId &&
+            r.status !== "pending_supervisor_review" &&
+            r.status !== "back_to_hr" &&
+            r.status !== "cancelled"
+        )
         .sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -1694,7 +1866,10 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
   const getUnacknowledgedKpiUpdates = useCallback(
     (): KpiUpdateRequest[] =>
-      state.kpiUpdateRequests.filter((r) => r.status === "unacknowledged"),
+      // 👈 Only employee-visible statuses (supervisor-pending ones stay hidden)
+      state.kpiUpdateRequests.filter(
+        (r) => r.status === "unacknowledged" || r.status === "acknowledged"
+      ),
     [state.kpiUpdateRequests]
   );
 
@@ -1751,6 +1926,613 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   );
 
   // ============================================
+  // 👈 NEW — KPI REQUESTS
+  // ============================================
+
+  const submitKpiRequest = useCallback(
+    async (employeeId: string, comment?: string) => {
+      const employee = state.employees.find((e) => e.id === employeeId);
+      if (!employee) throw new Error("Employee not found");
+
+      // Block duplicates — one pending request max
+      const existing = state.kpiRequests.find(
+        (r) => r.employeeId === employeeId && r.status === "pending"
+      );
+      if (existing) {
+        return { id: existing.id };
+      }
+
+      const now = new Date().toISOString();
+      const request: KpiRequest = {
+        id: newId(),
+        employeeId: employee.id,
+        employeeName: employee.name,
+        employeeEmail: employee.email || "",
+        department: employee.department,
+        role: employee.role,
+        comment,
+        status: "pending",
+        createdAt: now,
+      };
+
+      // Notifications: HR/admin (action) + supervisor (FYI if assigned)
+      const notifs: Notification[] = [];
+
+      state.employees
+        .filter((e) => e.roleType === "hr" || e.roleType === "admin")
+        .forEach((hr) => {
+          notifs.push({
+            id: newId(),
+            userId: hr.id,
+            type: "appraisal_needs_revision" as any,
+            message: `${employee.name} requested KPIs for ${employee.department} · ${employee.role}`,
+            link: "/employees",
+            read: false,
+            createdAt: now,
+          });
+        });
+
+      if (employee.supervisorId) {
+        notifs.push({
+          id: newId(),
+          userId: employee.supervisorId,
+          type: "appraisal_needs_revision" as any,
+          message: `${employee.name} requested KPIs from HR (FYI)`,
+          link: "/employees",
+          read: false,
+          createdAt: now,
+        });
+      }
+
+      setState((s) => ({
+        ...s,
+        kpiRequests: [...s.kpiRequests, request],
+        notifications: [...s.notifications, ...notifs],
+      }));
+
+      for (const n of notifs) {
+        insertNotification(n).catch((err) =>
+          console.error("KPI request notification failed:", err)
+        );
+      }
+
+      return { id: request.id };
+    },
+    [state.employees, state.kpiRequests]
+  );
+
+  const getKpiRequests = useCallback(
+    (): KpiRequest[] =>
+      [...state.kpiRequests].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [state.kpiRequests]
+  );
+
+  const getEmployeeKpiRequest = useCallback(
+    (employeeId: string): KpiRequest | null =>
+      state.kpiRequests.find(
+        (r) => r.employeeId === employeeId && r.status === "pending"
+      ) || null,
+    [state.kpiRequests]
+  );
+
+  const cancelKpiRequest = useCallback(
+    async (id: string) => {
+      const req = state.kpiRequests.find((r) => r.id === id);
+      if (!req || req.status !== "pending") return;
+
+      const now = new Date().toISOString();
+      setState((s) => ({
+        ...s,
+        kpiRequests: s.kpiRequests.map((r) =>
+          r.id === id
+            ? { ...r, status: "cancelled" as const, cancelledAt: now }
+            : r
+        ),
+      }));
+    },
+    [state.kpiRequests]
+  );
+
+  const fulfillKpiRequest = useCallback(
+    async (id: string) => {
+      const req = state.kpiRequests.find((r) => r.id === id);
+      if (!req || req.status !== "pending") return;
+
+      const now = new Date().toISOString();
+      setState((s) => ({
+        ...s,
+        kpiRequests: s.kpiRequests.map((r) =>
+          r.id === id
+            ? { ...r, status: "fulfilled" as const, fulfilledAt: now }
+            : r
+        ),
+      }));
+    },
+    [state.kpiRequests]
+  );
+
+  // ============================================
+  // 👈 NEW — SUPERVISOR GATE
+  // ============================================
+
+  const getSupervisorPendingKpiUpdates = useCallback(
+    (supervisorId: string): KpiUpdateRequest[] =>
+      state.kpiUpdateRequests
+        .filter(
+          (r) =>
+            r.assignedSupervisorId === supervisorId &&
+            r.status === "pending_supervisor_review"
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ),
+    [state.kpiUpdateRequests]
+  );
+
+  const commentOnKpiUpdateRequest = useCallback(
+    async (
+      requestId: string,
+      authorId: string,
+      authorName: string,
+      authorRole: "hr" | "admin" | "supervisor",
+      text: string
+    ) => {
+      const req = state.kpiUpdateRequests.find((r) => r.id === requestId);
+      if (!req) return;
+
+      const comment: KpiUpdateComment = {
+        id: newId(),
+        authorId,
+        authorName,
+        authorRole,
+        text,
+        timestamp: new Date().toISOString(),
+      };
+
+      const updatedComments = [...(req.comments || []), comment];
+      // 👈 Bounce between HR and supervisor
+      let newStatus = req.status;
+      if (authorRole === "supervisor" && req.status === "pending_supervisor_review") {
+        newStatus = "back_to_hr";
+      } else if (
+        (authorRole === "hr" || authorRole === "admin") &&
+        req.status === "back_to_hr"
+      ) {
+        newStatus = "pending_supervisor_review";
+      }
+
+      const updatedReq: KpiUpdateRequest = {
+        ...req,
+        comments: updatedComments,
+        status: newStatus,
+      };
+
+      setState((s) => ({
+        ...s,
+        kpiUpdateRequests: s.kpiUpdateRequests.map((r) =>
+          r.id === requestId ? updatedReq : r
+        ),
+      }));
+
+      upsertKpiUpdateRequest(updatedReq).catch((err) =>
+        console.error("commentOnKpiUpdateRequest save failed:", err)
+      );
+
+      // Notify the other side
+      const notifs: Notification[] = [];
+      if (authorRole === "supervisor" && req.pushedBy) {
+        notifs.push({
+          id: newId(),
+          userId: req.pushedBy,
+          type: "appraisal_needs_revision" as any,
+          message: `${authorName} commented on KPI changes for ${req.department} · ${req.role}`,
+          link: "/my-team",
+          read: false,
+          createdAt: new Date().toISOString(),
+        });
+      } else if (authorRole === "hr" || authorRole === "admin") {
+        if (req.assignedSupervisorId) {
+          notifs.push({
+            id: newId(),
+            userId: req.assignedSupervisorId,
+            type: "appraisal_needs_revision" as any,
+            message: `HR replied on KPI changes for ${req.department} · ${req.role}`,
+            link: "/my-team",
+            read: false,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      if (notifs.length > 0) {
+        setState((s) => ({
+          ...s,
+          notifications: [...s.notifications, ...notifs],
+        }));
+        for (const n of notifs) {
+          insertNotification(n).catch((err) =>
+            console.error("KPI comment notification failed:", err)
+          );
+        }
+      }
+    },
+    [state.kpiUpdateRequests]
+  );
+
+  const approveKpiUpdateAsSupervisor = useCallback(
+    async (
+      requestId: string,
+      supervisorId: string,
+      supervisorName: string,
+      comment?: string,
+      updateTemplate = false
+    ) => {
+      const req = state.kpiUpdateRequests.find((r) => r.id === requestId);
+      if (!req) throw new Error("Request not found");
+      if (req.status !== "pending_supervisor_review" && req.status !== "back_to_hr") {
+        throw new Error("Request already resolved or not awaiting supervisor");
+      }
+
+      const employee = state.employees.find((e) => e.id === req.employeeId);
+      if (!employee) throw new Error("Employee not found");
+
+      const now = new Date().toISOString();
+      const revertUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+
+      const updatedEmployee: Employee = {
+        ...employee,
+        categories: req.proposedCategories,
+        needsKpiSetup: false,
+      };
+
+      // 👈 NEW — grab current template if we're going to overwrite it
+      const templateKey = `${req.department}-${req.role}`;
+      const currentTemplate = updateTemplate ? state.kpiTemplates[templateKey] : undefined;
+      const previousCategories = currentTemplate?.categories;
+
+      const updatedReq: KpiUpdateRequest = {
+        ...req,
+        status: "unacknowledged",
+        approvedBySupervisorAt: now,
+        supervisorComment: comment,
+        updateTemplateRequested: updateTemplate,
+        updateTemplateApplied: updateTemplate,
+        previousTemplate: updateTemplate ? previousCategories : undefined,
+        canRevertUntil: updateTemplate ? revertUntil : undefined,
+      };
+
+      // 👈 NEW — new template from approved categories
+      const newTemplate: KPITemplate | null = updateTemplate
+        ? {
+            department: req.department,
+            roleName: req.role,
+            jobGrade: currentTemplate?.jobGrade || "",
+            categories: req.proposedCategories.map((cat) => ({
+              id: cat.id,
+              name: cat.name,
+              weight: cat.weight,
+              kpis: cat.kpis.map((k) => ({
+                id: k.id,
+                description: k.description,
+                metric: k.metric,
+                target: k.target,
+                weight: k.weight ?? 0,
+                measurementSource: k.measurementSource,
+              })),
+            })),
+          }
+        : null;
+
+      // Employee notification
+      const employeeNotif: Notification = {
+        id: newId(),
+        userId: employee.id,
+        type: "appraisal_needs_revision" as any,
+        message: `Your KPIs were updated — ${req.diffs.length} change${req.diffs.length === 1 ? "" : "s"} to review`,
+        link: "/kpi-updates",
+        read: false,
+        createdAt: now,
+      };
+
+      // HR notifications — FYI + optional template update notice
+      const hrNotifs: Notification[] = state.employees
+        .filter((e) => e.roleType === "hr" || e.roleType === "admin")
+        .filter((e) => e.id !== supervisorId)
+        .map((hr) => ({
+          id: newId(),
+          userId: hr.id,
+          type: "appraisal_approved" as any,
+          message: updateTemplate
+            ? `${supervisorName} approved KPI changes for ${employee.name} AND updated the standard template for ${req.department} · ${req.role}`
+            : `${supervisorName} approved KPI changes for ${employee.name}`,
+          link: updateTemplate ? "/kpi-framework" : "/appraisals-review",
+          read: false,
+          createdAt: now,
+        }));
+
+      // Apply state
+      setState((s) => {
+        const nextState: any = {
+          ...s,
+          employees: s.employees.map((e) =>
+            e.id === employee.id ? updatedEmployee : e
+          ),
+          kpiUpdateRequests: s.kpiUpdateRequests.map((r) =>
+            r.id === requestId ? updatedReq : r
+          ),
+          notifications: [...s.notifications, employeeNotif, ...hrNotifs],
+        };
+
+        // 👈 If updating template, overwrite kpiTemplates
+        if (newTemplate) {
+          nextState.kpiTemplates = {
+            ...s.kpiTemplates,
+            [templateKey]: newTemplate,
+          };
+        }
+
+        return nextState;
+      });
+
+      // Persist
+      try {
+        await upsertEmployeeDB(updatedEmployee);
+        await upsertKpiUpdateRequest(updatedReq);
+        await insertNotification(employeeNotif);
+        for (const n of hrNotifs) {
+          await insertNotification(n);
+        }
+        if (newTemplate) {
+          await upsertTemplate(newTemplate);
+        }
+      } catch (err) {
+        console.error("approveKpiUpdateAsSupervisor persist error:", err);
+        throw err;
+      }
+    },
+    [state.kpiUpdateRequests, state.employees, state.kpiTemplates]
+  );
+
+  // 👈 NEW — HR reverts a template write-back within the 3-day window
+  const revertTemplateUpdate = useCallback(
+    async (requestId: string) => {
+      const req = state.kpiUpdateRequests.find((r) => r.id === requestId);
+      if (!req) throw new Error("Request not found");
+      if (!req.updateTemplateApplied || !req.previousTemplate) {
+        throw new Error("This request didn't update a template");
+      }
+      if (req.templateRevertedAt) {
+        throw new Error("Already reverted");
+      }
+      if (req.canRevertUntil && new Date(req.canRevertUntil) < new Date()) {
+        throw new Error("Revert window has expired");
+      }
+
+      const now = new Date().toISOString();
+      const templateKey = `${req.department}-${req.role}`;
+      const currentTemplate = state.kpiTemplates[templateKey];
+
+      const revertedTemplate: KPITemplate = {
+        department: req.department,
+        roleName: req.role,
+        jobGrade: currentTemplate?.jobGrade || "",
+        categories: req.previousTemplate,
+      };
+
+      const updatedReq: KpiUpdateRequest = {
+        ...req,
+        templateRevertedAt: now,
+      };
+
+      // Find HR who triggered the revert (for FYI to supervisor)
+      const supervisorId = req.assignedSupervisorId;
+      const notifs: Notification[] = [];
+      if (supervisorId) {
+        notifs.push({
+          id: newId(),
+          userId: supervisorId,
+          type: "appraisal_rejected" as any,
+          message: `HR reverted the template update for ${req.department} · ${req.role}`,
+          link: "/my-team",
+          read: false,
+          createdAt: now,
+        });
+      }
+
+      setState((s) => ({
+        ...s,
+        kpiTemplates: {
+          ...s.kpiTemplates,
+          [templateKey]: revertedTemplate,
+        },
+        kpiUpdateRequests: s.kpiUpdateRequests.map((r) =>
+          r.id === requestId ? updatedReq : r
+        ),
+        notifications: [...s.notifications, ...notifs],
+      }));
+
+      try {
+        await upsertTemplate(revertedTemplate);
+        await upsertKpiUpdateRequest(updatedReq);
+        for (const n of notifs) {
+          await insertNotification(n);
+        }
+      } catch (err) {
+        console.error("revertTemplateUpdate persist error:", err);
+        throw err;
+      }
+    },
+    [state.kpiUpdateRequests, state.kpiTemplates]
+  );
+  const rejectKpiUpdateAsSupervisor = useCallback(
+    async (
+      requestId: string,
+      supervisorId: string,
+      supervisorName: string,
+      reason: string
+    ) => {
+      const req = state.kpiUpdateRequests.find((r) => r.id === requestId);
+      if (!req) throw new Error("Request not found");
+
+      const now = new Date().toISOString();
+      const updatedReq: KpiUpdateRequest = {
+        ...req,
+        status: "cancelled",
+        rejectedBySupervisorAt: now,
+        supervisorComment: reason,
+      };
+
+      // Notify HR
+      const hrNotifs: Notification[] = state.employees
+        .filter((e) => e.roleType === "hr" || e.roleType === "admin")
+        .map((hr) => ({
+          id: newId(),
+          userId: hr.id,
+          type: "appraisal_rejected" as any,
+          message: `${supervisorName} rejected KPI changes for ${req.employeeId.slice(0, 8)}…: "${reason.slice(0, 60)}${reason.length > 60 ? "…" : ""}"`,
+          link: "/appraisals-review",
+          read: false,
+          createdAt: now,
+        }));
+
+      setState((s) => ({
+        ...s,
+        kpiUpdateRequests: s.kpiUpdateRequests.map((r) =>
+          r.id === requestId ? updatedReq : r
+        ),
+        notifications: [...s.notifications, ...hrNotifs],
+      }));
+
+      try {
+        await upsertKpiUpdateRequest(updatedReq);
+        for (const n of hrNotifs) {
+          await insertNotification(n);
+        }
+      } catch (err) {
+        console.error("rejectKpiUpdateAsSupervisor persist error:", err);
+      }
+    },
+    [state.kpiUpdateRequests, state.employees]
+  );
+
+  // ============================================
+  // 👈 NEW — SUPERVISOR DIRECT KPI EDIT
+  // ============================================
+
+  const supervisorUpdateEmployeeKpis = useCallback(
+    async (employeeId: string, categories: Category[], justification: string) => {
+      const employee = state.employees.find((e) => e.id === employeeId);
+      if (!employee) throw new Error("Employee not found");
+
+      const now = new Date().toISOString();
+
+      const updatedEmployee: Employee = {
+        ...employee,
+        categories,
+        needsKpiSetup: false,
+      };
+
+      const supervisor = employee.supervisorId
+        ? state.employees.find((e) => e.id === employee.supervisorId)
+        : null;
+
+      const req: KpiUpdateRequest = {
+        id: newId(),
+        employeeId,
+        department: employee.department,
+        role: employee.role,
+        templateVersion: 1,
+        diffs: [
+          {
+            kind: "kpi_description_changed",
+            categoryName: "Supervisor direct edit",
+            kpiDescription: justification.slice(0, 80),
+          },
+        ],
+        proposedCategories: categories,
+        beforeScore: 0,
+        afterScore: 0,
+        status: "unacknowledged",
+        createdAt: now,
+        pushedBy: supervisor?.id,
+        pushedByName: supervisor?.name || "Supervisor",
+        assignedSupervisorId: supervisor?.id,
+        assignedSupervisorName: supervisor?.name,
+        approvedBySupervisorAt: now,
+        supervisorComment: justification,
+        comments: [
+          {
+            id: newId(),
+            authorId: supervisor?.id || "supervisor",
+            authorName: supervisor?.name || "Supervisor",
+            authorRole: "supervisor",
+            text: justification,
+            timestamp: now,
+          },
+        ],
+        templateUpdateRequested: false,
+        templateUpdateApplied: false,
+      };
+
+      const employeeNotif: Notification = {
+        id: newId(),
+        userId: employeeId,
+        type: "appraisal_needs_revision" as any,
+        message: "Your KPIs were updated by your supervisor",
+        link: "/kpi-updates",
+        read: false,
+        createdAt: now,
+      };
+
+      const hrNotifs: Notification[] = state.employees
+        .filter((e) => e.roleType === "hr" || e.roleType === "admin")
+        .map((hr) => ({
+          id: newId(),
+          userId: hr.id,
+          type: "appraisal_needs_revision" as any,
+          message: `${supervisor?.name || "Supervisor"} updated KPIs for ${employee.name}`,
+          link: "/appraisals-review",
+          read: false,
+          createdAt: now,
+        }));
+
+      setState((s) => ({
+        ...s,
+        employees: s.employees.map((e) =>
+          e.id === employeeId ? updatedEmployee : e
+        ),
+        kpiUpdateRequests: [...s.kpiUpdateRequests, req],
+        notifications: [...s.notifications, employeeNotif, ...hrNotifs],
+      }));
+
+      try {
+        await upsertEmployeeDB(updatedEmployee);
+        await upsertKpiUpdateRequest(req);
+        await insertNotification(employeeNotif);
+        for (const n of hrNotifs) {
+          await insertNotification(n);
+        }
+      } catch (err) {
+        console.error("supervisorUpdateEmployeeKpis persist error:", err);
+        throw err;
+      }
+    },
+    [state.employees]
+  );
+
+  const getKpiUpdateComments = useCallback(
+    (requestId: string): KpiUpdateComment[] => {
+      const req = state.kpiUpdateRequests.find((r) => r.id === requestId);
+      return req?.comments || [];
+    },
+    [state.kpiUpdateRequests]
+  );
+
+  // ============================================
   // SYNC
   // ============================================
   const setBonusRevealed = useCallback(async (value: boolean) => {
@@ -1790,6 +2572,42 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       setIsSyncing(false);
     }
   }, [state]);
+
+    // 👈 Public: force a fresh pull from Supabase
+  const refreshFromCloud = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudSettings] =
+        await Promise.all([
+          fetchAllEmployees(),
+          fetchAllTemplates(),
+          fetchAllMonthly(),
+          fetchAllAppraisals(),
+          fetchAllKpiUpdateRequests(),
+          fetchAppSettings(),
+        ]);
+
+      setState((s) => ({
+        ...s,
+        employees:
+          cloudEmployees.length > 0
+            ? mergeEmployees(cloudEmployees, s.employees)
+            : s.employees,
+        kpiTemplates:
+          Object.keys(cloudTemplates).length > 0 ? cloudTemplates : s.kpiTemplates,
+        monthlyData: cloudMonthly.length > 0 ? cloudMonthly : s.monthlyData,
+        appraisals: cloudAppraisals.length > 0 ? cloudAppraisals : s.appraisals,
+        kpiUpdateRequests: cloudKpiUpdates,
+        bonusRevealed: cloudSettings.bonus_revealed === true,
+      }));
+
+      setIsCloudSynced(true);
+    } catch (err) {
+      console.error("refreshFromCloud failed:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
 
   // ============================================
   // VALUE
@@ -1839,8 +2657,25 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     getUnacknowledgedKpiUpdates,
     acknowledgeKpiUpdate,
     commentKpiUpdate,
+
+    // 👈 NEW — supervisor gate
+    getSupervisorPendingKpiUpdates,
+    commentOnKpiUpdateRequest,
+    approveKpiUpdateAsSupervisor,
+    revertTemplateUpdate,   // 👈 ADD
+    rejectKpiUpdateAsSupervisor,
+    getKpiUpdateComments,
+    supervisorUpdateEmployeeKpis,
+
+    // 👈 NEW
+    submitKpiRequest,
+    getKpiRequests,
+    getEmployeeKpiRequest,
+    cancelKpiRequest,
+    fulfillKpiRequest,
     syncToCloud,
     setBonusRevealed,
+    refreshFromCloud,
   };
 
   // Dev-only: expose to window for console debugging

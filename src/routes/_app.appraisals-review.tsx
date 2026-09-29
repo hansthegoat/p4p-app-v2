@@ -15,6 +15,7 @@ import { SectionCard } from "@/components/ui/section-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { showToast } from "@/lib/toast";
 import { staggerContainer, fadeUp } from "@/lib/motion";
+import { KpiUpdatesTab } from "@/components/p4p/KpiUpdatesTab";
 import { getCurrentUser } from "@/lib/supabase";
 import {
   CheckCircle, XCircle, Clock, AlertCircle, Eye, Calendar,
@@ -30,7 +31,7 @@ function AppraisalsReviewPage() {
   const navigate = useNavigate();
   const {
     employees, getPendingAppraisals, getEmployeeAppraisals,
-    approveAppraisal, rejectAppraisal, requestChanges, addAppraisalComment,
+    approveAppraisal, rejectAppraisal, requestChanges, addAppraisalComment, kpiUpdateRequests,   // 👈 ADD
   } = useP4P();
 
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,7 @@ function AppraisalsReviewPage() {
   const [selectedAppraisal, setSelectedAppraisal] = useState<any>(null);
   const [reviewerName, setReviewerName] = useState("");
   const [commentText, setCommentText] = useState("");
-  const [activeTab, setActiveTab] = useState("pending");
+  const [activeTab, setActiveTab] = useState<string>("pending");
   const [actionLoading, setActionLoading] = useState(false);
   const [filterDepartment, setFilterDepartment] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -83,6 +84,14 @@ function AppraisalsReviewPage() {
       ? pending.filter((a) => directReports.includes(a.employeeId))
       : pending;
     setPendingAppraisals(filteredPending);
+
+      // 👈 Auto-select the most useful tab for HR with no appraisals to review
+  useEffect(() => {
+    if (!isHRorAdmin) return;
+    if (pendingAppraisals.length === 0) {
+      setActiveTab("kpi-updates");
+    }
+  }, [pendingAppraisals.length]);
 
     const all: any[] = [];
     const targetEmployees = isManagerUser ? directReports : employees.map((e) => e.id);
@@ -169,16 +178,39 @@ function AppraisalsReviewPage() {
     );
   }
 
-  if (!isManager && currentEmployee?.roleType !== "admin" && currentEmployee?.roleType !== "hr") {
-    return <EmptyState icon={<AlertCircle className="h-6 w-6" />} title="No Access" description="You don't have any direct reports to review." />;
+  const isHRorAdmin =
+    currentEmployee?.roleType === "hr" ||
+    currentEmployee?.roleType === "admin";
+
+  // No access at all — not a manager and not HR/admin
+  if (!isManager && !isHRorAdmin) {
+    return (
+      <EmptyState
+        icon={<AlertCircle className="h-6 w-6" />}
+        title="No Access"
+        description="You don't have any direct reports to review."
+      />
+    );
   }
-  if (isManager && directReportIds.length === 0) {
-    return <EmptyState icon={<Users className="h-6 w-6" />} title="No Direct Reports" description="You don't have any employees assigned to you yet." />;
+
+  // Manager with no reports AND not HR — genuinely nothing to review
+  if (isManager && directReportIds.length === 0 && !isHRorAdmin) {
+    return (
+      <EmptyState
+        icon={<Users className="h-6 w-6" />}
+        title="No Direct Reports"
+        description="You don't have any employees assigned to you yet."
+      />
+    );
   }
 
   const approvedCount = allAppraisals.filter((a) => a.status === "approved").length;
   const rejectedCount = allAppraisals.filter((a) => a.status === "rejected").length;
   const revisionCount = allAppraisals.filter((a) => a.status === "needs_revision").length;
+  // 👈 NEW — pending KPI changes across the org
+  const kpiUpdatesPendingCount = kpiUpdateRequests.filter(
+    (r) => r.status === "back_to_hr" || r.status === "pending_supervisor_review"
+  ).length;
 
   return (
     <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
@@ -201,9 +233,22 @@ function AppraisalsReviewPage() {
       </div>
 
       <Tabs defaultValue="pending" onValueChange={setActiveTab} data-tour="review-tabs">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="pending" className="gap-2"><Clock className="h-4 w-4" /> Pending ({pendingAppraisals.length})</TabsTrigger>
-          <TabsTrigger value="history" className="gap-2"><FileText className="h-4 w-4" /> History</TabsTrigger>
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsTrigger value="pending" className="gap-2">
+            <Clock className="h-4 w-4" /> Pending ({pendingAppraisals.length})
+          </TabsTrigger>
+          <TabsTrigger value="history" className="gap-2">
+            <FileText className="h-4 w-4" /> History
+          </TabsTrigger>
+          <TabsTrigger value="kpi-updates" className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            KPI Updates
+            {kpiUpdatesPendingCount > 0 && (
+              <span className="ml-1 bg-amber-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                {kpiUpdatesPendingCount}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending" className="mt-4 space-y-4">
@@ -446,6 +491,13 @@ function AppraisalsReviewPage() {
               );
             })
           )}
+        </TabsContent>
+        <TabsContent value="kpi-updates" className="mt-4">
+          <KpiUpdatesTab
+            reviewerId={currentEmployee?.id || user?.id || "hr"}
+            reviewerName={reviewerName || "HR"}
+            reviewerRole={currentEmployee?.roleType === "admin" ? "admin" : "hr"}
+          />
         </TabsContent>
       </Tabs>
     </motion.div>

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { usePageTour } from "@/hooks/usePageTour";
 import { PAGE_TOURS } from "@/lib/p4p/tours";
 import { Badge } from "@/components/ui/badge";
+import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -25,12 +26,14 @@ import { staggerContainer, fadeUp } from "@/lib/motion";
 import { ExcelImportDialog } from "@/lib/p4p/ExcelImportDialog";
 import { BulkExcelImportDialog } from "@/components/p4p/BulkExcelImportDialog";
 import { exportTemplateToExcel, exportAllTemplatesToExcel } from "@/lib/p4p/excel";
-import { AlertCircle, Send, Loader2 } from "lucide-react";
 import {
+  AlertCircle, Send, Loader2,
   Plus, Trash2, FolderPlus, Save,
-  FileSpreadsheet, AlertTriangle, CheckCircle, Info, GripVertical,
-  Layers, ListChecks, Building2, UserCog, Download, Upload,
+  FileSpreadsheet, AlertTriangle, CheckCircle, Info, GripVertical, RotateCcw,
+  Layers, ListChecks, Building2, UserCog, Download, Upload, Users,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { MissingKpisTab } from "@/components/p4p/MissingKpisTab";
 import type { KPITemplate } from "@/lib/p4p/types";
 import { newId } from "@/lib/p4p/defaults";
 import {
@@ -40,6 +43,11 @@ import {
 } from "@/lib/p4p/kpi-templates";
 
 export const Route = createFileRoute("/_app/kpi-framework")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    view: (search.view as string) || undefined,
+    dept: (search.dept as string) || undefined,
+    role: (search.role as string) || undefined,
+  }),
   component: KPIFrameworkPage,
 });
 
@@ -89,6 +97,7 @@ function KPIFrameworkPage() {
     employees,
   } = useP4P();
 
+  const [activeTab, setActiveTab] = useState<string>("build");
   const [selectedDept, setSelectedDept] = useState("");
   const [selectedRole, setSelectedRole] = useState("");
   const [roles, setRoles] = useState<string[]>([]);
@@ -104,6 +113,17 @@ function KPIFrameworkPage() {
 
   const [excelImportOpen, setExcelImportOpen] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+
+  // 👈 Read URL query params ONCE on mount (after state declarations)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("view") === "missing") setActiveTab("missing");
+    const dept = params.get("dept");
+    const role = params.get("role");
+    if (dept) setSelectedDept(dept);
+    if (role) setSelectedRole(role);
+  }, []);
 
   const departments = getDepartments();
   const templates = getAllTemplates();
@@ -156,7 +176,6 @@ function KPIFrameworkPage() {
   const totalWeight = template?.categories?.reduce((s: number, c: any) => s + c.weight, 0) || 0;
   const totalKpis = template?.categories?.reduce((s: number, c: any) => s + c.kpis.length, 0) || 0;
 
-  // ─── Category / KPI operations ────────────────────────────
   const addCategory = () => {
     setTemplate((t: any) => ({
       ...t,
@@ -253,7 +272,6 @@ function KPIFrameworkPage() {
     showToast.success("Template Saved", `${selectedDept} · ${selectedRole}`);
   };
 
-  // ─── Export (context-aware) ───────────────────────────────
   const handleExport = () => {
     if (isSingleMode) {
       if (!template) return;
@@ -271,7 +289,6 @@ function KPIFrameworkPage() {
     }
   };
 
-  // ─── Import (context-aware) ───────────────────────────────
   const handleImportClick = () => {
     if (isSingleMode) {
       setExcelImportOpen(true);
@@ -296,7 +313,6 @@ function KPIFrameworkPage() {
     );
   };
 
-  // ─── Push (context-aware) ─────────────────────────────────
   const handlePushClick = async () => {
     if (isSingleMode) {
       await handlePushSingle();
@@ -475,444 +491,466 @@ function KPIFrameworkPage() {
       variants={staggerContainer}
       className="space-y-6"
     >
-      {/* 👈 ADDED data-tour wrapper */}
+      <TemplateRevertBanner />
+
       <div data-tour="framework-header">
-      <PageHeader
-        title={isSingleMode ? `Editing: ${selectedDept} / ${selectedRole}` : "KPI Framework"}
-        description={
-          isSingleMode
-            ? "Edit the template below, then save and push to employees."
-            : "Bulk operations across every department and role. Pick a specific template below to edit it."
-        }
-        icon={<FileSpreadsheet className="h-6 w-6" />}
-        actions={
-          <div className="flex items-center gap-2 flex-wrap" data-tour="framework-actions">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              className="gap-2"
-            >
-              <Download className="h-3.5 w-3.5" />
-              {isSingleMode ? "Export Template" : "Export All"}
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleImportClick}
-              className="gap-2"
-            >
-              <Upload className="h-3.5 w-3.5" />
-              {isSingleMode ? "Import Template" : "Bulk Import"}
-            </Button>
-
-            {isSingleMode && template && (
-              <Button variant="outline" size="sm" onClick={handleSave} className="gap-2">
-                <Save className="h-3.5 w-3.5" /> Save
+        <PageHeader
+          title={isSingleMode ? `Editing: ${selectedDept} / ${selectedRole}` : "KPI Framework"}
+          description={
+            isSingleMode
+              ? "Edit the template below, then save and push to employees."
+              : "Build weighted KPI templates per department and role, or find employees missing KPIs."
+          }
+          icon={<FileSpreadsheet className="h-6 w-6" />}
+          actions={
+            <div className="flex items-center gap-2 flex-wrap" data-tour="framework-actions">
+              <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
+                <Download className="h-3.5 w-3.5" />
+                {isSingleMode ? "Export Template" : "Export All"}
               </Button>
-            )}
 
-            <Button
-              size="sm"
-              onClick={handlePushClick}
-              disabled={
-                (isSingleMode && (pushing || totalWeight !== 100)) ||
-                (!isSingleMode && pushingAll)
-              }
-              className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20 disabled:opacity-50"
-            >
-              <Send className="h-3.5 w-3.5" />
-              {isSingleMode ? "Push to Employees" : "Push All"}
-            </Button>
-          </div>
-        }
-      />
+              <Button variant="outline" size="sm" onClick={handleImportClick} className="gap-2">
+                <Upload className="h-3.5 w-3.5" />
+                {isSingleMode ? "Import Template" : "Bulk Import"}
+              </Button>
+
+              {isSingleMode && template && (
+                <Button variant="outline" size="sm" onClick={handleSave} className="gap-2">
+                  <Save className="h-3.5 w-3.5" /> Save
+                </Button>
+              )}
+
+              <Button
+                size="sm"
+                onClick={handlePushClick}
+                disabled={
+                  (isSingleMode && (pushing || totalWeight !== 100)) ||
+                  (!isSingleMode && pushingAll)
+                }
+                className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20 disabled:opacity-50"
+              >
+                <Send className="h-3.5 w-3.5" />
+                {isSingleMode ? "Push to Employees" : "Push All"}
+              </Button>
+            </div>
+          }
+        />
       </div>
 
-      {/* Department / Role selector */}
-      <motion.div variants={fadeUp} data-tour="framework-selector">
-        <Card className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <Label className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1.5">
-                <Building2 className="h-3.5 w-3.5" /> Department
-              </Label>
-              <Select
-                value={selectedDept}
-                onValueChange={(v) => {
-                  setSelectedDept(v);
-                  setSelectedRole("");
-                }}
-              >
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Select department (or leave empty for bulk)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((d, i) => (
-                    <SelectItem key={`dept-${i}-${d}`} value={d}>{d}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1.5">
-                <UserCog className="h-3.5 w-3.5" /> Role
-              </Label>
-              <Select value={selectedRole} onValueChange={setSelectedRole} disabled={!selectedDept}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder={selectedDept ? "Select role" : "Select department first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((r, i) => (
-                    <SelectItem key={`role-${i}-${r}`} value={r}>{r}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1.5">
-                {isSingleMode ? "Template Status" : "Mode"}
-              </Label>
-              <div className="flex items-center gap-2 h-10 px-3 rounded-md border border-border bg-muted/30 text-sm">
-                {isSingleMode && template ? (
-                  <>
-                    <Badge
-                      variant="outline"
-                      className={`bg-${weightStatus.color}-500/10 text-${weightStatus.color}-700 dark:text-${weightStatus.color}-400 border-${weightStatus.color}-500/30 gap-1 text-[10px] h-5`}
+      {/* 👈 Tabs: Build Templates vs Missing KPIs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} data-tour="framework-tabs">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="build" className="gap-2">
+            <FileSpreadsheet className="h-4 w-4" />
+            Build Templates
+          </TabsTrigger>
+          <TabsTrigger value="missing" className="gap-2">
+            <Users className="h-4 w-4" />
+            Missing KPIs
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ─────────── BUILD TAB ─────────── */}
+        <TabsContent value="build" className="mt-4 space-y-6">
+          {/* Department / Role selector */}
+          <motion.div variants={fadeUp} data-tour="framework-selector">
+            <Card className="p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1.5">
+                    <Building2 className="h-3.5 w-3.5" /> Department
+                  </Label>
+                  <Select
+                    value={selectedDept}
+                    onValueChange={(v) => {
+                      setSelectedDept(v);
+                      setSelectedRole("");
+                    }}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Select department (or leave empty for bulk)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((d, i) => (
+                        <SelectItem key={`dept-${i}-${d}`} value={d}>{d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1.5">
+                    <UserCog className="h-3.5 w-3.5" /> Role
+                  </Label>
+                  <Select value={selectedRole} onValueChange={setSelectedRole} disabled={!selectedDept}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder={selectedDept ? "Select role" : "Select department first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map((r, i) => (
+                        <SelectItem key={`role-${i}-${r}`} value={r}>{r}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1.5">
+                    {isSingleMode ? "Template Status" : "Mode"}
+                  </Label>
+                  <div className="flex items-center gap-2 h-10 px-3 rounded-md border border-border bg-muted/30 text-sm">
+                    {isSingleMode && template ? (
+                      <>
+                        <Badge
+                          variant="outline"
+                          className={`bg-${weightStatus.color}-500/10 text-${weightStatus.color}-700 dark:text-${weightStatus.color}-400 border-${weightStatus.color}-500/30 gap-1 text-[10px] h-5`}
+                        >
+                          <WeightIcon className="h-3 w-3" />
+                          {weightStatus.label}
+                        </Badge>
+                        <span className="text-[11px] text-muted-foreground ml-auto">
+                          {template.categories.length} cat · {totalKpis} KPI
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">
+                        Bulk mode — actions affect every template
+                      </span>
+                    )}
+                  </div>
+                  {isSingleMode && (
+                    <button
+                      onClick={() => {
+                        setSelectedDept("");
+                        setSelectedRole("");
+                      }}
+                      className="text-[10px] text-muted-foreground hover:text-foreground mt-1.5 underline"
                     >
-                      <WeightIcon className="h-3 w-3" />
-                      {weightStatus.label}
-                    </Badge>
-                    <span className="text-[11px] text-muted-foreground ml-auto">
-                      {template.categories.length} cat · {totalKpis} KPI
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-[11px] text-muted-foreground">
-                    Bulk mode — actions affect every template
-                  </span>
-                )}
-              </div>
-              {isSingleMode && (
-                <button
-                  onClick={() => {
-                    setSelectedDept("");
-                    setSelectedRole("");
-                  }}
-                  className="text-[10px] text-muted-foreground hover:text-foreground mt-1.5 underline"
-                >
-                  ← Back to bulk view
-                </button>
-              )}
-            </div>
-          </div>
-        </Card>
-      </motion.div>
-
-      {isSingleMode && template ? (
-        <div className="space-y-4">
-          {template.categories.length > 0 && (
-            <motion.div variants={fadeUp}>
-              <Card
-                className={`p-4 flex items-center gap-3 bg-${weightStatus.color}-500/5 border-${weightStatus.color}-500/20`}
-              >
-                <WeightIcon className={`h-5 w-5 text-${weightStatus.color}-600 dark:text-${weightStatus.color}-400`} />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    Category Total Weight: {totalWeight}%
-                    {totalWeight === 100 && <CheckCircle className="h-4 w-4 text-emerald-500" />}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    {totalWeight === 100
-                      ? "Category weights balanced. Now ensure each category's KPI weights sum to 100%."
-                      : totalWeight > 100
-                      ? `Reduce category weights by ${totalWeight - 100}% to reach 100%.`
-                      : `Add ${100 - totalWeight}% more to reach 100%.`}
-                  </div>
+                      ← Back to bulk view
+                    </button>
+                  )}
                 </div>
-                <div className="w-32 h-2 bg-muted rounded-full overflow-hidden shrink-0">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(100, totalWeight)}%` }}
-                    transition={{ duration: 0.6 }}
-                    className={`h-full bg-${weightStatus.color}-500`}
-                  />
-                </div>
-              </Card>
-            </motion.div>
-          )}
-
-          <motion.div variants={fadeUp}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-muted-foreground" />
-                <h2 className="text-sm font-semibold text-foreground">Categories</h2>
               </div>
-              <Button size="sm" variant="outline" onClick={addCategory} className="gap-2">
-                <FolderPlus className="h-4 w-4" /> Add Category
-              </Button>
-            </div>
+            </Card>
           </motion.div>
 
-          {template.categories.length === 0 ? (
+          {isSingleMode && template ? (
+            <div className="space-y-4">
+              {template.categories.length > 0 && (
+                <motion.div variants={fadeUp}>
+                  <Card
+                    className={`p-4 flex items-center gap-3 bg-${weightStatus.color}-500/5 border-${weightStatus.color}-500/20`}
+                  >
+                    <WeightIcon className={`h-5 w-5 text-${weightStatus.color}-600 dark:text-${weightStatus.color}-400`} />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        Category Total Weight: {totalWeight}%
+                        {totalWeight === 100 && <CheckCircle className="h-4 w-4 text-emerald-500" />}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        {totalWeight === 100
+                          ? "Category weights balanced. Now ensure each category's KPI weights sum to 100%."
+                          : totalWeight > 100
+                          ? `Reduce category weights by ${totalWeight - 100}% to reach 100%.`
+                          : `Add ${100 - totalWeight}% more to reach 100%.`}
+                      </div>
+                    </div>
+                    <div className="w-32 h-2 bg-muted rounded-full overflow-hidden shrink-0">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(100, totalWeight)}%` }}
+                        transition={{ duration: 0.6 }}
+                        className={`h-full bg-${weightStatus.color}-500`}
+                      />
+                    </div>
+                  </Card>
+                </motion.div>
+              )}
+
+              <motion.div variants={fadeUp}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-muted-foreground" />
+                    <h2 className="text-sm font-semibold text-foreground">Categories</h2>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={addCategory} className="gap-2">
+                    <FolderPlus className="h-4 w-4" /> Add Category
+                  </Button>
+                </div>
+              </motion.div>
+
+              {template.categories.length === 0 ? (
+                <motion.div variants={fadeUp}>
+                  <Card>
+                    <EmptyState
+                      icon={<Layers className="h-6 w-6" />}
+                      title="No categories yet"
+                      description="Add your first KPI category to start building this template."
+                      action={
+                        <Button onClick={addCategory} className="gap-2">
+                          <FolderPlus className="h-4 w-4" /> Add Category
+                        </Button>
+                      }
+                    />
+                  </Card>
+                </motion.div>
+              ) : (
+                <div className="space-y-4">
+                  {template.categories.map((cat: any, catIdx: number) => {
+                    const kpiWeight = cat.kpis.reduce((s: number, k: any) => s + (k.weight || 0), 0);
+                    const kpiWeightOk = Math.abs(kpiWeight - 100) < 0.01;
+                    const kpiWeightOver = kpiWeight > 100;
+
+                    return (
+                      <motion.div key={cat.id} variants={fadeUp} layout>
+                        <Card className="overflow-hidden">
+                          <div className="p-4 border-b border-border/50 bg-gradient-to-r from-muted/40 to-transparent">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                                {catIdx + 1}
+                              </div>
+                              <div className="flex-1 min-w-[180px]">
+                                <Label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                                  Category Name
+                                </Label>
+                                <Input
+                                  value={cat.name}
+                                  onChange={(e) => updateCategory(cat.id, { name: e.target.value })}
+                                  placeholder="Category name"
+                                  className="mt-1 h-9 font-medium"
+                                />
+                              </div>
+                              <div className="w-32">
+                                <Label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                                  Category Weight %
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={cat.weight}
+                                  onChange={(e) =>
+                                    updateCategory(cat.id, { weight: Number(e.target.value) })
+                                  }
+                                  placeholder="0"
+                                  className="mt-1 h-9 font-mono"
+                                />
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-9 w-9 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10 self-end"
+                                onClick={() => removeCategory(cat.id)}
+                                title="Delete category"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            {cat.kpis.length > 0 && (
+                              <div
+                                className={`mt-3 rounded-md px-3 py-2 text-[11px] flex items-center gap-2 ${
+                                  kpiWeightOver
+                                    ? "bg-red-50 border border-red-200 text-red-700 dark:bg-red-950/30 dark:text-red-400"
+                                    : kpiWeightOk
+                                    ? "bg-green-50 border border-green-200 text-green-700 dark:bg-green-950/30 dark:text-green-400"
+                                    : "bg-amber-50 border border-amber-200 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                                }`}
+                              >
+                                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                <span>
+                                  {kpiWeightOver ? "⚠️ KPI weights over 100%! " : kpiWeightOk ? "✅ KPI weights balanced. " : "📊 "}
+                                  KPI Total: <strong>{kpiWeight}%</strong>
+                                  {!kpiWeightOver && !kpiWeightOk && <> · Need <strong>{100 - kpiWeight}%</strong> more</>}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="p-4 space-y-3">
+                            {cat.kpis.length === 0 ? (
+                              <div className="text-[11px] text-muted-foreground text-center py-6 border border-dashed border-border/50 rounded-lg">
+                                No KPIs yet — add one below
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <div className="hidden md:grid grid-cols-14 gap-3 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-1">
+                                  <div className="col-span-5">KPI Description</div>
+                                  <div className="col-span-2">Metric</div>
+                                  <div className="col-span-2">Target</div>
+                                  <div className="col-span-2">Weight %</div>
+                                  <div className="col-span-3 text-right">Action</div>
+                                </div>
+
+                                {cat.kpis.map((kpi: any, kpiIdx: number) => (
+                                  <motion.div
+                                    key={kpi.id}
+                                    layout
+                                    initial={{ opacity: 0, x: -8 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: kpiIdx * 0.03 }}
+                                    className="grid grid-cols-1 md:grid-cols-14 gap-3 items-center p-2 rounded-lg hover:bg-accent/30 transition-colors"
+                                  >
+                                    <div className="md:col-span-5">
+                                      <Label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden mb-1 block">
+                                        Description
+                                      </Label>
+                                      <div className="flex items-start gap-2">
+                                        <GripVertical className="hidden md:block h-4 w-4 text-muted-foreground/40 shrink-0 mt-2.5" />
+                                        <AutoGrowTextarea
+                                          value={kpi.description}
+                                          onChange={(e) =>
+                                            updateKPI(cat.id, kpi.id, { description: e.target.value })
+                                          }
+                                          placeholder="KPI description"
+                                          minRows={1}
+                                          maxRows={3}
+                                          className="text-sm"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                      <Label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden mb-1 block">
+                                        Metric
+                                      </Label>
+                                      <Select
+                                        value={kpi.metric}
+                                        onValueChange={(v) => updateKPI(cat.id, kpi.id, { metric: v })}
+                                      >
+                                        <SelectTrigger className="h-9 font-mono">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {METRICS.map((m, i) => (
+                                            <SelectItem key={`metric-${i}-${m}`} value={m}>{m}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                      <Label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden mb-1 block">
+                                        Target
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        value={kpi.target}
+                                        onChange={(e) =>
+                                          updateKPI(cat.id, kpi.id, { target: Number(e.target.value) })
+                                        }
+                                        className="h-9 font-mono"
+                                      />
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                      <Label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden mb-1 block">
+                                        Weight %
+                                      </Label>
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        value={kpi.weight || 0}
+                                        onChange={(e) =>
+                                          updateKPI(cat.id, kpi.id, { weight: Number(e.target.value) })
+                                        }
+                                        placeholder="0"
+                                        className="h-9 font-mono"
+                                      />
+                                    </div>
+
+                                    <div className="md:col-span-3 flex justify-end">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-9 w-9 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
+                                        onClick={() => removeKPI(cat.id, kpi.id)}
+                                        title="Delete KPI"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </motion.div>
+                                ))}
+                              </div>
+                            )}
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => addKPI(cat.id)}
+                              className="gap-2 mt-2"
+                            >
+                              <Plus className="h-4 w-4" /> Add KPI to {cat.name}
+                            </Button>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {template.categories.length > 0 && (
+                <motion.div variants={fadeUp}>
+                  <Card className="p-4 flex flex-wrap items-center justify-between gap-3 bg-muted/30">
+                    <div className="flex items-center gap-3 text-sm">
+                      <ListChecks className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground text-[13px]">
+                        <strong className="text-foreground">{template.categories.length}</strong> categories ·{" "}
+                        <strong className="text-foreground">{totalKpis}</strong> KPIs ·{" "}
+                        <strong className={totalWeight === 100 ? "text-emerald-600" : "text-amber-600"}>
+                          {totalWeight}%
+                        </strong>{" "}
+                        category weight
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleSave} variant="outline" className="gap-2">
+                        <Save className="h-3.5 w-3.5" /> Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handlePushClick}
+                        disabled={pushing || totalWeight !== 100}
+                        className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20 disabled:opacity-50"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        Push to Employees
+                      </Button>
+                    </div>
+                  </Card>
+                </motion.div>
+              )}
+            </div>
+          ) : (
             <motion.div variants={fadeUp}>
               <Card>
                 <EmptyState
-                  icon={<Layers className="h-6 w-6" />}
-                  title="No categories yet"
-                  description="Add your first KPI category to start building this template."
-                  action={
-                    <Button onClick={addCategory} className="gap-2">
-                      <FolderPlus className="h-4 w-4" /> Add Category
-                    </Button>
+                  icon={<FileSpreadsheet className="h-6 w-6" />}
+                  title={isSingleMode ? "Loading template…" : "Bulk mode"}
+                  description={
+                    isSingleMode
+                      ? "Loading the KPI template for this department and role."
+                      : "Use the buttons above to export, import, or push all templates at once. Or pick a specific department and role to edit it."
                   }
                 />
               </Card>
             </motion.div>
-          ) : (
-            <div className="space-y-4">
-              {template.categories.map((cat: any, catIdx: number) => {
-                const kpiWeight = cat.kpis.reduce((s: number, k: any) => s + (k.weight || 0), 0);
-                const kpiWeightOk = Math.abs(kpiWeight - 100) < 0.01;
-                const kpiWeightOver = kpiWeight > 100;
-
-                return (
-                  <motion.div key={cat.id} variants={fadeUp} layout>
-                    <Card className="overflow-hidden">
-                      <div className="p-4 border-b border-border/50 bg-gradient-to-r from-muted/40 to-transparent">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
-                            {catIdx + 1}
-                          </div>
-                          <div className="flex-1 min-w-[180px]">
-                            <Label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                              Category Name
-                            </Label>
-                            <Input
-                              value={cat.name}
-                              onChange={(e) => updateCategory(cat.id, { name: e.target.value })}
-                              placeholder="Category name"
-                              className="mt-1 h-9 font-medium"
-                            />
-                          </div>
-                          <div className="w-32">
-                            <Label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                              Category Weight %
-                            </Label>
-                            <Input
-                              type="number"
-                              value={cat.weight}
-                              onChange={(e) =>
-                                updateCategory(cat.id, { weight: Number(e.target.value) })
-                              }
-                              placeholder="0"
-                              className="mt-1 h-9 font-mono"
-                            />
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 w-9 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10 self-end"
-                            onClick={() => removeCategory(cat.id)}
-                            title="Delete category"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-
-                        {cat.kpis.length > 0 && (
-                          <div
-                            className={`mt-3 rounded-md px-3 py-2 text-[11px] flex items-center gap-2 ${
-                              kpiWeightOver
-                                ? "bg-red-50 border border-red-200 text-red-700 dark:bg-red-950/30 dark:text-red-400"
-                                : kpiWeightOk
-                                ? "bg-green-50 border border-green-200 text-green-700 dark:bg-green-950/30 dark:text-green-400"
-                                : "bg-amber-50 border border-amber-200 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
-                            }`}
-                          >
-                            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                            <span>
-                              {kpiWeightOver ? "⚠️ KPI weights over 100%! " : kpiWeightOk ? "✅ KPI weights balanced. " : "📊 "}
-                              KPI Total: <strong>{kpiWeight}%</strong>
-                              {!kpiWeightOver && !kpiWeightOk && <> · Need <strong>{100 - kpiWeight}%</strong> more</>}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="p-4 space-y-3">
-                        {cat.kpis.length === 0 ? (
-                          <div className="text-[11px] text-muted-foreground text-center py-6 border border-dashed border-border/50 rounded-lg">
-                            No KPIs yet — add one below
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <div className="hidden md:grid grid-cols-14 gap-3 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-1">
-                              <div className="col-span-5">KPI Description</div>
-                              <div className="col-span-2">Metric</div>
-                              <div className="col-span-2">Target</div>
-                              <div className="col-span-2">Weight %</div>
-                              <div className="col-span-3 text-right">Action</div>
-                            </div>
-
-                            {cat.kpis.map((kpi: any, kpiIdx: number) => (
-                              <motion.div
-                                key={kpi.id}
-                                layout
-                                initial={{ opacity: 0, x: -8 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: kpiIdx * 0.03 }}
-                                className="grid grid-cols-1 md:grid-cols-14 gap-3 items-center p-2 rounded-lg hover:bg-accent/30 transition-colors"
-                              >
-                                <div className="md:col-span-5">
-                                  <Label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden mb-1 block">
-                                    Description
-                                  </Label>
-                                  <div className="flex items-center gap-2">
-                                    <GripVertical className="hidden md:block h-4 w-4 text-muted-foreground/40 shrink-0" />
-                                    <Input
-                                      value={kpi.description}
-                                      onChange={(e) =>
-                                        updateKPI(cat.id, kpi.id, { description: e.target.value })
-                                      }
-                                      placeholder="KPI description"
-                                      className="h-9"
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="md:col-span-2">
-                                  <Label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden mb-1 block">
-                                    Metric
-                                  </Label>
-                                  <Select
-                                    value={kpi.metric}
-                                    onValueChange={(v) => updateKPI(cat.id, kpi.id, { metric: v })}
-                                  >
-                                    <SelectTrigger className="h-9 font-mono">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {METRICS.map((m, i) => (
-                                        <SelectItem key={`metric-${i}-${m}`} value={m}>{m}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-
-                                <div className="md:col-span-2">
-                                  <Label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden mb-1 block">
-                                    Target
-                                  </Label>
-                                  <Input
-                                    type="number"
-                                    value={kpi.target}
-                                    onChange={(e) =>
-                                      updateKPI(cat.id, kpi.id, { target: Number(e.target.value) })
-                                    }
-                                    className="h-9 font-mono"
-                                  />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                  <Label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground md:hidden mb-1 block">
-                                    Weight %
-                                  </Label>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    value={kpi.weight || 0}
-                                    onChange={(e) =>
-                                      updateKPI(cat.id, kpi.id, { weight: Number(e.target.value) })
-                                    }
-                                    placeholder="0"
-                                    className="h-9 font-mono"
-                                  />
-                                </div>
-
-                                <div className="md:col-span-3 flex justify-end">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-9 w-9 p-0 text-red-500 hover:text-red-700 hover:bg-red-500/10"
-                                    onClick={() => removeKPI(cat.id, kpi.id)}
-                                    title="Delete KPI"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </motion.div>
-                            ))}
-                          </div>
-                        )}
-
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => addKPI(cat.id)}
-                          className="gap-2 mt-2"
-                        >
-                          <Plus className="h-4 w-4" /> Add KPI to {cat.name}
-                        </Button>
-                      </div>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </div>
           )}
+        </TabsContent>
 
-          {template.categories.length > 0 && (
-            <motion.div variants={fadeUp}>
-              <Card className="p-4 flex flex-wrap items-center justify-between gap-3 bg-muted/30">
-                <div className="flex items-center gap-3 text-sm">
-                  <ListChecks className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground text-[13px]">
-                    <strong className="text-foreground">{template.categories.length}</strong> categories ·{" "}
-                    <strong className="text-foreground">{totalKpis}</strong> KPIs ·{" "}
-                    <strong className={totalWeight === 100 ? "text-emerald-600" : "text-amber-600"}>
-                      {totalWeight}%
-                    </strong>{" "}
-                    category weight
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleSave} variant="outline" className="gap-2">
-                    <Save className="h-3.5 w-3.5" /> Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handlePushClick}
-                    disabled={pushing || totalWeight !== 100}
-                    className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20 disabled:opacity-50"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    Push to Employees
-                  </Button>
-                </div>
-              </Card>
-            </motion.div>
-          )}
-        </div>
-      ) : (
-        <motion.div variants={fadeUp}>
-          <Card>
-            <EmptyState
-              icon={<FileSpreadsheet className="h-6 w-6" />}
-              title={isSingleMode ? "Loading template…" : "Bulk mode"}
-              description={
-                isSingleMode
-                  ? "Loading the KPI template for this department and role."
-                  : "Use the buttons above to export, import, or push all templates at once. Or pick a specific department and role to edit it."
-              }
-            />
-          </Card>
-        </motion.div>
-      )}
+        {/* ─────────── MISSING KPIs TAB ─────────── */}
+        <TabsContent value="missing" className="mt-4">
+          <MissingKpisTab
+            onPickRole={(dept, role) => {
+              setSelectedDept(dept);
+              setSelectedRole(role);
+              setActiveTab("build");
+            }}
+          />
+        </TabsContent>
+      </Tabs>
 
-      {/* Single push dialog */}
+      {/* ─────────── DIALOGS (outside Tabs so they don't unmount) ─────────── */}
+
       <Dialog open={pushDialogOpen} onOpenChange={setPushDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-5">
           <DialogHeader className="space-y-1.5">
@@ -944,29 +982,19 @@ function KPIFrameworkPage() {
                       <div className="font-medium text-[13px] truncate">{emp.name}</div>
                       <div className="text-[11px] text-muted-foreground truncate">{emp.email}</div>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className="shrink-0 text-[10px] h-5 px-1.5 font-medium"
-                    >
+                    <Badge variant="outline" className="shrink-0 text-[10px] h-5 px-1.5 font-medium">
                       {emp.changeCount} {emp.changeCount === 1 ? "change" : "changes"}
                     </Badge>
                   </div>
                   <div className="space-y-1">
                     {emp.diffs.slice(0, 5).map((d, i) => (
-                      <div
-                        key={i}
-                        className="text-[11px] flex items-center gap-2 text-muted-foreground leading-relaxed"
-                      >
+                      <div key={i} className="text-[11px] flex items-center gap-2 text-muted-foreground leading-relaxed">
                         <span className="w-1 h-1 rounded-full bg-primary shrink-0" />
                         <span className="font-medium text-foreground shrink-0">
                           {labelForDiffKind(d.kind)}
                         </span>
-                        {d.kpiDescription && (
-                          <span className="truncate">· {d.kpiDescription}</span>
-                        )}
-                        {d.categoryName && !d.kpiDescription && (
-                          <span className="truncate">· {d.categoryName}</span>
-                        )}
+                        {d.kpiDescription && <span className="truncate">· {d.kpiDescription}</span>}
+                        {d.categoryName && !d.kpiDescription && <span className="truncate">· {d.categoryName}</span>}
                       </div>
                     ))}
                     {emp.diffs.length > 5 && (
@@ -1014,7 +1042,6 @@ function KPIFrameworkPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Push All dialog */}
       <Dialog open={pushAllDialogOpen} onOpenChange={setPushAllDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-5">
           <DialogHeader className="space-y-1.5">
@@ -1049,10 +1076,7 @@ function KPIFrameworkPage() {
                         {emp.email} · {emp.department} / {emp.role}
                       </div>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className="shrink-0 text-[10px] h-5 px-1.5 font-medium"
-                    >
+                    <Badge variant="outline" className="shrink-0 text-[10px] h-5 px-1.5 font-medium">
                       {emp.changeCount} change{emp.changeCount === 1 ? "" : "s"}
                     </Badge>
                   </div>
@@ -1126,4 +1150,82 @@ function labelForDiffKind(kind: string): string {
     case "kpi_description_changed": return "KPI renamed";
     default: return kind;
   }
+}
+
+// ============================================
+// HR revert banner for template write-backs
+// ============================================
+function TemplateRevertBanner() {
+  const { kpiUpdateRequests, revertTemplateUpdate } = useP4P();
+  const [reverting, setReverting] = useState<string | null>(null);
+
+  const revertible = kpiUpdateRequests.filter(
+    (r) =>
+      r.updateTemplateApplied &&
+      !r.templateRevertedAt &&
+      r.canRevertUntil &&
+      new Date(r.canRevertUntil) > new Date()
+  );
+
+  if (revertible.length === 0) return null;
+
+  const handleRevert = async (id: string, name: string) => {
+    if (!confirm(`Revert the template update from ${name}'s approval?`)) return;
+    setReverting(id);
+    try {
+      await revertTemplateUpdate(id);
+      showToast.success("Template reverted", "The previous version is active again.");
+    } catch (err: any) {
+      showToast.error("Could not revert", err.message);
+    } finally {
+      setReverting(null);
+    }
+  };
+
+  return (
+    <Card className="p-4 bg-amber-500/5 border-amber-500/20">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+            {revertible.length} recent template update{revertible.length === 1 ? "" : "s"}
+          </div>
+          <div className="text-[11px] text-amber-800 dark:text-amber-400 mt-0.5">
+            Approve within 3 days or revert to the previous version.
+          </div>
+          <div className="mt-3 space-y-2">
+            {revertible.map((r) => {
+              const expiring = new Date(r.canRevertUntil!).getTime() - Date.now();
+              const daysLeft = Math.max(0, Math.ceil(expiring / (1000 * 60 * 60 * 24)));
+              return (
+                <div
+                  key={r.id}
+                  className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-background border border-border/60"
+                >
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium truncate">
+                      {r.department} · {r.role}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Approved by {r.assignedSupervisorName || "Supervisor"} · {daysLeft} day{daysLeft === 1 ? "" : "s"} left to revert
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleRevert(r.id, r.assignedSupervisorName || "the supervisor")}
+                    disabled={reverting === r.id}
+                    className="gap-1.5 shrink-0"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Revert
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
 }

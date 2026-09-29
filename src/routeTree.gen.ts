@@ -21,6 +21,7 @@ import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AppTraceRouteImport } from './routes/_app.trace'
 import { Route as AppSupervisorsRouteImport } from './routes/_app.supervisors'
 import { Route as AppProfileRouteImport } from './routes/_app.profile'
+import { Route as AppMyTeamRouteImport } from './routes/_app.my-team'
 import { Route as AppMyCalculationRouteImport } from './routes/_app.my-calculation'
 import { Route as AppKpiUpdatesRouteImport } from './routes/_app.kpi-updates'
 import { Route as AppKpiFrameworkRouteImport } from './routes/_app.kpi-framework'
@@ -90,6 +91,11 @@ const AppProfileRoute = AppProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMyTeamRoute = AppMyTeamRouteImport.update({
+  id: '/my-team',
+  path: '/my-team',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMyCalculationRoute = AppMyCalculationRouteImport.update({
   id: '/my-calculation',
   path: '/my-calculation',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/kpi-framework': typeof AppKpiFrameworkRoute
   '/kpi-updates': typeof AppKpiUpdatesRoute
   '/my-calculation': typeof AppMyCalculationRoute
+  '/my-team': typeof AppMyTeamRoute
   '/profile': typeof AppProfileRoute
   '/supervisors': typeof AppSupervisorsRoute
   '/trace': typeof AppTraceRoute
@@ -179,6 +186,7 @@ export interface FileRoutesByTo {
   '/kpi-framework': typeof AppKpiFrameworkRoute
   '/kpi-updates': typeof AppKpiUpdatesRoute
   '/my-calculation': typeof AppMyCalculationRoute
+  '/my-team': typeof AppMyTeamRoute
   '/profile': typeof AppProfileRoute
   '/supervisors': typeof AppSupervisorsRoute
   '/trace': typeof AppTraceRoute
@@ -204,6 +212,7 @@ export interface FileRoutesById {
   '/_app/kpi-framework': typeof AppKpiFrameworkRoute
   '/_app/kpi-updates': typeof AppKpiUpdatesRoute
   '/_app/my-calculation': typeof AppMyCalculationRoute
+  '/_app/my-team': typeof AppMyTeamRoute
   '/_app/profile': typeof AppProfileRoute
   '/_app/supervisors': typeof AppSupervisorsRoute
   '/_app/trace': typeof AppTraceRoute
@@ -228,6 +237,7 @@ export interface FileRouteTypes {
     | '/kpi-framework'
     | '/kpi-updates'
     | '/my-calculation'
+    | '/my-team'
     | '/profile'
     | '/supervisors'
     | '/trace'
@@ -250,6 +260,7 @@ export interface FileRouteTypes {
     | '/kpi-framework'
     | '/kpi-updates'
     | '/my-calculation'
+    | '/my-team'
     | '/profile'
     | '/supervisors'
     | '/trace'
@@ -274,6 +285,7 @@ export interface FileRouteTypes {
     | '/_app/kpi-framework'
     | '/_app/kpi-updates'
     | '/_app/my-calculation'
+    | '/_app/my-team'
     | '/_app/profile'
     | '/_app/supervisors'
     | '/_app/trace'
@@ -377,6 +389,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProfileRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/my-team': {
+      id: '/_app/my-team'
+      path: '/my-team'
+      fullPath: '/my-team'
+      preLoaderRoute: typeof AppMyTeamRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/my-calculation': {
       id: '/_app/my-calculation'
       path: '/my-calculation'
@@ -475,6 +494,7 @@ interface AppRouteChildren {
   AppKpiFrameworkRoute: typeof AppKpiFrameworkRoute
   AppKpiUpdatesRoute: typeof AppKpiUpdatesRoute
   AppMyCalculationRoute: typeof AppMyCalculationRoute
+  AppMyTeamRoute: typeof AppMyTeamRoute
   AppProfileRoute: typeof AppProfileRoute
   AppSupervisorsRoute: typeof AppSupervisorsRoute
   AppTraceRoute: typeof AppTraceRoute
@@ -491,6 +511,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppKpiFrameworkRoute: AppKpiFrameworkRoute,
   AppKpiUpdatesRoute: AppKpiUpdatesRoute,
   AppMyCalculationRoute: AppMyCalculationRoute,
+  AppMyTeamRoute: AppMyTeamRoute,
   AppProfileRoute: AppProfileRoute,
   AppSupervisorsRoute: AppSupervisorsRoute,
   AppTraceRoute: AppTraceRoute,

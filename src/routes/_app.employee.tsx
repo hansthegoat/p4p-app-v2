@@ -53,9 +53,9 @@ function EmployeePortal() {
   const navigate = useNavigate();
   const {
     employees, setEmployees, getMonthlyHistory, submitAppraisal, saveKPIProof,
+    submitKpiRequest, getEmployeeKpiRequest,
   } = useP4P();
 
-  // ⭐ Page tour — fires once, first visit
   usePageTour(PAGE_TOURS["/employee"]);
 
   const [loading, setLoading] = useState(true);
@@ -71,6 +71,7 @@ function EmployeePortal() {
   const [viewMode, setViewMode] = useState<"year" | "month">("month");
   const [submittingAppraisal, setSubmittingAppraisal] = useState(false);
   const [expandedKpi, setExpandedKpi] = useState<string | null>(null);
+  const [submittingKpiRequest, setSubmittingKpiRequest] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const getCurrentPeriod = () => {
@@ -208,6 +209,22 @@ function EmployeePortal() {
 
   const updateComment = (kpiId: string, value: string) =>
     setKpiComments((prev) => ({ ...prev, [kpiId]: value }));
+
+  const handleRequestKpis = async () => {
+    if (!employee) return;
+    setSubmittingKpiRequest(true);
+    try {
+      await submitKpiRequest(employee.id, undefined);
+      showToast.success(
+        "Request sent to HR",
+        "HR has been notified. Your KPIs will appear once they're assigned."
+      );
+    } catch (err: any) {
+      showToast.error("Could not send request", err.message);
+    } finally {
+      setSubmittingKpiRequest(false);
+    }
+  };
 
   const handleFileUpload = async (kpiId: string, files: FileList | null) => {
     if (!files || files.length === 0 || !employee) return;
@@ -361,6 +378,7 @@ function EmployeePortal() {
   const BandIcon = band.icon;
   const hasApprovedData = !!selectedSnapshot;
   const hasNoKpis = !employee?.categories || employee.categories.length === 0;
+  const pendingKpiRequest = employee ? getEmployeeKpiRequest(employee.id) : null;
 
   if (loading) {
     return (
@@ -395,7 +413,6 @@ function EmployeePortal() {
       variants={staggerContainer}
       className="space-y-6"
     >
-      {/* ⭐ Tour anchor: page header */}
       <div data-tour="performance-header">
         <PageHeader
           title="My KPIs"
@@ -431,18 +448,52 @@ function EmployeePortal() {
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-4">
                   <Sparkles className="h-8 w-8 text-amber-600 dark:text-amber-400" />
                 </div>
-                <h2 className="text-2xl font-bold mb-2">Your KPIs Are Being Set Up</h2>
-                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                  HR is preparing your KPI framework for{" "}
-                  <strong className="text-foreground">{employee.department}</strong> ·{" "}
-                  <strong className="text-foreground">{employee.role}</strong>.
-                  <br />
-                  Your KPIs will appear here once they're assigned — usually within 1–2 business days.
-                </p>
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted text-xs text-muted-foreground">
-                  <Clock className="h-3.5 w-3.5" />
-                  Waiting for template assignment
-                </div>
+
+                {pendingKpiRequest ? (
+                  <>
+                    <h2 className="text-2xl font-bold mb-2">Waiting for HR</h2>
+                    <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                      You requested KPIs for{" "}
+                      <strong className="text-foreground">{employee.department}</strong> ·{" "}
+                      <strong className="text-foreground">{employee.role}</strong>.
+                      <br />
+                      HR has been notified. Your KPIs will appear here once they're assigned.
+                    </p>
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/30 text-xs text-blue-700 dark:text-blue-400">
+                      <Clock className="h-3.5 w-3.5" />
+                      Request sent · awaiting HR
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-2xl font-bold mb-2">Your KPIs Are Being Set Up</h2>
+                    <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+                      HR is preparing your KPI framework for{" "}
+                      <strong className="text-foreground">{employee.department}</strong> ·{" "}
+                      <strong className="text-foreground">{employee.role}</strong>.
+                      <br />
+                      Your KPIs will appear here once they're assigned — usually within 1–2 business days.
+                    </p>
+                    <Button
+                      onClick={handleRequestKpis}
+                      disabled={submittingKpiRequest}
+                      size="lg"
+                      className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/20"
+                    >
+                      {submittingKpiRequest ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Sending request...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4" />
+                          Request KPIs from HR
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
               </div>
             </Card>
           </motion.div>
@@ -640,7 +691,6 @@ function EmployeePortal() {
             </SectionCard>
           )}
 
-          {/* ⭐ Tour anchor: KPI categories list */}
           <div data-tour="performance-categories">
             {displayCategories.length > 0 && (
               <div className="space-y-4">
@@ -711,162 +761,162 @@ function EmployeePortal() {
                           {kpiDetails.map((kpi: any) => {
                             const isUploading = uploadingFiles[kpi.id] || false;
                             const isExpanded = expandedKpi === kpi.id;
-const achColor =
-  kpi.achievement >= 100 ? "text-emerald-600 dark:text-emerald-400"
-    : kpi.achievement >= 70 ? "text-blue-600 dark:text-blue-400"
-    : kpi.achievement >= 50 ? "text-amber-600 dark:text-amber-400"
-    : "text-red-600 dark:text-red-400";
-                          return (
-                            <div key={kpi.id} className="p-5 hover:bg-accent/30 transition-colors">
-                              <div className="grid grid-cols-12 gap-3 items-start">
-                                <div className="col-span-12 sm:col-span-5 min-w-0">
-                                  <p className="text-sm font-medium text-foreground break-words whitespace-normal leading-relaxed">
-                                    {kpi.description}
-                                  </p>
-                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 text-xs text-muted-foreground">
-                                    <span className="whitespace-nowrap">
-                                      Target: <strong className="text-foreground">{fmtNum(kpi.target)} {kpi.metric}</strong>
-                                    </span>
-                                    <span className="text-border/60">·</span>
-                                    <span className="whitespace-nowrap">
-                                      Weight: <strong className="text-foreground">{kpi.weight}%</strong>
-                                    </span>
-                                    {kpi.measurementSource && (
-                                      <>
-                                        <span className="text-border/60">·</span>
-                                        <span className="break-words whitespace-normal">
-                                          Source: {kpi.measurementSource}
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="col-span-4 sm:col-span-2">
-                                  <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground block mb-1 sm:hidden">
-                                    Actual
-                                  </label>
-                                  <Input
-                                    type="number"
-                                    className="h-9 text-sm"
-                                    value={editingActuals[kpi.id] ?? 0}
-                                    onChange={(e) => updateActual(kpi.id, Number(e.target.value))}
-                                  />
-                                </div>
-
-                                <div className="col-span-4 sm:col-span-1 text-center">
-                                  <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground block mb-1 sm:hidden">
-                                    Score
-                                  </label>
-                                  <div className={`text-base font-bold ${achColor}`}>
-                                    {fmtNum(kpi.achievement, 1)}%
-                                  </div>
-                                </div>
-
-                                <div className="col-span-4 sm:col-span-2 flex items-center gap-1.5">
-                                  {kpi.proof.length > 0 && (
-                                    <Badge variant="outline" className="text-[10px] gap-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 px-1.5">
-                                      <Paperclip className="h-2.5 w-2.5" />
-                                      {kpi.proof.length}
-                                    </Badge>
-                                  )}
-                                  {kpi.comment && kpi.comment.trim().length > 0 && (
-                                    <Badge variant="outline" className="text-[10px] gap-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 px-1.5">
-                                      <MessageSquare className="h-2.5 w-2.5" />
-                                    </Badge>
-                                  )}
-                                </div>
-
-                                <div className="col-span-12 sm:col-span-2 flex items-center justify-end gap-1.5">
-                                  <input
-                                    type="file"
-                                    ref={(el) => { fileInputRefs.current[kpi.id] = el; }}
-                                    className="hidden"
-                                    multiple
-                                    onChange={(e) => handleFileUpload(kpi.id, e.target.files)}
-                                  />
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 gap-1.5 text-xs"
-                                    onClick={() => fileInputRefs.current[kpi.id]?.click()}
-                                    disabled={isUploading}
-                                  >
-                                    {isUploading ? (
-                                      <div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-                                    ) : (
-                                      <Upload className="h-3 w-3" />
-                                    )}
-                                    <span className="hidden sm:inline">Support File</span>
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-8 w-8 p-0"
-                                    onClick={() => setExpandedKpi(isExpanded ? null : kpi.id)}
-                                  >
-                                    <ChevronRight className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
-                                  </Button>
-                                </div>
-                              </div>
-
-                              <AnimatePresence>
-                                {isExpanded && (
-                                  <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: "auto" }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    transition={{ duration: 0.25 }}
-                                    className="overflow-hidden"
-                                  >
-                                    <div className="pt-4 mt-4 border-t border-border/50 space-y-3">
-                                      <div>
-                                        <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-1.5 mb-1.5">
-                                          <MessageSquare className="h-3 w-3" /> Comment
-                                        </label>
-                                        <Input
-                                          type="text"
-                                          className="h-9 text-sm"
-                                          placeholder="Add a comment for this KPI..."
-                                          value={kpiComments[kpi.id] ?? ""}
-                                          onChange={(e) => updateComment(kpi.id, e.target.value)}
-                                        />
-                                      </div>
-
-                                      {kpi.proof.length > 0 && (
-                                        <div>
-                                          <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-1.5 mb-1.5">
-                                            <Paperclip className="h-3 w-3" /> Support Files
-                                          </label>
-                                          <div className="flex flex-wrap gap-2">
-                                            {kpi.proof.map((p: any) => (
-                                              <div key={p.id} className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400 px-2.5 py-1.5 rounded-lg text-xs">
-                                                <File className="h-3 w-3 shrink-0" />
-                                                <a href={p.fileUrl} target="_blank" rel="noopener noreferrer" className="hover:underline truncate max-w-[180px]">
-                                                  {p.fileName}
-                                                </a>
-                                                <button onClick={() => removeProof(kpi.id, p.id)} className="text-red-500 hover:text-red-700 ml-0.5">
-                                                  <X className="h-3 w-3" />
-                                                </button>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
+                            const achColor =
+                              kpi.achievement >= 100 ? "text-emerald-600 dark:text-emerald-400"
+                                : kpi.achievement >= 70 ? "text-blue-600 dark:text-blue-400"
+                                : kpi.achievement >= 50 ? "text-amber-600 dark:text-amber-400"
+                                : "text-red-600 dark:text-red-400";
+                            return (
+                              <div key={kpi.id} className="p-5 hover:bg-accent/30 transition-colors">
+                                <div className="grid grid-cols-12 gap-3 items-start">
+                                  <div className="col-span-12 sm:col-span-5 min-w-0">
+                                    <p className="text-sm font-medium text-foreground break-words whitespace-normal leading-relaxed">
+                                      {kpi.description}
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 text-xs text-muted-foreground">
+                                      <span className="whitespace-nowrap">
+                                        Target: <strong className="text-foreground">{fmtNum(kpi.target)} {kpi.metric}</strong>
+                                      </span>
+                                      <span className="text-border/60">·</span>
+                                      <span className="whitespace-nowrap">
+                                        Weight: <strong className="text-foreground">{kpi.weight}%</strong>
+                                      </span>
+                                      {kpi.measurementSource && (
+                                        <>
+                                          <span className="text-border/60">·</span>
+                                          <span className="break-words whitespace-normal">
+                                            Source: {kpi.measurementSource}
+                                          </span>
+                                        </>
                                       )}
                                     </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </Card>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
+                                  </div>
+
+                                  <div className="col-span-4 sm:col-span-2">
+                                    <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground block mb-1 sm:hidden">
+                                      Actual
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      className="h-9 text-sm"
+                                      value={editingActuals[kpi.id] ?? 0}
+                                      onChange={(e) => updateActual(kpi.id, Number(e.target.value))}
+                                    />
+                                  </div>
+
+                                  <div className="col-span-4 sm:col-span-1 text-center">
+                                    <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground block mb-1 sm:hidden">
+                                      Score
+                                    </label>
+                                    <div className={`text-base font-bold ${achColor}`}>
+                                      {fmtNum(kpi.achievement, 1)}%
+                                    </div>
+                                  </div>
+
+                                  <div className="col-span-4 sm:col-span-2 flex items-center gap-1.5">
+                                    {kpi.proof.length > 0 && (
+                                      <Badge variant="outline" className="text-[10px] gap-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 px-1.5">
+                                        <Paperclip className="h-2.5 w-2.5" />
+                                        {kpi.proof.length}
+                                      </Badge>
+                                    )}
+                                    {kpi.comment && kpi.comment.trim().length > 0 && (
+                                      <Badge variant="outline" className="text-[10px] gap-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 px-1.5">
+                                        <MessageSquare className="h-2.5 w-2.5" />
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  <div className="col-span-12 sm:col-span-2 flex items-center justify-end gap-1.5">
+                                    <input
+                                      type="file"
+                                      ref={(el) => { fileInputRefs.current[kpi.id] = el; }}
+                                      className="hidden"
+                                      multiple
+                                      onChange={(e) => handleFileUpload(kpi.id, e.target.files)}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 gap-1.5 text-xs"
+                                      onClick={() => fileInputRefs.current[kpi.id]?.click()}
+                                      disabled={isUploading}
+                                    >
+                                      {isUploading ? (
+                                        <div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                                      ) : (
+                                        <Upload className="h-3 w-3" />
+                                      )}
+                                      <span className="hidden sm:inline">Support File</span>
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0"
+                                      onClick={() => setExpandedKpi(isExpanded ? null : kpi.id)}
+                                    >
+                                      <ChevronRight className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                <AnimatePresence>
+                                  {isExpanded && (
+                                    <motion.div
+                                      initial={{ opacity: 0, height: 0 }}
+                                      animate={{ opacity: 1, height: "auto" }}
+                                      exit={{ opacity: 0, height: 0 }}
+                                      transition={{ duration: 0.25 }}
+                                      className="overflow-hidden"
+                                    >
+                                      <div className="pt-4 mt-4 border-t border-border/50 space-y-3">
+                                        <div>
+                                          <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-1.5 mb-1.5">
+                                            <MessageSquare className="h-3 w-3" /> Comment
+                                          </label>
+                                          <Input
+                                            type="text"
+                                            className="h-9 text-sm"
+                                            placeholder="Add a comment for this KPI..."
+                                            value={kpiComments[kpi.id] ?? ""}
+                                            onChange={(e) => updateComment(kpi.id, e.target.value)}
+                                          />
+                                        </div>
+
+                                        {kpi.proof.length > 0 && (
+                                          <div>
+                                            <label className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-1.5 mb-1.5">
+                                              <Paperclip className="h-3 w-3" /> Support Files
+                                            </label>
+                                            <div className="flex flex-wrap gap-2">
+                                              {kpi.proof.map((p: any) => (
+                                                <div key={p.id} className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400 px-2.5 py-1.5 rounded-lg text-xs">
+                                                  <File className="h-3 w-3 shrink-0" />
+                                                  <a href={p.fileUrl} target="_blank" rel="noopener noreferrer" className="hover:underline truncate max-w-[180px]">
+                                                    {p.fileName}
+                                                  </a>
+                                                  <button onClick={() => removeProof(kpi.id, p.id)} className="text-red-500 hover:text-red-700 ml-0.5">
+                                                    <X className="h-3 w-3" />
+                                                  </button>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <motion.div variants={fadeUp}>

@@ -1,3 +1,7 @@
+// ============================================
+// CORE TYPES
+// ============================================
+
 export interface KPI {
   id: string;
   description: string;
@@ -6,7 +10,6 @@ export interface KPI {
   actual: number;
   weight: number;
   measurementSource?: string;
-  // ===== NEW FIELDS =====
   proof?: {
     id: string;
     fileName: string;
@@ -30,6 +33,7 @@ export interface Employee {
   id: string;
   name: string;
   email: string;
+  authUserId?: string;
   jobGrade: string;
   department: string;
   role: string;
@@ -43,6 +47,19 @@ export interface Employee {
   supervisorId?: string;
   supervisorName?: string;
   isManager?: boolean;
+  needsKpiSetup?: boolean;
+}
+
+/**
+ * Single source of truth for "does this employee need KPIs?"
+ * Use this everywhere instead of checking fields directly.
+ */
+export function employeeNeedsKpis(emp: {
+  categories?: unknown[];
+  needsKpiSetup?: boolean;
+}): boolean {
+  const hasCategories = (emp.categories?.length ?? 0) > 0;
+  return !hasCategories;
 }
 
 export interface GradePoint {
@@ -88,6 +105,10 @@ export interface CalcResult {
   avgBonus: number;
   warnings: string[];
 }
+
+// ============================================
+// MONTHLY / TREND
+// ============================================
 
 export interface MonthlyUpload {
   id: string;
@@ -155,6 +176,10 @@ export interface MonthlyStats {
   monthsWithData: { year: number; month: number }[];
 }
 
+// ============================================
+// TRIGGERS
+// ============================================
+
 export interface PerformanceTrigger {
   employeeId: string;
   employeeName: string;
@@ -172,20 +197,16 @@ export interface TriggerSummary {
   total: number;
 }
 
+// ============================================
+// KPI TEMPLATES
+// ============================================
+
 export interface KPIItem {
   id: string;
   description: string;
   metric: string;
   target: number;
-  maxScore?: number;
-  measurementSource?: string;
-}
-export interface KPIItem {
-  id: string;
-  description: string;
-  metric: string;
-  target: number;
-  weight?: number;      // ← NEW: weight % within category
+  weight?: number;
   maxScore?: number;
   measurementSource?: string;
 }
@@ -204,6 +225,10 @@ export interface KPITemplate {
   categories: CategoryTemplate[];
 }
 
+// ============================================
+// APPRAISALS
+// ============================================
+
 export interface AppraisalComment {
   id: string;
   authorId: string;
@@ -219,6 +244,8 @@ export interface AppraisalRequest {
   department: string;
   role: string;
   period: string;
+  year: number;
+  month: number;
   submittedAt: string;
   reviewedAt?: string;
   status: 'pending' | 'approved' | 'rejected' | 'needs_revision';
@@ -230,7 +257,6 @@ export interface AppraisalRequest {
   reviewerId?: string;
   reviewerName?: string;
   revisionReason?: string;
-  // NOTE: reviewerComment has been removed - use comments instead
 }
 
 export interface AppraisalPeriod {
@@ -241,32 +267,15 @@ export interface AppraisalPeriod {
   isActive: boolean;
   deadline: string;
 }
-export interface AppraisalRequest {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  department: string;
-  role: string;
-  period: string;          // e.g., "Q1 2025" (optional, can be derived)
-  year: number;            // NEW
-  month: number;           // NEW
-  submittedAt: string;
-  reviewedAt?: string;
-  status: 'pending' | 'approved' | 'rejected' | 'needs_revision';
-  categories: Category[];
-  overallScore: number;
-  overallPercent: number;
-  performanceBand: string;
-  comments: AppraisalComment[];
-  reviewerId?: string;
-  reviewerName?: string;
-  revisionReason?: string;
-}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
 
 export interface Notification {
   id: string;
   userId: string;
-  type: 
+  type:
     | 'appraisal_submitted'
     | 'appraisal_approved'
     | 'appraisal_rejected'
@@ -281,6 +290,10 @@ export interface Notification {
   createdAt: string;
 }
 
+// ============================================
+// UPLOADED FILES
+// ============================================
+
 export interface UploadedFile {
   id: string;
   fileName: string;
@@ -291,28 +304,27 @@ export interface UploadedFile {
   uploadedBy: string;
   kpiId: string;
 }
-export interface Employee {
+
+// ============================================
+// KPI REQUESTS (employee → HR)
+// ============================================
+
+export interface KpiRequest {
   id: string;
-  name: string;
-  email: string;
-  authUserId?: string; // ← NEW: Supabase Auth user ID
-  jobGrade: string;
+  employeeId: string;
+  employeeName: string;
+  employeeEmail: string;
   department: string;
   role: string;
-  isAdjunct: boolean;
-  isSalesRole: boolean;
-  joinDate: string;
-  monthsWorked: number;
-  kpis: KPI[];
-  categories?: Category[];
-  roleType?: 'employee' | 'hr' | 'admin';
-  supervisorId?: string;
-  supervisorName?: string;
-  isManager?: boolean;
+  comment?: string;
+  status: "pending" | "fulfilled" | "cancelled";
+  createdAt: string;
+  fulfilledAt?: string;
+  cancelledAt?: string;
 }
 
 // ============================================
-// KPI UPDATE REQUESTS (Phase 1)
+// KPI UPDATE REQUESTS
 // ============================================
 
 export type DiffKind =
@@ -335,6 +347,15 @@ export interface KpiDiffItem {
   after?: unknown;
 }
 
+export interface KpiUpdateComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorRole: "hr" | "admin" | "supervisor";
+  text: string;
+  timestamp: string;
+}
+
 export interface KpiUpdateRequest {
   id: string;
   employeeId: string;
@@ -345,20 +366,43 @@ export interface KpiUpdateRequest {
   proposedCategories: Category[];
   beforeScore: number;
   afterScore: number;
-  status: "unacknowledged" | "acknowledged";
+
+  /**
+   * Flow:
+   * - pending_supervisor_review → HR pushed, waiting for supervisor
+   * - back_to_hr               → supervisor commented, waiting for HR
+   * - unacknowledged           → approved by supervisor, employee hasn't seen
+   * - acknowledged             → employee acknowledged
+   * - cancelled                → HR or supervisor cancelled
+   */
+  status:
+    | "pending_supervisor_review"
+    | "back_to_hr"
+    | "unacknowledged"
+    | "acknowledged"
+    | "cancelled";
+
   employeeComment?: string;
   createdAt: string;
   acknowledgedAt?: string;
   commentedAt?: string;
   pushedBy?: string;
   pushedByName?: string;
-}
 
-// Also — patch the Employee type to declare the field we use everywhere
-// (It's missing from your current types.ts; TS was silently allowing it via `as any` in some places)
-declare module "./types" {
-  interface Employee {
-    needsKpiSetup?: boolean;
-    authUserId?: string;
-  }
+  // Supervisor gate
+  assignedSupervisorId?: string;
+  assignedSupervisorName?: string;
+  approvedBySupervisorAt?: string;
+  rejectedBySupervisorAt?: string;
+  supervisorComment?: string;
+
+  // Comment thread
+  comments?: KpiUpdateComment[];
+
+  // Template write-back (Stage 6)
+  templateUpdateRequested?: boolean;
+  templateUpdateApplied?: boolean;
+  previousTemplate?: CategoryTemplate[];
+  canRevertUntil?: string;
+  templateRevertedAt?: string;
 }

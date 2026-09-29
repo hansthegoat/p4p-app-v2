@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { P4PProvider, useP4P } from "@/lib/p4p/store";
+import { useP4P } from "@/lib/p4p/store";
 import { getDepartments, getRolesForDepartment } from "@/lib/p4p/kpi-templates";
 import { supabase } from "@/lib/supabase";
 import { showToast } from "@/lib/toast";
@@ -412,9 +412,5 @@ function RegisterForm() {
 
 export const Route = createFileRoute("/_auth/register")({
   validateSearch: searchSchema,
-  component: () => (
-    <P4PProvider>
-      <RegisterForm />
-    </P4PProvider>
-  ),
+  component: RegisterForm,
 });

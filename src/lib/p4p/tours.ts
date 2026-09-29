@@ -451,14 +451,26 @@ const APPRAISALS_REVIEW_TOUR: Tour = {
   ],
 };
 
+// KPI Framework tour — updated with the Missing KPIs tab
 const KPI_FRAMEWORK_TOUR: Tour = {
-  key: "page_kpi_framework",
+  key: "page_kpi_framework_v2",
   steps: [
     {
       element: '[data-tour="framework-header"]',
       popover: {
         title: "KPI Framework",
-        description: "Build weighted KPI templates for every department and role.",
+        description:
+          "Build weighted KPI templates for every department and role — or check who still needs one.",
+        side: "bottom",
+        align: "center",
+      },
+    },
+    {
+      element: '[data-tour="framework-tabs"]',
+      popover: {
+        title: "Two workspaces in one",
+        description:
+          "Build Templates is where you create and edit. Missing KPIs shows exactly who needs a template, grouped by role.",
         side: "bottom",
         align: "center",
       },
@@ -478,7 +490,7 @@ const KPI_FRAMEWORK_TOUR: Tour = {
       popover: {
         title: "Pick a department and role",
         description:
-          "Choose from the dropdowns to edit that template. Or leave empty for bulk mode.",
+          "Choose from the dropdowns to edit that template — or click 'Missing KPIs' above to find groups that need one.",
         side: "bottom",
         align: "center",
       },
@@ -613,6 +625,63 @@ const SUPERVISORS_TOUR: Tour = {
     },
   ],
 };
+
+// My Team tour — for supervisors and managers
+const MY_TEAM_TOUR: Tour = {
+  key: "page_my_team_v2",   // 👈 new key so it re-fires even if you saw the old version
+  steps: [
+    {
+      element: '[data-tour="my-team-header"]',
+      popover: {
+        title: "Your team, at a glance",
+        description:
+          "This is your supervisor workspace. See everyone you supervise, their performance, and any KPI work waiting on you.",
+        side: "bottom",
+        align: "center",
+      },
+    },
+    {
+      element: '[data-tour="my-team-stats"]',
+      popover: {
+        title: "The numbers that matter",
+        description:
+          "How many people you supervise, how many KPI changes are pending your review, and the total changes across all of them.",
+        side: "bottom",
+        align: "center",
+      },
+    },
+    {
+      element: '[data-tour="my-team-tabs"]',
+      popover: {
+        title: "Three views of your team",
+        description:
+          "Overview shows performance trends. Reviews is where you approve KPI changes. Team KPIs lets you edit anyone's KPIs directly.",
+        side: "bottom",
+        align: "center",
+      },
+    },
+    {
+      element: '[data-tour="my-team-overview"]',
+      popover: {
+        title: "Compare performance",
+        description:
+          "The chart shows every report's trend over the last 6 months. Below, each card shows their current score and MoM change. Click any card for full KPI details.",
+        side: "bottom",
+        align: "center",
+      },
+    },
+    {
+      element: '[data-tour="my-team-list"]',
+      popover: {
+        title: "KPI changes awaiting you",
+        description:
+          "When HR pushes KPI changes for your reports, they land here first. You review, comment back to HR, and approve — the employee only sees it after you sign off.",
+        side: "top",
+        align: "center",
+      },
+    },
+  ],
+};
 // 👈 NEW — Grade Points tour
 const GRADES_TOUR: Tour = {
   key: "page_grades",
@@ -659,26 +728,6 @@ const GRADES_TOUR: Tour = {
     },
   ],
 };
-
-/* ============================================================
-   REGISTRY + HELPERS
-   ============================================================ */
-
-/** Route path → page tour. Dashboard is excluded (handled in-component by role). */
-export const PAGE_TOURS: Record<string, Tour> = {
-  "/employee": MY_PERFORMANCE_TOUR,
-  "/my-calculation": MY_CALCULATION_TOUR,
-  "/profile": PROFILE_TOUR,
-  "/appraisals": APPRAISALS_TOUR,
-  "/appraisals-review": APPRAISALS_REVIEW_TOUR,
-  "/kpi-framework": KPI_FRAMEWORK_TOUR,
-  "/employees": EMPLOYEES_TOUR,
-  "/kpi-updates": KPI_UPDATES_TOUR,
-  "/supervisors": SUPERVISORS_TOUR,
-  "/grades": GRADES_TOUR,   // 👈 ADD THIS LINE
-  "/trace": TRACE_TOUR,   // 👈 ADD THIS LINE
-};
-
 // 👈 NEW — Calculation Trace tour
 const TRACE_TOUR: Tour = {
   key: "page_trace",
@@ -734,6 +783,26 @@ const TRACE_TOUR: Tour = {
       },
     },
   ],
+};
+
+/* ============================================================
+   REGISTRY + HELPERS
+   ============================================================ */
+
+/** Route path → page tour. Dashboard is excluded (handled in-component by role). */
+export const PAGE_TOURS: Record<string, Tour> = {
+  "/employee": MY_PERFORMANCE_TOUR,
+  "/my-calculation": MY_CALCULATION_TOUR,
+  "/profile": PROFILE_TOUR,
+  "/appraisals": APPRAISALS_TOUR,
+  "/appraisals-review": APPRAISALS_REVIEW_TOUR,
+  "/kpi-framework": KPI_FRAMEWORK_TOUR,
+  "/employees": EMPLOYEES_TOUR,
+  "/kpi-updates": KPI_UPDATES_TOUR,
+  "/supervisors": SUPERVISORS_TOUR,
+  "/grades": GRADES_TOUR,   // 👈 ADD THIS LINE
+  "/trace": TRACE_TOUR,   // 👈 ADD THIS LINE
+  "/my-team": MY_TEAM_TOUR,   // 👈 ADD
 };
 
 export function getWelcomeTourForRole(role: string): Tour {

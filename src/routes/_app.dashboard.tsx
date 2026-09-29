@@ -14,7 +14,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { SectionCard } from "@/components/ui/section-card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { getCurrentUser } from "@/lib/supabase";
 import { useUser } from "@/lib/p4p/user-context";
 import { staggerContainer, fadeUp, tabContent, cardHover } from "@/lib/motion";
 import { showToast } from "@/lib/toast";
@@ -25,9 +24,12 @@ import { DepartmentLeaderboard } from "@/components/p4p/DepartmentLeaderboard";
 import { NotificationBell } from "@/components/p4p/NotificationBell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { usePageTour } from "@/hooks/usePageTour";
+import { SettingUpScreen } from "@/components/p4p/SettingUpScreen";
+import { PageLoader } from "@/components/ui/page-loader";
 import {
   getWelcomeTourForRole,
   getDashboardTourForRole,
+  isTourDone,
   type Tour,
 } from "@/lib/p4p/tours";
 import {
@@ -79,74 +81,71 @@ function Dashboard() {
     globals, setGlobals, calc, employees, monthlyData,
     getAllTrends, getMonthlyStats, getMonthlyHistory,
     bonusRevealed, setBonusRevealed,
+    refreshFromCloud,
   } = useP4P();
   const { role: contextRole, user: contextUser } = useUser();
 
   const [detectedRole, setDetectedRole] = useState<string>("employee");
   const [welcomeTour, setWelcomeTour] = useState<Tour | null>(null);
   const [chainDashboardTour, setChainDashboardTour] = useState(false);
-  const [employee, setEmployee] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
-  const [authUserId, setAuthUserId] = useState<string | null>(null);
 
   // 👈 Track whether the welcome tour was queued on THIS mount.
   const welcomeShownRef = useRef(false);
 
-  // 👈 Auth user id stored in a ref so the lookup effect doesn't depend on state
-  const authUserIdRef = useRef<string | null>(null);
+  // ============================================================
+  // EMPLOYEE RESOLUTION — synchronous, no async lookup, no spinner
+  // ============================================================
+  // Derive the employee directly from the store. `contextUser` is
+  // available synchronously, and `employees` is already loaded.
+  // This runs on every render but is cheap (array find).
+  const employee = useMemo(() => {
+    if (!contextUser) return null;
+    return (
+      employees.find((e) => e.authUserId === contextUser.id) ||
+      employees.find((e) => e.email === contextUser.email) ||
+      null
+    );
+  }, [employees, contextUser]);
 
-  // 👈 Employee lookup — re-runs when `employees` changes, which happens
-  // automatically when the store rehydrates from Supabase or localStorage.
-  // No phantom `p4p.refresh()` calls.
+  // ============================================================
+  // REGISTRATION WAITING — only when we know the user but the
+  // employee record hasn't synced from cloud yet.
+  // ============================================================
+  const [waitingSince, setWaitingSince] = useState<number | null>(null);
+  const [setupTimedOut, setSetupTimedOut] = useState(false);
+
   useEffect(() => {
-    let cancelled = false;
+    if (!contextUser) return;
+    if (employee) {
+      setWaitingSince(null);
+      setSetupTimedOut(false);
+      return;
+    }
+    setWaitingSince((prev) => prev ?? Date.now());
+  }, [contextUser, employee]);
 
-    const lookup = async () => {
-      try {
-        const user = await getCurrentUser();
-        if (!user) {
-          navigate({ to: "/login" });
-          return;
-        }
-        if (cancelled) return;
+  // After 10s of waiting, flip to "took too long"
+  useEffect(() => {
+    if (waitingSince === null) return;
+    const elapsed = Date.now() - waitingSince;
+    const remaining = Math.max(0, 10000 - elapsed);
+    const timer = window.setTimeout(() => setSetupTimedOut(true), remaining);
+    return () => window.clearTimeout(timer);
+  }, [waitingSince]);
 
-        authUserIdRef.current = user.id;
-        setAuthUserId(user.id);
+  // While waiting, force a cloud refresh every 3s
+  useEffect(() => {
+    if (waitingSince === null) return;
+    const interval = window.setInterval(() => {
+      refreshFromCloud().catch(() => {});
+    }, 3000);
+    return () => window.clearInterval(interval);
+  }, [waitingSince, refreshFromCloud]);
 
-        const emp =
-          employees.find((e) => e.authUserId === user.id) ||
-          employees.find((e) => e.email === user.email) ||
-          null;
-
-        setEmployee(emp);
-
-        // 👈 Keep the loading spinner visible until we either find the
-        // employee, or give the store time to hydrate. Only stop loading
-        // once we've either matched or waited a bit.
-        if (emp) {
-          setLoading(false);
-        } else {
-          // Give the store ~1.5s to hydrate from cloud before showing
-          // "No Employee Record". If `employees` updates during this
-          // window, this effect re-runs and matches immediately.
-          const t = window.setTimeout(() => {
-            if (!cancelled) setLoading(false);
-          }, 1500);
-          return () => window.clearTimeout(t);
-        }
-      } catch {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    lookup();
-    return () => {
-      cancelled = true;
-    };
-  }, [employees, navigate]);
-
-  // Detect role
+  // ============================================================
+  // ROLE DETECTION
+  // ============================================================
   useEffect(() => {
     if (contextUser?.email === "hr@aoholdings.net") {
       setDetectedRole("hr");
@@ -164,32 +163,33 @@ function Dashboard() {
   const role = detectedRole || contextRole || "employee";
   const isAdmin = role === "admin" || role === "hr";
 
-  // ⭐ Welcome tour queue — reads the pending flag set by onboarding.
+  // ============================================================
+  // TOURS
+  // ============================================================
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const pending = localStorage.getItem("p4p_welcome_tour_pending");
-    if (pending === "true" && role) {
+    if (!role) return;
+    if (welcomeShownRef.current) return;
+
+    const employeeDone = isTourDone("employee_welcome");
+    const hrDone = isTourDone("hr_welcome");
+
+    if (!employeeDone && !hrDone) {
       welcomeShownRef.current = true;
       setWelcomeTour(getWelcomeTourForRole(role));
     }
   }, [role]);
 
-  // ⭐ Welcome tour — fires first for new users.
   usePageTour(
     welcomeTour,
     !!role,
     () => {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("p4p_welcome_tour_pending");
-      }
       setTimeout(() => {
         setChainDashboardTour(true);
       }, 1200);
     }
   );
 
-  // ⭐ Dashboard page tour — either chains after welcome, or fires directly
-  // for returning users who've already finished the welcome tour.
   const dashboardPageTour = role ? getDashboardTourForRole(role) : null;
 
   useEffect(() => {
@@ -202,6 +202,9 @@ function Dashboard() {
 
   usePageTour(dashboardPageTour, chainDashboardTour);
 
+  // ============================================================
+  // LOCAL GLOBALS (admin editable)
+  // ============================================================
   const [localGlobals, setLocalGlobals] = useState({
     totalRevenue: globals.totalRevenue,
     p4pPercent: globals.p4pPercent,
@@ -383,11 +386,29 @@ function Dashboard() {
 
   const band = getBand(currentMonthScore);
 
-  if (loading) {
+  // ============================================================
+  // RENDER GATES
+  // ============================================================
+
+  // Case 1: We don't yet know who's logged in — brief initial check.
+  // This only happens on cold page load, for a fraction of a second.
+  if (!contextUser) {
+    return <PageLoader text="Loading your dashboard…" />;
+  }
+
+  // Case 2: We know the user, but their employee record hasn't arrived.
+  // This only happens during a fresh registration while cloud sync is
+  // catching up.
+  if (!employee && !isAdmin) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+      <SettingUpScreen
+        status={setupTimedOut ? "timeout" : "loading"}
+        onRetry={() => {
+          setSetupTimedOut(false);
+          setWaitingSince(Date.now());
+          refreshFromCloud().catch(() => {});
+        }}
+      />
     );
   }
 
@@ -611,10 +632,6 @@ function Dashboard() {
   }
 
   // ============ EMPLOYEE DASHBOARD ============
-  if (!employee) {
-    return <EmptyState icon={<AlertCircle className="h-6 w-6" />} title="No Employee Record" description="Your profile is not linked to an employee record. Please contact HR." />;
-  }
-
   return (
     <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
       <KpiUpdatesBanner />
@@ -622,7 +639,7 @@ function Dashboard() {
       <div data-tour="dashboard-header">
         <PageHeader
           title="My Performance"
-          description={`${employee.name} · ${employee.department} · ${employee.role}`}
+          description={`${employee!.name} · ${employee!.department} · ${employee!.role}`}
           icon={<Award className="h-6 w-6" />}
           actions={
             <div className="flex items-center gap-3">

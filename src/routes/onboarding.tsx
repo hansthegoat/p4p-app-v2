@@ -397,7 +397,7 @@ function OnboardingPage() {
           setProgress(0);
         }
       }
-    }, 50);
+    }, 30);
 
     return () => window.clearInterval(tick);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -419,7 +419,10 @@ function OnboardingPage() {
   }
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
       className="min-h-screen w-full relative overflow-hidden flex flex-col"
       {...pauseHandlers}
     >
@@ -487,10 +490,13 @@ function OnboardingPage() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={slide.id}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -16 }}
-                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -24, scale: 0.98 }}
+                transition={{
+                  duration: 0.4,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
                 className="flex flex-col items-center"
               >
                 <div className="w-56 h-56 sm:w-72 sm:h-72 mb-8 relative">
@@ -569,6 +575,6 @@ function OnboardingPage() {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

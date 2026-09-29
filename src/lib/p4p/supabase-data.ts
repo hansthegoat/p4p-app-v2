@@ -575,6 +575,15 @@ function mapKpiUpdateFromDB(row: any): KpiUpdateRequest {
     commentedAt: row.commented_at || undefined,
     pushedBy: row.pushed_by || undefined,
     pushedByName: row.pushed_by_name || undefined,
+    // 👈 NEW
+    assignedSupervisorId: row.assigned_supervisor_id || undefined,
+    assignedSupervisorName: row.assigned_supervisor_name || undefined,
+    approvedBySupervisorAt: row.approved_by_supervisor_at || undefined,
+    rejectedBySupervisorAt: row.rejected_by_supervisor_at || undefined,
+    supervisorComment: row.supervisor_comment || undefined,
+    comments: row.comments || [],
+    templateUpdateRequested: row.template_update_requested ?? false,
+    templateUpdateApplied: row.template_update_applied ?? false,
   };
 }
 
@@ -596,6 +605,15 @@ function mapKpiUpdateToDB(req: KpiUpdateRequest): any {
     commented_at: req.commentedAt || null,
     pushed_by: req.pushedBy || null,
     pushed_by_name: req.pushedByName || null,
+    // 👈 NEW
+    assigned_supervisor_id: req.assignedSupervisorId || null,
+    assigned_supervisor_name: req.assignedSupervisorName || null,
+    approved_by_supervisor_at: req.approvedBySupervisorAt || null,
+    rejected_by_supervisor_at: req.rejectedBySupervisorAt || null,
+    supervisor_comment: req.supervisorComment || null,
+    comments: req.comments || [],
+    template_update_requested: req.templateUpdateRequested ?? false,
+    template_update_applied: req.templateUpdateApplied ?? false,
   };
 }
 
@@ -626,3 +644,4 @@ export async function upsertAppSetting(key: string, value: any): Promise<void> {
     throw error;
   }
 }
+

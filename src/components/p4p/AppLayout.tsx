@@ -1,8 +1,9 @@
-import { type ReactNode, useState, useEffect } from "react";
+import { type ReactNode, useState, useMemo } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Link, useNavigate, useLocation } from "@tanstack/react-router";
 import { useUser } from "@/lib/p4p/user-context";
 import { useP4P } from "@/lib/p4p/store";
-import { supabase, getCurrentUser } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { LogoutConfirmModal } from "@/components/p4p/LogoutConfirmModal";
 import { Logo } from "@/components/p4p/Logo";
 import { showToast } from "@/lib/toast";
@@ -12,7 +13,6 @@ import {
   Target,
   FileSpreadsheet,
   FileText,
-  TrendingUp,
   UserCheck,
   User,
   ClipboardCheck,
@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePageTour } from "@/hooks/usePageTour";
-import { getPageTourForPath, isTourDone } from "@/lib/p4p/tours";
+import { getPageTourForPath } from "@/lib/p4p/tours";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -37,6 +37,7 @@ interface NavItem {
   icon: any;
   roles: string[];
   showOnlyIfPending?: boolean;
+  showOnlyIfManager?: boolean;
   group?: "main" | "team" | "admin";
 }
 
@@ -47,13 +48,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Appraisals", to: "/appraisals", icon: ClipboardCheck, roles: ["employee", "hr", "admin"], group: "main" },
   { label: "KPI Updates", to: "/kpi-updates", icon: RefreshCw, roles: ["employee", "hr", "admin"], showOnlyIfPending: true, group: "main" },
   { label: "Review Appraisals", to: "/appraisals-review", icon: ClipboardCheck, roles: ["employee", "hr", "admin"], group: "main" },
-  { label: "My Profile", to: "/profile", icon: User, roles: ["employee", "hr", "admin"], group: "main" },   // 👈 moved to bottom
+  { label: "My Team", to: "/my-team", icon: Users, roles: ["employee", "hr", "admin"], group: "main", showOnlyIfManager: true },
+  { label: "My Profile", to: "/profile", icon: User, roles: ["employee", "hr", "admin"], group: "main" },
   { label: "Employees", to: "/employees", icon: Users, roles: ["hr", "admin"], group: "team" },
   { label: "Supervisors", to: "/supervisors", icon: UserCheck, roles: ["hr", "admin"], group: "team" },
   { label: "KPI Framework", to: "/kpi-framework", icon: FileSpreadsheet, roles: ["hr", "admin"], group: "admin" },
   { label: "Grade Points", to: "/grades", icon: Target, roles: ["hr", "admin"], group: "admin" },
-  { label: "Monthly Performance", to: "/monthly", icon: TrendingUp, roles: ["hr", "admin"], group: "admin" },
-  { label: "Audit Log", to: "/audit-log", icon: History, roles: ["hr", "admin"], group: "admin" },
   { label: "Calculation Trace", to: "/trace", icon: FileText, roles: ["hr", "admin"], group: "admin" },
 ];
 
@@ -68,75 +68,72 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { employees, kpiUpdateRequests } = useP4P();
   const navigate = useNavigate();
   const location = useLocation();
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [detectedRole, setDetectedRole] = useState<string | null>(null);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
-  const [authUserId, setAuthUserId] = useState<string | null>(null);
 
+  // ============================================================
+  // 👈 SYNCHRONOUS DERIVATIONS — no async, no lag
+  // ============================================================
+
+  // Resolve the employee record for the current user.
+  const me = useMemo(() => {
+    if (!user) return null;
+    return (
+      employees.find((e) => e.authUserId === user.id) ||
+      employees.find((e) => e.email === user.email) ||
+      null
+    );
+  }, [employees, user]);
+
+  // Resolve role: shared HR email → HR; employee record → its roleType;
+  // fallback → context role → "employee".
+  const role = useMemo(() => {
+    if (user?.email === "hr@aoholdings.net") return "hr";
+    if (me?.roleType) return me.roleType;
+    if (contextRole && ["employee", "hr", "admin"].includes(contextRole)) {
+      return contextRole;
+    }
+    return "employee";
+  }, [user, me, contextRole]);
+
+  // Pending KPI updates for the current user — drives the badge.
+  const pendingKpiUpdates = useMemo(() => {
+    if (!me) return 0;
+    return kpiUpdateRequests.filter(
+      (r) => r.employeeId === me.id && r.status === "unacknowledged"
+    ).length;
+  }, [me, kpiUpdateRequests]);
+
+  // Page tours fire based on the current route — no gate, no welcome check.
   const pageTour = getPageTourForPath(location.pathname);
-  const welcomeDone =
-    isTourDone("employee_welcome") || isTourDone("hr_welcome");
+  usePageTour(pageTour);
 
-  // 👈 Skip the dashboard page tour in AppLayout — the dashboard file
-  // handles it directly so it can chain after the welcome tour.
-  const isDashboard = location.pathname === "/dashboard";
-  usePageTour(pageTour, welcomeDone && !isDashboard);
+  // ============================================================
+  // NAV ITEM FILTERING
+  // ============================================================
 
-  useEffect(() => {
-    const detectRole = async () => {
-      try {
-        const currentUser = await getCurrentUser();
-        if (!currentUser) {
-          if (!contextRole) setDetectedRole("employee");
-          return;
-        }
-        setAuthUserId(currentUser.id);
-        if (currentUser.email === "hr@aoholdings.net") {
-          setDetectedRole("hr");
-          return;
-        }
-        if (contextRole && ["employee", "hr", "admin"].includes(contextRole)) {
-          setDetectedRole(contextRole);
-          return;
-        }
-        const emp =
-          employees.find((e) => e.email === currentUser.email) ||
-          employees.find((e) => e.authUserId === currentUser.id);
-        if (emp?.roleType) setDetectedRole(emp.roleType);
-        else setDetectedRole("employee");
-      } catch {
-        if (!contextRole) setDetectedRole("employee");
-      }
-    };
-    detectRole();
-  }, [contextRole, employees]);
+  const visibleItems = useMemo(() => {
+    return NAV_ITEMS.filter((item) => {
+      if (!item.roles.includes(role)) return false;
+      if (item.showOnlyIfPending && pendingKpiUpdates === 0) return false;
+      if (item.showOnlyIfManager && me?.isManager !== true) return false;
+      return true;
+    });
+  }, [role, pendingKpiUpdates, me?.isManager]);
 
-  const role = detectedRole || contextRole || "employee";
-
-  const me = employees.find(
-    (e) => e.authUserId === authUserId || (user?.email && e.email === user.email)
-  );
-  const pendingKpiUpdates = me
-    ? kpiUpdateRequests.filter(
-        (r) => r.employeeId === me.id && r.status === "unacknowledged"
-      ).length
-    : 0;
-
-  const visibleItems = NAV_ITEMS.filter((item) => {
-    if (!item.roles.includes(role)) return false;
-    if (item.showOnlyIfPending && pendingKpiUpdates === 0) return false;
-    return true;
-  });
-
-  const groupedItems = visibleItems.reduce<Record<string, NavItem[]>>(
-    (acc, item) => {
+  const groupedItems = useMemo(() => {
+    return visibleItems.reduce<Record<string, NavItem[]>>((acc, item) => {
       const g = item.group || "main";
       if (!acc[g]) acc[g] = [];
       acc[g].push(item);
       return acc;
-    },
-    {}
-  );
+    }, {});
+  }, [visibleItems]);
+
+  // ============================================================
+  // LOGOUT
+  // ============================================================
 
   const requestLogout = () => setLogoutModalOpen(true);
 
@@ -152,6 +149,10 @@ export function AppLayout({ children }: AppLayoutProps) {
       showToast.error("Logout Failed", err.message || "Something went wrong.");
     }
   };
+
+  // ============================================================
+  // NAV RENDERING
+  // ============================================================
 
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(path + "/");
@@ -206,10 +207,9 @@ export function AppLayout({ children }: AppLayoutProps) {
     );
   };
 
-  /** Full sidebar body — reused for desktop and mobile */
   const sidebarContent = (onItemClick?: () => void) => (
     <div className="flex h-full flex-col bg-slate-900 dark:bg-slate-950">
-      {/* 👈 Brand block — top of sidebar */}
+      {/* Brand block */}
       <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-slate-800/60 px-4">
         <Link
           to="/dashboard"
@@ -229,7 +229,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               P4P Platform
             </div>
             <div className="truncate text-[10.5px] font-medium leading-tight text-slate-500">
-              Pay for Performance 
+              Pay for Performance
             </div>
           </div>
         </Link>
@@ -247,7 +247,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         ))}
       </nav>
 
-      {/* 👈 Bottom rail — user card with logout beside email */}
+      {/* Bottom rail — user card with logout */}
       <div className="shrink-0 border-t border-slate-800/60 px-3 py-3">
         {user && (
           <div className="flex items-center gap-2.5 rounded-lg bg-slate-800/40 p-2.5">
@@ -262,7 +262,6 @@ export function AppLayout({ children }: AppLayoutProps) {
                 {role}
               </div>
             </div>
-            {/* 👈 logout pinned to the far right of the card */}
             <button
               onClick={requestLogout}
               className="shrink-0 rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-700/60 hover:text-red-400"
@@ -278,7 +277,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Mobile top bar (only visible on small screens) */}
+      {/* Mobile top bar */}
       <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-slate-900 px-4 dark:bg-slate-950 lg:hidden">
         <Button
           variant="ghost"
@@ -298,7 +297,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         </Link>
       </header>
 
-      {/* Body — sidebar is full height on desktop */}
+      {/* Body */}
       <div className="flex">
         {/* Desktop full-height sidebar */}
         <aside
@@ -321,8 +320,24 @@ export function AppLayout({ children }: AppLayoutProps) {
           </>
         )}
 
-        {/* Main content */}
-        <main className="flex-1 p-4 lg:p-8 min-w-0">{children}</main>
+        {/* Main content — with page transition */}
+        <main className="flex-1 p-4 lg:p-8 min-w-0">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{
+                duration: 0.32,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              style={{ willChange: "opacity, transform" }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        </main>
       </div>
 
       <LogoutConfirmModal

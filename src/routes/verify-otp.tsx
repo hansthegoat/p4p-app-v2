@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { showToast } from "@/lib/toast";
 import { supabase } from "@/lib/supabase";
+import { useP4P } from "@/lib/p4p/store";
 import {
   Mail, Shield, RefreshCw, ArrowLeft, CheckCircle,
   AlertCircle, Loader2, Sparkles, KeyRound,
@@ -31,6 +32,7 @@ export const Route = createFileRoute("/verify-otp")({
 function VerifyOtpPage() {
   const navigate = useNavigate();
   const search = useSearch({ from: "/verify-otp" }) as { email?: string };
+  const { upsertEmployee } = useP4P();
   const email = search.email || "";
 
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -150,7 +152,7 @@ function VerifyOtpPage() {
             (r) => r.toLowerCase() === (pending.role || "").toLowerCase()
           );
 
-          // ⭐ Write directly to Supabase with SNAKE_CASE keys
+          // Write directly to Supabase with SNAKE_CASE keys
           const dbRow = {
             id: data.user.id,
             auth_id: data.user.id,
@@ -187,8 +189,6 @@ function VerifyOtpPage() {
             needs_kpi_setup: !hasTemplate,
           };
 
-          console.log("💾 Writing employee to Supabase:", dbRow);
-
           const { error: dbError } = await supabase
             .from("employees")
             .upsert(dbRow, { onConflict: "id" });
@@ -197,7 +197,28 @@ function VerifyOtpPage() {
             console.error("❌ Failed to save employee to Supabase:", dbError);
             showToast.error("Profile sync failed", dbError.message || "Unknown error");
           } else {
-            console.log("✅ Employee saved to Supabase");
+            // 👈 Push the freshly created employee into the root store
+            // so the Dashboard sees it immediately, no refresh needed.
+            upsertEmployee({
+              id: data.user.id,
+              authUserId: data.user.id,
+              name: pending.name,
+              email: pending.email,
+              department: pending.department,
+              role: pending.role,
+              jobGrade: template?.jobGrade || "4",
+              isAdjunct: false,
+              isSalesRole: false,
+              isManager,
+              supervisorId: "",
+              supervisorName: "",
+              joinDate: new Date().toISOString().slice(0, 10),
+              monthsWorked: 12,
+              roleType: "employee",
+              categories: dbRow.categories,
+              kpis: [],
+              needsKpiSetup: !hasTemplate,
+            } as any);
           }
 
           // Mirror to localStorage cache (camelCase for in-memory use)
@@ -244,33 +265,22 @@ function VerifyOtpPage() {
         }
       }
 
+      // ─── Show "Verified!" then fade out and navigate ───
       setSuccess(true);
       showToast.success("Email Verified!", "Your account is ready.");
 
-      // 👈 Fresh signup — ALWAYS show onboarding.
-      // Also set the welcome tour flag NOW (before navigating) so the tour
-       setSuccess(true);
-      showToast.success("Email Verified!", "Your account is ready.");
-
-      // 👈 Fresh signup — ALWAYS show onboarding.
-      // Also set the welcome tour flag NOW (before navigating) so the tour
-      // fires even if the user skips onboarding.
+      // Fresh signup — always show onboarding. Set the welcome tour flag
+      // NOW so it fires even if the user skips onboarding.
       localStorage.removeItem("p4p_onboarding_done");
       localStorage.setItem("p4p_welcome_tour_pending", "true");
 
-      // 👈 1) Hold "Verified!" for 1.4s, 2) fade it out over 0.8s, 3) navigate
-      setTimeout(() => {
+      // Hold "Verified!" for 1.4s → fade out over 1.2s → navigate
+      window.setTimeout(() => {
         setFadingOut(true);
-        setTimeout(() => {
+        window.setTimeout(() => {
           navigate({ to: "/onboarding" });
-        }, 1600);
-      }, 1400);     // fires even if the user skips onboarding.
-      localStorage.removeItem("p4p_onboarding_done");
-      localStorage.setItem("p4p_welcome_tour_pending", "true");
-
-      setTimeout(() => {
-        navigate({ to: "/onboarding" });
-      }, 1100);
+        }, 1200);
+      }, 1400);
     } catch (err: any) {
       console.error("Verify error:", err);
       setError(err.message || "Invalid or expired code. Please try again.");
@@ -338,12 +348,22 @@ function VerifyOtpPage() {
       ? "bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400"
       : "bg-primary/10 border-primary/20 text-primary";
 
+  // ─── Success state (fades out) ───
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+      <motion.div
+        initial={{ opacity: 1 }}
+        animate={{ opacity: fadingOut ? 0 : 1 }}
+        transition={{
+          duration: fadingOut ? 1.2 : 0.25,
+          ease: "easeInOut",
+        }}
+        className="min-h-screen flex items-center justify-center bg-muted/30 p-4"
+      >
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           className="w-full max-w-md"
         >
           <Card className="p-8 text-center">
@@ -359,10 +379,11 @@ function VerifyOtpPage() {
             </div>
           </Card>
         </motion.div>
-      </div>
+      </motion.div>
     );
   }
 
+  // ─── OTP entry state ───
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <motion.div
