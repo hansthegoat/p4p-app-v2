@@ -22,7 +22,6 @@ import type {
   KpiDiffItem,
   KpiUpdateComment,   // 👈 ADD
   KpiRequest,
-  CategoryTemplate,
 } from "./types";
 import { newId } from "./defaults";
 import { sendEmail } from "@/lib/email";
@@ -40,6 +39,8 @@ import {
   fetchAllTemplates,
   fetchAllMonthly,
   fetchAllAppraisals,
+  fetchNotifications,
+  fetchAllKpiRequests,
   upsertEmployeeDB,
   deleteEmployeeDB,
   bulkUpsertEmployees,
@@ -49,120 +50,16 @@ import {
   upsertAppraisal,
   insertAppraisalComment,
   insertNotification,
+  insertNotifications,
   markNotificationReadDB,
   fetchAllKpiUpdateRequests,
   upsertKpiUpdateRequest,
+  upsertKpiRequest,
   fetchAppSettings,
   upsertAppSetting,
 } from "./supabase-data";
+import { DEFAULT_ORG_ID } from "./constants";
 
-const LS_KEY = "p4p_state_v1";
-const MONTHLY_KEY = "p4p_monthly_data";
-const TEMPLATES_KEY = "p4p_kpi_templates";
-const APPRAISALS_KEY = "p4p_appraisals";
-const NOTIFICATIONS_KEY = "p4p_notifications";
-const KPI_UPDATES_KEY = "p4p_kpi_update_requests";
-const SYNC_FLAG_KEY = "p4p_synced_to_supabase";
-
-// ============================================
-// LOCALSTORAGE HELPERS
-// ============================================
-
-function loadMonthlyData(): MonthlyPerformance[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(MONTHLY_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
-}
-
-function saveMonthlyData(data: MonthlyPerformance[]) {
-  if (typeof window === "undefined") return;
-  try { localStorage.setItem(MONTHLY_KEY, JSON.stringify(data)); } catch {}
-}
-
-function loadTemplates(): Record<string, KPITemplate> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(TEMPLATES_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return {};
-}
-
-function saveTemplates(templates: Record<string, KPITemplate>) {
-  if (typeof window === "undefined") return;
-  try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates)); } catch {}
-}
-
-function loadAppraisals(): AppraisalRequest[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(APPRAISALS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
-}
-
-function saveAppraisals(data: AppraisalRequest[]) {
-  if (typeof window === "undefined") return;
-  try { localStorage.setItem(APPRAISALS_KEY, JSON.stringify(data)); } catch {}
-}
-
-function loadNotifications(): Notification[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(NOTIFICATIONS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
-}
-
-function saveNotifications(data: Notification[]) {
-  if (typeof window === "undefined") return;
-  try { localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(data)); } catch {}
-}
-
-function loadKpiUpdateRequests(): KpiUpdateRequest[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(KPI_UPDATES_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
-}
-
-function saveKpiUpdateRequests(data: KpiUpdateRequest[]) {
-  if (typeof window === "undefined") return;
-  try { localStorage.setItem(KPI_UPDATES_KEY, JSON.stringify(data)); } catch {}
-}
-
-// 👈 NEW — KPI requests (localStorage only for now)
-const KPI_REQUESTS_KEY = "p4p_kpi_requests";
-
-function loadKpiRequests(): KpiRequest[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(KPI_REQUESTS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return [];
-}
-
-function saveKpiRequests(data: KpiRequest[]) {
-  if (typeof window === "undefined") return;
-  try { localStorage.setItem(KPI_REQUESTS_KEY, JSON.stringify(data)); } catch {}
-}
-
-// 👈 Merge cloud employees with local — cloud wins for shared IDs,
-// local-only records (like a just-registered user) are preserved.
-function mergeEmployees(cloud: Employee[], local: Employee[]): Employee[] {
-  const byId = new Map<string, Employee>();
-  for (const e of local) byId.set(e.id, e);
-  for (const e of cloud) byId.set(e.id, e);
-  return Array.from(byId.values());
-}
 
 // ============================================
 // STATE TYPES
@@ -276,48 +173,18 @@ const C = createContext<Ctx | null>(null);
 // ============================================
 
 function loadInitial(): State {
-  if (typeof window === "undefined") {
-    return {
-      globals: DEFAULT_GLOBALS,
-      grades: DEFAULT_GRADES,
-      employees: DEMO_EMPLOYEES,
-      monthlyData: [],
-      kpiTemplates: {},
-      appraisals: [],
-      notifications: [],
-      kpiUpdateRequests: [],
-      kpiRequests: [],   // 👈 ADD
-      bonusRevealed: false,
-    };
-  }
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return {
-        globals: { ...DEFAULT_GLOBALS, ...parsed.globals },
-        grades: parsed.grades?.length ? parsed.grades : DEFAULT_GRADES,
-        employees: Array.isArray(parsed.employees) ? parsed.employees : DEMO_EMPLOYEES,
-        monthlyData: loadMonthlyData(),
-        kpiTemplates: loadTemplates(),
-        appraisals: loadAppraisals(),
-        notifications: loadNotifications(),
-        kpiUpdateRequests: loadKpiUpdateRequests(),
-        kpiRequests: loadKpiRequests(),   // 👈 ADD
-        bonusRevealed: false,
-      };
-    }
-  } catch {}
+  // No localStorage. Cloud is the single source of truth.
+  // Fresh state until cloud fetch completes.
   return {
     globals: DEFAULT_GLOBALS,
     grades: DEFAULT_GRADES,
-    employees: DEMO_EMPLOYEES,
+    employees: [],
     monthlyData: [],
-    kpiTemplates: loadTemplates(),
-    appraisals: loadAppraisals(),
-    notifications: loadNotifications(),
-    kpiUpdateRequests: loadKpiUpdateRequests(),
-    kpiRequests: loadKpiRequests(),   // 👈 ADD
+    kpiTemplates: {},
+    appraisals: [],
+    notifications: [],
+    kpiUpdateRequests: [],
+    kpiRequests: [],
     bonusRevealed: false,
   };
 }
@@ -340,28 +207,45 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     const refetchFromCloud = async () => {
       setIsSyncing(true);
       try {
-        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudSettings] =
+        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudKpiRequests, cloudSettings] =
           await Promise.all([
             fetchAllEmployees(),
             fetchAllTemplates(),
             fetchAllMonthly(),
             fetchAllAppraisals(),
             fetchAllKpiUpdateRequests(),
+            fetchAllKpiRequests(),
             fetchAppSettings(),
           ]);
 
         if (cancelled) return;
 
+        // Notifications are per-user. Fetch only for the signed-in employee.
+        let cloudNotifications: Notification[] = [];
+        try {
+          const { getCurrentUser } = await import("@/lib/supabase");
+          const user = await getCurrentUser();
+          if (user) {
+            const me = cloudEmployees.find((e) => e.authUserId === user.id);
+            if (me) {
+              cloudNotifications = await fetchNotifications(me.id);
+            }
+          }
+        } catch {
+          // Best-effort
+        }
+
+        if (cancelled) return;
+
         setState((s) => ({
           ...s,
-          employees: cloudEmployees.length > 0
-            ? mergeEmployees(cloudEmployees, s.employees)
-            : s.employees,
-          kpiTemplates:
-            Object.keys(cloudTemplates).length > 0 ? cloudTemplates : s.kpiTemplates,
-          monthlyData: cloudMonthly.length > 0 ? cloudMonthly : s.monthlyData,
-          appraisals: cloudAppraisals.length > 0 ? cloudAppraisals : s.appraisals,
+          employees: cloudEmployees,
+          kpiTemplates: cloudTemplates,
+          monthlyData: cloudMonthly,
+          appraisals: cloudAppraisals,
+          notifications: cloudNotifications,
           kpiUpdateRequests: cloudKpiUpdates,
+          kpiRequests: cloudKpiRequests,
           bonusRevealed: cloudSettings.bonus_revealed === true,
         }));
 
@@ -388,54 +272,45 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
       setIsSyncing(true);
       try {
-        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudSettings] =
+        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudKpiRequests, cloudSettings] =
           await Promise.all([
             fetchAllEmployees(),
             fetchAllTemplates(),
             fetchAllMonthly(),
             fetchAllAppraisals(),
             fetchAllKpiUpdateRequests(),
+            fetchAllKpiRequests(),
             fetchAppSettings(),
           ]);
 
         if (cancelled) return;
 
-        const localStorageHasData =
-          state.employees.length > 0 &&
-          state.employees.some((e) => !DEMO_EMPLOYEES.find((d) => d.id === e.id));
-        const cloudHasData = cloudEmployees.length > 0;
-        const alreadySynced = localStorage.getItem(SYNC_FLAG_KEY) === "true";
-
-        if (!cloudHasData && localStorageHasData && !alreadySynced) {
-          console.log("🚀 Migrating localStorage data to Supabase...");
-          try {
-            await bulkUpsertEmployees(state.employees);
-            for (const key in state.kpiTemplates) {
-              await upsertTemplate(state.kpiTemplates[key]);
+        // Notifications are per-user.
+        let cloudNotifications: Notification[] = [];
+        try {
+          const { getCurrentUser } = await import("@/lib/supabase");
+          const user = await getCurrentUser();
+          if (user) {
+            const me = cloudEmployees.find((e) => e.authUserId === user.id);
+            if (me) {
+              cloudNotifications = await fetchNotifications(me.id);
             }
-            for (const m of state.monthlyData) {
-              await upsertMonthlyPerformance(m);
-            }
-            for (const a of state.appraisals) {
-              await upsertAppraisal(a);
-            }
-            localStorage.setItem(SYNC_FLAG_KEY, "true");
-            console.log("✅ Migration complete");
-          } catch (err) {
-            console.error("❌ Migration failed:", err);
           }
+        } catch {
+          // Best-effort
         }
+
+        if (cancelled) return;
 
         setState((s) => ({
           ...s,
-          employees: cloudHasData
-            ? mergeEmployees(cloudEmployees, s.employees)
-            : s.employees,
-          kpiTemplates:
-            Object.keys(cloudTemplates).length > 0 ? cloudTemplates : s.kpiTemplates,
-          monthlyData: cloudMonthly.length > 0 ? cloudMonthly : s.monthlyData,
-          appraisals: cloudAppraisals.length > 0 ? cloudAppraisals : s.appraisals,
+          employees: cloudEmployees,
+          kpiTemplates: cloudTemplates,
+          monthlyData: cloudMonthly,
+          appraisals: cloudAppraisals,
+          notifications: cloudNotifications,
           kpiUpdateRequests: cloudKpiUpdates,
+          kpiRequests: cloudKpiRequests,
           bonusRevealed: cloudSettings.bonus_revealed === true,
         }));
 
@@ -458,6 +333,21 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           refetchFromCloud();
         } else if (event === "SIGNED_OUT") {
           setIsCloudSynced(false);
+          setIsSyncing(false);
+          // Clear all in-memory state so the next user on this
+          // browser can't see the previous user's data.
+          setState({
+            globals: DEFAULT_GLOBALS,
+            grades: DEFAULT_GRADES,
+            employees: [],
+            monthlyData: [],
+            kpiTemplates: {},
+            appraisals: [],
+            notifications: [],
+            kpiUpdateRequests: [],
+            kpiRequests: [],
+            bonusRevealed: false,
+          });
         } else if (event === "TOKEN_REFRESHED" && session?.user) {
           refetchFromCloud();
         }
@@ -471,29 +361,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ============================================
-  // CACHE WRITES
-  // ============================================
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem(
-        LS_KEY,
-        JSON.stringify({
-          globals: state.globals,
-          grades: state.grades,
-          employees: state.employees,
-        })
-      );
-    } catch {}
-    saveMonthlyData(state.monthlyData);
-    saveTemplates(state.kpiTemplates);
-    saveAppraisals(state.appraisals);
-    saveNotifications(state.notifications);
-    saveKpiUpdateRequests(state.kpiUpdateRequests);
-    saveKpiRequests(state.kpiRequests);   // 👈 ADD
-  }, [state]);
 
   // ============================================
   // BASIC SETTERS
@@ -565,7 +432,10 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       appraisals: s.appraisals.filter((a) => a.employeeId !== id),
       notifications: s.notifications.filter((n) => n.userId !== id),
       kpiUpdateRequests: s.kpiUpdateRequests.filter((r) => r.employeeId !== id),
+      kpiRequests: s.kpiRequests.filter((r) => r.employeeId !== id),
     }));
+    // Related rows (appraisals, monthly_performance, kpi_update_requests,
+    // kpi_requests) cascade-delete automatically via FK.
     deleteEmployeeDB(id).catch((err) => console.error("Cloud hard delete failed:", err));
   }, []);
 
@@ -1030,27 +900,53 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         comments: [],
       };
 
-      const notification: Notification = {
-        id: newId(),
-        userId: "manager",
-        type: "appraisal_submitted",
-        message: `${employee.name} submitted an appraisal for ${period}`,
-        link: `/appraisals-review`,
-        read: false,
-        createdAt: new Date().toISOString(),
-      };
+      // Resolve real recipients — supervisor + HR.
+      const recipients = new Map<string, Notification>();
+      const now = new Date().toISOString();
+
+      const supervisor = employee.supervisorId
+        ? state.employees.find((e) => e.id === employee.supervisorId)
+        : null;
+      if (supervisor) {
+        recipients.set(supervisor.id, {
+          id: newId(),
+          userId: supervisor.id,
+          type: "appraisal_submitted",
+          message: `${employee.name} submitted an appraisal for ${period}`,
+          link: `/appraisals-review`,
+          read: false,
+          createdAt: now,
+        });
+      }
+
+      state.employees
+        .filter((e) => e.roleType === "hr")
+        .forEach((hr) => {
+          if (recipients.has(hr.id)) return;
+          recipients.set(hr.id, {
+            id: newId(),
+            userId: hr.id,
+            type: "appraisal_submitted",
+            message: `${employee.name} submitted an appraisal for ${period}`,
+            link: `/appraisals-review`,
+            read: false,
+            createdAt: now,
+          });
+        });
+
+      const newNotifs = Array.from(recipients.values());
 
       setState((s) => ({
         ...s,
         appraisals: [...s.appraisals, appraisal],
-        notifications: [...s.notifications, notification],
+        notifications: [...s.notifications, ...newNotifs],
       }));
 
       upsertAppraisal(appraisal).catch((err) =>
         console.error("Cloud submit appraisal failed:", err)
       );
-      insertNotification(notification).catch((err) =>
-        console.error("Cloud insert notification failed:", err)
+      insertNotifications(newNotifs).catch((err) =>
+        console.error("Cloud insert notifications failed:", err)
       );
 
       sendAppraisalNotification("submitted", appraisal);
@@ -1955,11 +1851,11 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         createdAt: now,
       };
 
-      // Notifications: HR/admin (action) + supervisor (FYI if assigned)
+      // Notifications: HR (action) + supervisor (FYI if assigned)
       const notifs: Notification[] = [];
 
       state.employees
-        .filter((e) => e.roleType === "hr" || e.roleType === "admin")
+        .filter((e) => e.roleType === "hr")
         .forEach((hr) => {
           notifs.push({
             id: newId(),
@@ -1990,8 +1886,13 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         notifications: [...s.notifications, ...notifs],
       }));
 
-      for (const n of notifs) {
-        insertNotification(n).catch((err) =>
+      // 👇 Persist to cloud — these are the two lines to add
+      upsertKpiRequest(request).catch((err) =>
+        console.error("Cloud upsert kpi_request failed:", err)
+      );
+
+      if (notifs.length > 0) {
+        insertNotifications(notifs).catch((err) =>
           console.error("KPI request notification failed:", err)
         );
       }
@@ -2024,14 +1925,20 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       if (!req || req.status !== "pending") return;
 
       const now = new Date().toISOString();
+      const updated: KpiRequest = {
+        ...req,
+        status: "cancelled",
+        cancelledAt: now,
+      };
+
       setState((s) => ({
         ...s,
-        kpiRequests: s.kpiRequests.map((r) =>
-          r.id === id
-            ? { ...r, status: "cancelled" as const, cancelledAt: now }
-            : r
-        ),
+        kpiRequests: s.kpiRequests.map((r) => (r.id === id ? updated : r)),
       }));
+
+      upsertKpiRequest(updated).catch((err) =>
+        console.error("Cloud cancel kpi_request failed:", err)
+      );
     },
     [state.kpiRequests]
   );
@@ -2042,14 +1949,20 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       if (!req || req.status !== "pending") return;
 
       const now = new Date().toISOString();
+      const updated: KpiRequest = {
+        ...req,
+        status: "fulfilled",
+        fulfilledAt: now,
+      };
+
       setState((s) => ({
         ...s,
-        kpiRequests: s.kpiRequests.map((r) =>
-          r.id === id
-            ? { ...r, status: "fulfilled" as const, fulfilledAt: now }
-            : r
-        ),
+        kpiRequests: s.kpiRequests.map((r) => (r.id === id ? updated : r)),
       }));
+
+      upsertKpiRequest(updated).catch((err) =>
+        console.error("Cloud fulfill kpi_request failed:", err)
+      );
     },
     [state.kpiRequests]
   );
@@ -2061,16 +1974,19 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   const getSupervisorPendingKpiUpdates = useCallback(
     (supervisorId: string): KpiUpdateRequest[] =>
       state.kpiUpdateRequests
-        .filter(
-          (r) =>
-            r.assignedSupervisorId === supervisorId &&
-            r.status === "pending_supervisor_review"
-        )
+        .filter((r) => {
+          if (r.status !== "pending_supervisor_review") return false;
+          // Resolve the employee's CURRENT supervisor, not the snapshot
+          // stored on the request. Prevents stale approvals after a
+          // supervisor change.
+          const emp = state.employees.find((e) => e.id === r.employeeId);
+          return emp?.supervisorId === supervisorId;
+        })
         .sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         ),
-    [state.kpiUpdateRequests]
+    [state.kpiUpdateRequests, state.employees]
   );
 
   const commentOnKpiUpdateRequest = useCallback(
@@ -2563,7 +2479,9 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       for (const r of state.kpiUpdateRequests) {
         await upsertKpiUpdateRequest(r);
       }
-      localStorage.setItem(SYNC_FLAG_KEY, "true");
+      for (const r of state.kpiUpdateRequests) {
+        await upsertKpiUpdateRequest(r);
+      }
       console.log("✅ Manual sync complete");
     } catch (err) {
       console.error("Manual sync failed:", err);
@@ -2577,27 +2495,41 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   const refreshFromCloud = useCallback(async () => {
     setIsSyncing(true);
     try {
-      const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudSettings] =
+      const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudKpiRequests, cloudSettings] =
         await Promise.all([
           fetchAllEmployees(),
           fetchAllTemplates(),
           fetchAllMonthly(),
           fetchAllAppraisals(),
           fetchAllKpiUpdateRequests(),
+          fetchAllKpiRequests(),
           fetchAppSettings(),
         ]);
 
+      // Notifications are per-user.
+      let cloudNotifications: Notification[] = [];
+      try {
+        const { getCurrentUser } = await import("@/lib/supabase");
+        const user = await getCurrentUser();
+        if (user) {
+          const me = cloudEmployees.find((e) => e.authUserId === user.id);
+          if (me) {
+            cloudNotifications = await fetchNotifications(me.id);
+          }
+        }
+      } catch {
+        // Best-effort
+      }
+
       setState((s) => ({
         ...s,
-        employees:
-          cloudEmployees.length > 0
-            ? mergeEmployees(cloudEmployees, s.employees)
-            : s.employees,
-        kpiTemplates:
-          Object.keys(cloudTemplates).length > 0 ? cloudTemplates : s.kpiTemplates,
-        monthlyData: cloudMonthly.length > 0 ? cloudMonthly : s.monthlyData,
-        appraisals: cloudAppraisals.length > 0 ? cloudAppraisals : s.appraisals,
+        employees: cloudEmployees,
+        kpiTemplates: cloudTemplates,
+        monthlyData: cloudMonthly,
+        appraisals: cloudAppraisals,
+        notifications: cloudNotifications,
         kpiUpdateRequests: cloudKpiUpdates,
+        kpiRequests: cloudKpiRequests,
         bonusRevealed: cloudSettings.bonus_revealed === true,
       }));
 

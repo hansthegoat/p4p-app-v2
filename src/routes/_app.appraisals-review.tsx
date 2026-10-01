@@ -85,13 +85,7 @@ function AppraisalsReviewPage() {
       : pending;
     setPendingAppraisals(filteredPending);
 
-      // 👈 Auto-select the most useful tab for HR with no appraisals to review
-  useEffect(() => {
-    if (!isHRorAdmin) return;
-    if (pendingAppraisals.length === 0) {
-      setActiveTab("kpi-updates");
-    }
-  }, [pendingAppraisals.length]);
+    loadAppraisals()
 
     const all: any[] = [];
     const targetEmployees = isManagerUser ? directReports : employees.map((e) => e.id);
@@ -167,6 +161,18 @@ function AppraisalsReviewPage() {
   const departments = [...new Set(allAppraisals.map((a) => a.department))];
   const statuses = ["pending", "approved", "rejected", "needs_revision"];
 
+  const isHRorAdmin =
+    currentEmployee?.roleType === "hr" ||
+    currentEmployee?.roleType === "admin";
+    
+useEffect(() => {
+  if (!isHRorAdmin) return;
+
+  if (pendingAppraisals.length === 0) {
+    setActiveTab("kpi-updates");
+  }
+}, [isHRorAdmin, pendingAppraisals.length]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -178,9 +184,6 @@ function AppraisalsReviewPage() {
     );
   }
 
-  const isHRorAdmin =
-    currentEmployee?.roleType === "hr" ||
-    currentEmployee?.roleType === "admin";
 
   // No access at all — not a manager and not HR/admin
   if (!isManager && !isHRorAdmin) {

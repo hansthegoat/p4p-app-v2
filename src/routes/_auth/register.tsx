@@ -10,6 +10,7 @@ import { useP4P } from "@/lib/p4p/store";
 import { getDepartments, getRolesForDepartment } from "@/lib/p4p/kpi-templates";
 import { supabase } from "@/lib/supabase";
 import { showToast } from "@/lib/toast";
+import { DEFAULT_ORG_ID } from "@/lib/p4p/constants";
 import { checkPassword, passwordColor } from "@/lib/p4p/password";
 import { Check, X, Eye, EyeOff } from "lucide-react";
 
@@ -192,9 +193,10 @@ function RegisterForm() {
 
       const dbRow = {
         id: newEmployee.id,
+        org_id: DEFAULT_ORG_ID,
         auth_id: authData.user.id,
         name: newEmployee.name,
-        email: newEmployee.email,
+        email: newEmployee.email.toLowerCase().trim(),
         department: newEmployee.department,
         role: newEmployee.role,
         job_grade: newEmployee.jobGrade,
@@ -206,6 +208,7 @@ function RegisterForm() {
         join_date: newEmployee.joinDate,
         months_worked: newEmployee.monthsWorked,
         role_type: newEmployee.roleType,
+        role_status: "active",
         categories: newEmployee.categories,
         kpis: newEmployee.kpis,
         needs_kpi_setup: newEmployee.needsKpiSetup,

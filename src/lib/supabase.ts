@@ -1,3 +1,4 @@
+// src/lib/supabase.ts
 import { createClient } from '@supabase/supabase-js'
 import { newId } from './p4p/defaults'
 
@@ -8,7 +9,6 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error('Missing Supabase environment variables')
 }
 
-// Regular client for normal operations (uses anon key)
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 export const getCurrentUser = async () => {
@@ -33,7 +33,7 @@ export const uploadProofFile = async (
 
     const fileExt = file.name.split('.').pop();
     const fileName = `${employeeId}/${kpiId}/${Date.now()}.${fileExt}`;
-    
+
     const { data, error } = await supabase.storage
       .from('proof-files')
       .upload(fileName, file, {
@@ -58,4 +58,3 @@ export const uploadProofFile = async (
     return null;
   }
 };
-

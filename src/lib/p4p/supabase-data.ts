@@ -1,15 +1,33 @@
 // src/lib/p4p/supabase-data.ts
 // All Supabase database operations for P4P
+// Updated for schema v2 (org_id, role_status, kpi_requests, clean FKs)
 
 import { supabase } from "@/lib/supabase";
 import { newId } from "./defaults";
+import { DEFAULT_ORG_ID } from "./constants";
 import type {
   Employee,
   MonthlyPerformance,
   AppraisalRequest,
   Notification,
   KPITemplate,
+  KpiUpdateRequest,
+  KpiRequest,
 } from "./types";
+
+// ============================================
+// CURRENT ORG RESOLUTION
+// ============================================
+
+let currentOrgId: string = DEFAULT_ORG_ID;
+
+export function setCurrentOrgId(id: string) {
+  currentOrgId = id;
+}
+
+export function getCurrentOrgId(): string {
+  return currentOrgId;
+}
 
 // ============================================
 // EMPLOYEES
@@ -19,6 +37,7 @@ export async function fetchAllEmployees(): Promise<Employee[]> {
   const { data, error } = await supabase
     .from("employees")
     .select("*")
+    .eq("org_id", currentOrgId)
     .order("name");
 
   if (error) {
@@ -35,6 +54,7 @@ export async function fetchEmployeeByAuthId(
   const { data, error } = await supabase
     .from("employees")
     .select("*")
+    .eq("org_id", currentOrgId)
     .eq("auth_id", authId)
     .maybeSingle();
 
@@ -49,10 +69,12 @@ export async function fetchEmployeeByAuthId(
 export async function fetchEmployeeByEmail(
   email: string
 ): Promise<Employee | null> {
+  const normalized = email.trim().toLowerCase();
   const { data, error } = await supabase
     .from("employees")
     .select("*")
-    .eq("email", email)
+    .eq("org_id", currentOrgId)
+    .ilike("email", normalized)
     .maybeSingle();
 
   if (error) {
@@ -63,6 +85,22 @@ export async function fetchEmployeeByEmail(
   return data ? mapEmployeeFromDB(data) : null;
 }
 
+/**
+ * Insert a new employee (registration only). Includes auth_id.
+ */
+export async function insertEmployeeDB(emp: Employee): Promise<void> {
+  const row = mapEmployeeToDB(emp, { includeAuthId: true });
+  const { error } = await supabase.from("employees").insert(row);
+
+  if (error) {
+    console.error("insertEmployee error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Upsert existing employee. Never touches auth_id.
+ */
 export async function upsertEmployeeDB(emp: Employee): Promise<void> {
   const row = mapEmployeeToDB(emp);
   const { error } = await supabase
@@ -76,7 +114,11 @@ export async function upsertEmployeeDB(emp: Employee): Promise<void> {
 }
 
 export async function deleteEmployeeDB(id: string): Promise<void> {
-  const { error } = await supabase.from("employees").delete().eq("id", id);
+  const { error } = await supabase
+    .from("employees")
+    .delete()
+    .eq("org_id", currentOrgId)
+    .eq("id", id);
 
   if (error) {
     console.error("deleteEmployee error:", error);
@@ -87,7 +129,7 @@ export async function deleteEmployeeDB(id: string): Promise<void> {
 export async function bulkUpsertEmployees(emps: Employee[]): Promise<void> {
   if (emps.length === 0) return;
 
-  const rows = emps.map(mapEmployeeToDB);
+  const rows = emps.map((e) => mapEmployeeToDB(e));
   const { error } = await supabase
     .from("employees")
     .upsert(rows, { onConflict: "id" });
@@ -103,7 +145,10 @@ export async function bulkUpsertEmployees(emps: Employee[]): Promise<void> {
 // ============================================
 
 export async function fetchAllTemplates(): Promise<Record<string, KPITemplate>> {
-  const { data, error } = await supabase.from("kpi_templates").select("*");
+  const { data, error } = await supabase
+    .from("kpi_templates")
+    .select("*")
+    .eq("org_id", currentOrgId);
 
   if (error) {
     console.error("fetchAllTemplates error:", error);
@@ -125,7 +170,7 @@ export async function fetchAllTemplates(): Promise<Record<string, KPITemplate>> 
 
 export async function upsertTemplate(template: KPITemplate): Promise<void> {
   const row = {
-    id: `${template.department}-${template.roleName}`.replace(/\s+/g, "_"),
+    org_id: currentOrgId,
     department: template.department,
     role_name: template.roleName,
     job_grade: template.jobGrade,
@@ -134,7 +179,7 @@ export async function upsertTemplate(template: KPITemplate): Promise<void> {
 
   const { error } = await supabase
     .from("kpi_templates")
-    .upsert(row, { onConflict: "department,role_name" });
+    .upsert(row, { onConflict: "org_id,department,role_name" });
 
   if (error) {
     console.error("upsertTemplate error:", error);
@@ -152,6 +197,7 @@ export async function fetchMonthlyForEmployee(
   const { data, error } = await supabase
     .from("monthly_performance")
     .select("*")
+    .eq("org_id", currentOrgId)
     .eq("employee_id", employeeId)
     .order("year")
     .order("month");
@@ -168,6 +214,7 @@ export async function fetchAllMonthly(): Promise<MonthlyPerformance[]> {
   const { data, error } = await supabase
     .from("monthly_performance")
     .select("*")
+    .eq("org_id", currentOrgId)
     .order("year")
     .order("month");
 
@@ -185,6 +232,7 @@ export async function upsertMonthlyPerformance(
   const id = `${data.employeeId}_${data.year}_${data.month}`;
   const row = {
     id,
+    org_id: currentOrgId,
     employee_id: data.employeeId,
     year: data.year,
     month: data.month,
@@ -212,6 +260,7 @@ export async function deleteMonthlyPerformance(
   const { error } = await supabase
     .from("monthly_performance")
     .delete()
+    .eq("org_id", currentOrgId)
     .eq("employee_id", employeeId)
     .eq("year", year)
     .eq("month", month);
@@ -230,6 +279,7 @@ export async function fetchAllAppraisals(): Promise<AppraisalRequest[]> {
   const { data, error } = await supabase
     .from("appraisals")
     .select("*")
+    .eq("org_id", currentOrgId)
     .order("submitted_at", { ascending: false });
 
   if (error) {
@@ -237,12 +287,36 @@ export async function fetchAllAppraisals(): Promise<AppraisalRequest[]> {
     return [];
   }
 
-  const appraisals: AppraisalRequest[] = [];
-  for (const row of data || []) {
-    const comments = await fetchCommentsForAppraisal(row.id);
-    appraisals.push(mapAppraisalFromDB(row, comments));
+  const rows = data || [];
+  const appraisalIds = rows.map((r) => r.id);
+
+  const commentsByAppraisal = new Map<string, any[]>();
+  if (appraisalIds.length > 0) {
+    const { data: comments, error: commentsError } = await supabase
+      .from("appraisal_comments")
+      .select("*")
+      .eq("org_id", currentOrgId)
+      .in("appraisal_id", appraisalIds)
+      .order("timestamp");
+
+    if (!commentsError && comments) {
+      for (const c of comments) {
+        const arr = commentsByAppraisal.get(c.appraisal_id) || [];
+        arr.push({
+          id: c.id,
+          authorId: c.author_id,
+          authorName: c.author_name,
+          text: c.text,
+          timestamp: c.timestamp,
+        });
+        commentsByAppraisal.set(c.appraisal_id, arr);
+      }
+    }
   }
-  return appraisals;
+
+  return rows.map((row) =>
+    mapAppraisalFromDB(row, commentsByAppraisal.get(row.id) || [])
+  );
 }
 
 export async function fetchAppraisalsForEmployee(
@@ -251,6 +325,7 @@ export async function fetchAppraisalsForEmployee(
   const { data, error } = await supabase
     .from("appraisals")
     .select("*")
+    .eq("org_id", currentOrgId)
     .eq("employee_id", employeeId)
     .order("submitted_at", { ascending: false });
 
@@ -259,12 +334,36 @@ export async function fetchAppraisalsForEmployee(
     return [];
   }
 
-  const appraisals: AppraisalRequest[] = [];
-  for (const row of data || []) {
-    const comments = await fetchCommentsForAppraisal(row.id);
-    appraisals.push(mapAppraisalFromDB(row, comments));
+  const rows = data || [];
+  const appraisalIds = rows.map((r) => r.id);
+
+  const commentsByAppraisal = new Map<string, any[]>();
+  if (appraisalIds.length > 0) {
+    const { data: comments, error: commentsError } = await supabase
+      .from("appraisal_comments")
+      .select("*")
+      .eq("org_id", currentOrgId)
+      .in("appraisal_id", appraisalIds)
+      .order("timestamp");
+
+    if (!commentsError && comments) {
+      for (const c of comments) {
+        const arr = commentsByAppraisal.get(c.appraisal_id) || [];
+        arr.push({
+          id: c.id,
+          authorId: c.author_id,
+          authorName: c.author_name,
+          text: c.text,
+          timestamp: c.timestamp,
+        });
+        commentsByAppraisal.set(c.appraisal_id, arr);
+      }
+    }
   }
-  return appraisals;
+
+  return rows.map((row) =>
+    mapAppraisalFromDB(row, commentsByAppraisal.get(row.id) || [])
+  );
 }
 
 export async function upsertAppraisal(
@@ -287,6 +386,7 @@ export async function fetchCommentsForAppraisal(
   const { data, error } = await supabase
     .from("appraisal_comments")
     .select("*")
+    .eq("org_id", currentOrgId)
     .eq("appraisal_id", appraisalId)
     .order("timestamp");
 
@@ -316,6 +416,7 @@ export async function insertAppraisalComment(
 ): Promise<void> {
   const { error } = await supabase.from("appraisal_comments").insert({
     id: comment.id,
+    org_id: currentOrgId,
     appraisal_id: appraisalId,
     author_id: comment.authorId,
     author_name: comment.authorName,
@@ -339,6 +440,7 @@ export async function fetchNotifications(
   const { data, error } = await supabase
     .from("notifications")
     .select("*")
+    .eq("org_id", currentOrgId)
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -361,10 +463,11 @@ export async function fetchNotifications(
 export async function insertNotification(n: Notification): Promise<void> {
   const { error } = await supabase.from("notifications").insert({
     id: n.id,
+    org_id: currentOrgId,
     user_id: n.userId,
     type: n.type,
     message: n.message,
-    link: n.link,
+    link: n.link || null,
     read: n.read || false,
     created_at: n.createdAt,
   });
@@ -375,10 +478,35 @@ export async function insertNotification(n: Notification): Promise<void> {
   }
 }
 
+export async function insertNotifications(
+  notifications: Notification[]
+): Promise<void> {
+  if (notifications.length === 0) return;
+
+  const rows = notifications.map((n) => ({
+    id: n.id,
+    org_id: currentOrgId,
+    user_id: n.userId,
+    type: n.type,
+    message: n.message,
+    link: n.link || null,
+    read: n.read || false,
+    created_at: n.createdAt,
+  }));
+
+  const { error } = await supabase.from("notifications").insert(rows);
+
+  if (error) {
+    console.error("insertNotifications error:", error);
+    throw error;
+  }
+}
+
 export async function markNotificationReadDB(id: string): Promise<void> {
   const { error } = await supabase
     .from("notifications")
     .update({ read: true })
+    .eq("org_id", currentOrgId)
     .eq("id", id);
 
   if (error) {
@@ -387,7 +515,158 @@ export async function markNotificationReadDB(id: string): Promise<void> {
 }
 
 // ============================================
-// MAPPERS (DB row ↔ TypeScript object)
+// KPI UPDATE REQUESTS
+// ============================================
+
+export async function fetchAllKpiUpdateRequests(): Promise<KpiUpdateRequest[]> {
+  const { data, error } = await supabase
+    .from("kpi_update_requests")
+    .select("*")
+    .eq("org_id", currentOrgId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("fetchAllKpiUpdateRequests error:", error);
+    return [];
+  }
+
+  return (data || []).map(mapKpiUpdateFromDB);
+}
+
+export async function fetchKpiUpdateRequestsForEmployee(
+  employeeId: string
+): Promise<KpiUpdateRequest[]> {
+  const { data, error } = await supabase
+    .from("kpi_update_requests")
+    .select("*")
+    .eq("org_id", currentOrgId)
+    .eq("employee_id", employeeId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("fetchKpiUpdateRequestsForEmployee error:", error);
+    return [];
+  }
+
+  return (data || []).map(mapKpiUpdateFromDB);
+}
+
+export async function upsertKpiUpdateRequest(
+  req: KpiUpdateRequest
+): Promise<void> {
+  const row = mapKpiUpdateToDB(req);
+  const { error } = await supabase
+    .from("kpi_update_requests")
+    .upsert(row, { onConflict: "id" });
+
+  if (error) {
+    console.error("upsertKpiUpdateRequest error:", error);
+    throw error;
+  }
+}
+
+// ============================================
+// KPI REQUESTS (employee → HR)
+// ============================================
+
+export async function fetchAllKpiRequests(): Promise<KpiRequest[]> {
+  const { data, error } = await supabase
+    .from("kpi_requests")
+    .select("*")
+    .eq("org_id", currentOrgId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("fetchAllKpiRequests error:", error);
+    return [];
+  }
+
+  return (data || []).map(mapKpiRequestFromDB);
+}
+
+export async function upsertKpiRequest(req: KpiRequest): Promise<void> {
+  const row = {
+    id: req.id,
+    org_id: currentOrgId,
+    employee_id: req.employeeId,
+    employee_name: req.employeeName,
+    employee_email: req.employeeEmail,
+    department: req.department,
+    role: req.role,
+    comment: req.comment || null,
+    status: req.status,
+    created_at: req.createdAt,
+    fulfilled_at: req.fulfilledAt || null,
+    cancelled_at: req.cancelledAt || null,
+  };
+
+  const { error } = await supabase
+    .from("kpi_requests")
+    .upsert(row, { onConflict: "id" });
+
+  if (error) {
+    console.error("upsertKpiRequest error:", error);
+    throw error;
+  }
+}
+
+function mapKpiRequestFromDB(row: any): KpiRequest {
+  return {
+    id: row.id,
+    employeeId: row.employee_id,
+    employeeName: row.employee_name,
+    employeeEmail: row.employee_email,
+    department: row.department,
+    role: row.role,
+    comment: row.comment || undefined,
+    status: row.status,
+    createdAt: row.created_at,
+    fulfilledAt: row.fulfilled_at || undefined,
+    cancelledAt: row.cancelled_at || undefined,
+  };
+}
+
+// ============================================
+// APP SETTINGS (per-org key-value)
+// ============================================
+
+export async function fetchAppSettings(): Promise<Record<string, any>> {
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("*")
+    .eq("org_id", currentOrgId);
+
+  if (error) {
+    console.error("fetchAppSettings error:", error);
+    return {};
+  }
+
+  const result: Record<string, any> = {};
+  for (const row of data || []) result[row.key] = row.value;
+  return result;
+}
+
+export async function upsertAppSetting(key: string, value: any): Promise<void> {
+  const { error } = await supabase
+    .from("app_settings")
+    .upsert(
+      {
+        org_id: currentOrgId,
+        key,
+        value,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "org_id,key" }
+    );
+
+  if (error) {
+    console.error("upsertAppSetting error:", error);
+    throw error;
+  }
+}
+
+// ============================================
+// MAPPERS
 // ============================================
 
 function mapEmployeeFromDB(row: any): Employee {
@@ -406,20 +685,22 @@ function mapEmployeeFromDB(row: any): Employee {
     supervisorName: row.supervisor_name || "",
     joinDate: row.join_date || new Date().toISOString().slice(0, 10),
     monthsWorked: row.months_worked ?? 12,
-    roleType: (row.role_type as any) || "employee",
+    roleType: normalizeRoleType(row.role_type),
     categories: row.categories || [],
     kpis: row.kpis || [],
     needsKpiSetup: row.needs_kpi_setup ?? false,
   } as Employee & { needsKpiSetup?: boolean };
 }
 
-function mapEmployeeToDB(emp: Employee): any {
-  return {
+function mapEmployeeToDB(
+  emp: Employee,
+  opts: { includeAuthId?: boolean } = {}
+): any {
+  const row: any = {
     id: emp.id,
-    // ⭐ FIXED: was hard-coded null — this is what broke cross-device login
-    auth_id: emp.authUserId || null,
+    org_id: currentOrgId,
     name: emp.name,
-    email: emp.email,
+    email: (emp.email || "").trim().toLowerCase(),
     department: emp.department,
     role: emp.role,
     job_grade: emp.jobGrade,
@@ -430,11 +711,26 @@ function mapEmployeeToDB(emp: Employee): any {
     supervisor_name: emp.supervisorName || null,
     join_date: emp.joinDate,
     months_worked: emp.monthsWorked,
-    role_type: emp.roleType || "employee",
+    role_type: normalizeRoleType(emp.roleType),
     categories: emp.categories || [],
     kpis: emp.kpis || [],
     needs_kpi_setup: (emp as any).needsKpiSetup ?? false,
   };
+
+  if (opts.includeAuthId) {
+    row.auth_id = emp.authUserId || null;
+  }
+
+  return row;
+}
+
+function normalizeRoleType(value: any): "employee" | "hr" {
+  if (value === "hr") return "hr";
+  if (value === "admin") {
+    console.warn("role_type 'admin' is deprecated — coercing to 'hr'");
+    return "hr";
+  }
+  return "employee";
 }
 
 function mapMonthlyFromDB(row: any): MonthlyPerformance {
@@ -478,6 +774,7 @@ function mapAppraisalFromDB(row: any, comments: any[]): AppraisalRequest {
 function mapAppraisalToDB(a: AppraisalRequest): any {
   return {
     id: a.id,
+    org_id: currentOrgId,
     employee_id: a.employeeId,
     employee_name: a.employeeName,
     department: a.department,
@@ -499,64 +796,6 @@ function mapAppraisalToDB(a: AppraisalRequest): any {
   };
 }
 
-// ============================================
-// HELPERS
-// ============================================
-
-export async function generateEmployeeId(): Promise<string> {
-  return newId();
-}
-// ============================================
-// KPI UPDATE REQUESTS (Phase 1)
-// ============================================
-
-import type { KpiUpdateRequest } from "./types";
-
-export async function fetchAllKpiUpdateRequests(): Promise<KpiUpdateRequest[]> {
-  const { data, error } = await supabase
-    .from("kpi_update_requests")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("fetchAllKpiUpdateRequests error:", error);
-    return [];
-  }
-
-  return (data || []).map(mapKpiUpdateFromDB);
-}
-
-export async function fetchKpiUpdateRequestsForEmployee(
-  employeeId: string
-): Promise<KpiUpdateRequest[]> {
-  const { data, error } = await supabase
-    .from("kpi_update_requests")
-    .select("*")
-    .eq("employee_id", employeeId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("fetchKpiUpdateRequestsForEmployee error:", error);
-    return [];
-  }
-
-  return (data || []).map(mapKpiUpdateFromDB);
-}
-
-export async function upsertKpiUpdateRequest(
-  req: KpiUpdateRequest
-): Promise<void> {
-  const row = mapKpiUpdateToDB(req);
-  const { error } = await supabase
-    .from("kpi_update_requests")
-    .upsert(row, { onConflict: "id" });
-
-  if (error) {
-    console.error("upsertKpiUpdateRequest error:", error);
-    throw error;
-  }
-}
-
 function mapKpiUpdateFromDB(row: any): KpiUpdateRequest {
   return {
     id: row.id,
@@ -575,7 +814,6 @@ function mapKpiUpdateFromDB(row: any): KpiUpdateRequest {
     commentedAt: row.commented_at || undefined,
     pushedBy: row.pushed_by || undefined,
     pushedByName: row.pushed_by_name || undefined,
-    // 👈 NEW
     assignedSupervisorId: row.assigned_supervisor_id || undefined,
     assignedSupervisorName: row.assigned_supervisor_name || undefined,
     approvedBySupervisorAt: row.approved_by_supervisor_at || undefined,
@@ -584,12 +822,16 @@ function mapKpiUpdateFromDB(row: any): KpiUpdateRequest {
     comments: row.comments || [],
     templateUpdateRequested: row.template_update_requested ?? false,
     templateUpdateApplied: row.template_update_applied ?? false,
+    previousTemplate: row.previous_template || undefined,
+    canRevertUntil: row.can_revert_until || undefined,
+    templateRevertedAt: row.template_reverted_at || undefined,
   };
 }
 
 function mapKpiUpdateToDB(req: KpiUpdateRequest): any {
   return {
     id: req.id,
+    org_id: currentOrgId,
     employee_id: req.employeeId,
     department: req.department,
     role: req.role,
@@ -605,7 +847,6 @@ function mapKpiUpdateToDB(req: KpiUpdateRequest): any {
     commented_at: req.commentedAt || null,
     pushed_by: req.pushedBy || null,
     pushed_by_name: req.pushedByName || null,
-    // 👈 NEW
     assigned_supervisor_id: req.assignedSupervisorId || null,
     assigned_supervisor_name: req.assignedSupervisorName || null,
     approved_by_supervisor_at: req.approvedBySupervisorAt || null,
@@ -614,34 +855,16 @@ function mapKpiUpdateToDB(req: KpiUpdateRequest): any {
     comments: req.comments || [],
     template_update_requested: req.templateUpdateRequested ?? false,
     template_update_applied: req.templateUpdateApplied ?? false,
+    previous_template: req.previousTemplate || null,
+    can_revert_until: req.canRevertUntil || null,
+    template_reverted_at: req.templateRevertedAt || null,
   };
 }
 
 // ============================================
-// APP SETTINGS (key-value)
+// HELPERS
 // ============================================
 
-export async function fetchAppSettings(): Promise<Record<string, any>> {
-  const { data, error } = await supabase.from("app_settings").select("*");
-  if (error) {
-    console.error("fetchAppSettings error:", error);
-    return {};
-  }
-  const result: Record<string, any> = {};
-  for (const row of data || []) result[row.key] = row.value;
-  return result;
+export async function generateEmployeeId(): Promise<string> {
+  return newId();
 }
-
-export async function upsertAppSetting(key: string, value: any): Promise<void> {
-  const { error } = await supabase
-    .from("app_settings")
-    .upsert(
-      { key, value, updated_at: new Date().toISOString() },
-      { onConflict: "key" }
-    );
-  if (error) {
-    console.error("upsertAppSetting error:", error);
-    throw error;
-  }
-}
-

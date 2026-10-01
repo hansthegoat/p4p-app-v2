@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { showToast } from "@/lib/toast";
 import { supabase } from "@/lib/supabase";
 import { useP4P } from "@/lib/p4p/store";
+import { insertEmployeeDB } from "@/lib/p4p/supabase-data";
+import type { Employee } from "@/lib/p4p/types";
 import {
   Mail, Shield, RefreshCw, ArrowLeft, CheckCircle,
   AlertCircle, Loader2, Sparkles, KeyRound,
@@ -32,7 +34,7 @@ export const Route = createFileRoute("/verify-otp")({
 function VerifyOtpPage() {
   const navigate = useNavigate();
   const search = useSearch({ from: "/verify-otp" }) as { email?: string };
-  const { upsertEmployee } = useP4P();
+  const { refreshFromCloud } = useP4P();
   const email = search.email || "";
 
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -147,11 +149,7 @@ function VerifyOtpPage() {
           const { getTemplateByDepartmentAndRole } = await import("@/lib/p4p/kpi-templates");
           const candidate = getTemplateByDepartmentAndRole(pending.department, pending.role);
 
-          // 👈 Detect placeholder fallback — HR hasn't built a real template yet.
-          // The fallback always has exactly one "Default Category" with one
-          // placeholder KPI. We treat it as "no template" so the new employee
-          // starts empty and can Request KPIs from HR instead of seeing a
-          // "Please configure" placeholder.
+          // Detect placeholder fallback — HR hasn't built a real template yet.
           const looksLikePlaceholder =
             candidate?.categories?.length === 1 &&
             candidate.categories[0]?.kpis?.length === 1 &&
@@ -166,23 +164,22 @@ function VerifyOtpPage() {
             (r) => r.toLowerCase() === (pending.role || "").toLowerCase()
           );
 
-          // Write directly to Supabase with SNAKE_CASE keys
-          const dbRow = {
+          const employee: Employee = {
             id: data.user.id,
-            auth_id: data.user.id,
+            authUserId: data.user.id,
             name: pending.name,
             email: pending.email,
             department: pending.department,
             role: pending.role,
-            job_grade: template?.jobGrade || "4",
-            is_adjunct: false,
-            is_sales_role: false,
-            is_manager: isManager,
-            supervisor_id: null,
-            supervisor_name: null,
-            join_date: new Date().toISOString().slice(0, 10),
-            months_worked: 12,
-            role_type: "employee",
+            jobGrade: template?.jobGrade || "4",
+            isAdjunct: false,
+            isSalesRole: false,
+            isManager,
+            supervisorId: "",
+            supervisorName: "",
+            joinDate: new Date().toISOString().slice(0, 10),
+            monthsWorked: 12,
+            roleType: "employee",
             categories: template
               ? template.categories.map((cat: any) => ({
                   id: cat.id || `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -200,82 +197,23 @@ function VerifyOtpPage() {
                 }))
               : [],
             kpis: [],
-            needs_kpi_setup: !hasTemplate,
+            needsKpiSetup: !hasTemplate,
           };
 
-          const { error: dbError } = await supabase
-            .from("employees")
-            .upsert(dbRow, { onConflict: "id" });
+          // Single cloud write — includes auth_id, org_id, role_status.
+          await insertEmployeeDB(employee);
 
-          if (dbError) {
-            console.error("❌ Failed to save employee to Supabase:", dbError);
-            showToast.error("Profile sync failed", dbError.message || "Unknown error");
-          } else {
-            // 👈 Push the freshly created employee into the root store
-            // so the Dashboard sees it immediately, no refresh needed.
-            upsertEmployee({
-              id: data.user.id,
-              authUserId: data.user.id,
-              name: pending.name,
-              email: pending.email,
-              department: pending.department,
-              role: pending.role,
-              jobGrade: template?.jobGrade || "4",
-              isAdjunct: false,
-              isSalesRole: false,
-              isManager,
-              supervisorId: "",
-              supervisorName: "",
-              joinDate: new Date().toISOString().slice(0, 10),
-              monthsWorked: 12,
-              roleType: "employee",
-              categories: dbRow.categories,
-              kpis: [],
-              needsKpiSetup: !hasTemplate,
-            } as any);
-          }
-
-          // Mirror to localStorage cache (camelCase for in-memory use)
-          try {
-            const newEmployeeCache = {
-              id: data.user.id,
-              authUserId: data.user.id,
-              name: pending.name,
-              email: pending.email,
-              department: pending.department,
-              role: pending.role,
-              jobGrade: template?.jobGrade || "4",
-              isAdjunct: false,
-              isSalesRole: false,
-              isManager,
-              supervisorId: "",
-              supervisorName: "",
-              joinDate: new Date().toISOString().slice(0, 10),
-              monthsWorked: 12,
-              roleType: "employee",
-              categories: dbRow.categories,
-              kpis: [],
-              needsKpiSetup: !hasTemplate,
-            };
-
-            const existingState = localStorage.getItem("p4p_state_v1");
-            const state = existingState ? JSON.parse(existingState) : { employees: [] };
-            if (!Array.isArray(state.employees)) state.employees = [];
-
-            const alreadyInCache = state.employees.some(
-              (e: any) => e.id === data.user.id || e.email === pending.email
-            );
-            if (!alreadyInCache) {
-              state.employees.push(newEmployeeCache);
-              localStorage.setItem("p4p_state_v1", JSON.stringify(state));
-            }
-          } catch (cacheErr) {
-            console.warn("Could not update localStorage cache:", cacheErr);
-          }
+          // Pull fresh state from cloud so the dashboard sees the new row
+          // immediately, without relying on auth event timing.
+          await refreshFromCloud();
 
           localStorage.removeItem("p4p_pending_registration");
         } catch (storageErr) {
-          console.error("Failed to save pending registration:", storageErr);
+          console.error("Failed to finalize registration:", storageErr);
+          showToast.error(
+            "Profile setup failed",
+            "Please contact HR to complete your setup."
+          );
         }
       }
 

@@ -16,14 +16,29 @@ interface Props {
 export function TeamKpisTab({ reports, onEdit }: Props) {
   const { getMonthlyHistory } = useP4P();
 
-  const rows = useMemo(() => {
-    return reports.map((rep) => {
-      const categories = rep.categories ?? [];
-      const kpiCount = categories.reduce((s, c) => s + c.kpis.length, 0);
-      const catCount = categories.length;
-      return { employee: rep, kpiCount, catCount, latest, needsSetup: employeeNeedsKpis(rep) };
-    });
-  }, [reports, getMonthlyHistory]);
+const rows = useMemo(() => {
+  return reports.map((rep) => {
+    const categories = rep.categories ?? [];
+    const kpiCount = categories.reduce((s, c) => s + c.kpis.length, 0);
+    const catCount = categories.length;
+
+    const history = getMonthlyHistory(rep.id);
+
+    const latest =
+      history.length > 0
+        ? history[history.length - 1].performanceMultiplier
+        : null;
+
+    return {
+      employee: rep,
+      kpiCount,
+      catCount,
+      latest,
+      needsSetup: employeeNeedsKpis(rep),
+    };
+  });
+}, [reports, getMonthlyHistory]);
+
 
   if (reports.length === 0) {
     return (
