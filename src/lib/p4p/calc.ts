@@ -17,7 +17,7 @@ export function performanceMultiplierFromCategories(
   floor: number, 
   cap: number
 ): number {
-  if (!categories || categories.length === 0) return 1;
+  if (!categories || categories.length === 0) return 0;
   
   let totalWeightedScore = 0;
   let totalWeight = 0;
@@ -47,14 +47,14 @@ export function performanceMultiplierFromCategories(
     totalWeight += categoryWeight / 100;
   }
   
-  if (totalWeight === 0) return 1;
+  if (totalWeight === 0) return 0;
   
   const multiplier = totalWeightedScore / totalWeight;
   return clamp(multiplier, floor, cap);
 }
 
 export function performanceMultiplier(kpis: KPI[], floor: number, cap: number): number {
-  if (!kpis || kpis.length === 0) return 1;
+  if (!kpis || kpis.length === 0) return 0;
   let sum = 0;
   let count = 0;
   for (const k of kpis) {
@@ -64,7 +64,7 @@ export function performanceMultiplier(kpis: KPI[], floor: number, cap: number): 
     sum += a / t;
     count++;
   }
-  if (count === 0) return 1;
+  if (count === 0) return 0;
   const ratio = sum / count;
   return clamp(ratio, floor, cap);
 }
@@ -144,9 +144,10 @@ export function calculate(
         ratio: k.target > 0 ? k.actual / k.target : 0,
       }));
     } else {
-      pm = 1;
-      if (!e.kpis || e.kpis.length === 0) 
-        warnings.push(`${e.name}: has no KPIs or Categories — multiplier defaults to 1.`);
+      // No KPIs = not yet measured = no bonus.
+      // Previously defaulted to 1.0 which granted a full unearned share.
+      pm = 0;
+      warnings.push(`${e.name}: no KPIs assigned — bonus set to 0 until measured.`);
     }
     
     let months = Number(e.monthsWorked);

@@ -473,3 +473,41 @@ button:not(:disabled):active,
     transform: translateY(0);
   }
 }
+
+/* Sonner live region — bulletproof sr-only */
+section[aria-label^="Notifications"],
+section[aria-label*="Notifications"],
+[data-sonner-toaster],
+[data-sonner-toaster] * {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  background: transparent !important;
+  pointer-events: none !important;
+}
+
+/* But allow actual toast items to still display */
+[data-sonner-toaster] [data-sonner-toast] {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  padding: revert !important;
+  margin: revert !important;
+  overflow: visible !important;
+  clip: auto !important;
+  clip-path: none !important;
+  white-space: normal !important;
+  border: revert !important;
+  background: revert !important;
+  pointer-events: auto !important;
+}
+

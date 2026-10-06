@@ -12,7 +12,10 @@ export function PageHeader({ title, description, icon, actions }: PageHeaderProp
     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-2">
       <div className="flex items-start gap-3 min-w-0">
         {icon && (
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-primary">
+          <div
+            aria-hidden="true"
+            className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-primary"
+          >
             {icon}
           </div>
         )}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useP4P } from "@/lib/p4p/store";
@@ -13,6 +13,7 @@ export function DepartmentLeaderboard() {
   const { employees, getPerformanceTrend } = useP4P();
   const [myDept, setMyDept] = useState<string | null>(null);
   const [myId, setMyId] = useState<string | null>(null);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     let cancelled = false;
@@ -62,7 +63,7 @@ export function DepartmentLeaderboard() {
     <motion.div variants={fadeUp}>
       <Card className="p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Trophy className="h-4 w-4 text-amber-500" />
+          <Trophy className="h-4 w-4 text-amber-500" aria-hidden="true" />
           <h3 className="text-sm font-semibold">Department Leaderboard</h3>
           <Badge variant="outline" className="text-[10px] h-5 ml-auto">
             {myDept}
@@ -74,7 +75,11 @@ export function DepartmentLeaderboard() {
             No performance data yet. Rankings appear once appraisals are submitted.
           </p>
         ) : (
-          <motion.div variants={staggerContainer} className="space-y-1.5">
+          <motion.ol
+            variants={staggerContainer}
+            className="space-y-1.5 list-none p-0 m-0"
+            aria-label={`Leaderboard for ${myDept}`}
+          >
             {ranked.map((entry, idx) => {
               const isMe = entry.id === myId;
               const rankColor =
@@ -100,8 +105,17 @@ export function DepartmentLeaderboard() {
                   ? "text-red-600"
                   : "text-muted-foreground";
 
+              const trendLabel =
+                entry.trend === "improving"
+                  ? "improving"
+                  : entry.trend === "declining"
+                  ? "declining"
+                  : "stable";
+
+              const rankLabel = idx === 0 ? "Rank 1" : `Rank ${idx + 1}`;
+
               return (
-                <motion.div
+                <motion.li
                   key={entry.id}
                   variants={fadeUp}
                   className={`flex items-center gap-3 p-2.5 rounded-lg transition-colors ${
@@ -111,6 +125,7 @@ export function DepartmentLeaderboard() {
                   }`}
                 >
                   <div
+                    aria-hidden="true"
                     className={`w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold shrink-0 ${rankColor}`}
                   >
                     {idx === 0 ? <Crown className="h-3.5 w-3.5" /> : idx + 1}
@@ -118,6 +133,7 @@ export function DepartmentLeaderboard() {
 
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium truncate flex items-center gap-2">
+                      <span className="sr-only">{rankLabel}: </span>
                       {entry.name}
                       {isMe && (
                         <span className="text-[9px] uppercase tracking-wider font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
@@ -130,15 +146,19 @@ export function DepartmentLeaderboard() {
                     </div>
                   </div>
 
-                  <TrendIcon className={`h-3.5 w-3.5 shrink-0 ${trendColor}`} />
+                  <TrendIcon
+                    className={`h-3.5 w-3.5 shrink-0 ${trendColor}`}
+                    aria-hidden="true"
+                  />
+                  <span className="sr-only">{trendLabel}</span>
 
                   <div className="text-[13px] font-bold tabular-nums shrink-0 w-12 text-right">
                     {entry.score.toFixed(2)}
                   </div>
-                </motion.div>
+                </motion.li>
               );
             })}
-          </motion.div>
+          </motion.ol>
         )}
       </Card>
     </motion.div>

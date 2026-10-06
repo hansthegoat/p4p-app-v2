@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { AnimatedNumber } from "@/components/p4p/AnimatedNumber";
@@ -10,6 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { SectionCard } from "@/components/ui/section-card";
@@ -35,7 +42,7 @@ import {
 import {
   TrendingUp, Wallet, Users, UserCheck, DollarSign,
   Sparkles, Target, Calendar, Award, AlertTriangle,
-  Settings, Save, RefreshCw, Activity, PieChart,
+  Settings, Save, RefreshCw, Activity, PieChart as PieChartIcon,
   BarChart3, CheckCircle, Clock, Star, Zap, Info, AlertCircle, Eye, EyeOff,
 } from "lucide-react";
 import {
@@ -48,24 +55,52 @@ export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
 });
 
-const COLORS = {
-  primary: "hsl(221 70% 50%)",
-  success: "hsl(152 55% 42%)",
-  warning: "hsl(38 75% 52%)",
-  danger: "hsl(0 65% 55%)",
-  purple: "hsl(270 70% 55%)",
-  cyan: "hsl(189 70% 42%)",
-  pink: "hsl(330 70% 55%)",
-};
+// Static Color Map Definitions to prevent Tailwind Purge failures
+const COLOR_THEMES = {
+  emerald: {
+    border: "border-l-emerald-500",
+    text: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-500",
+    subtleBg: "bg-emerald-500/10",
+  },
+  blue: {
+    border: "border-l-blue-500",
+    text: "text-blue-600 dark:text-blue-400",
+    bg: "bg-blue-500",
+    subtleBg: "bg-blue-500/10",
+  },
+  amber: {
+    border: "border-l-amber-500",
+    text: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-500",
+    subtleBg: "bg-amber-500/10",
+  },
+  red: {
+    border: "border-l-red-500",
+    text: "text-red-600 dark:text-red-400",
+    bg: "bg-red-500",
+    subtleBg: "bg-red-500/10",
+  },
+  purple: {
+    border: "border-l-purple-500",
+    text: "text-purple-600 dark:text-purple-400",
+    bg: "bg-purple-500",
+    subtleBg: "bg-purple-500/10",
+  },
+} as const;
+
+type ThemeKey = keyof typeof COLOR_THEMES;
 
 const CHART_COLORS = [
-  COLORS.success,
-  COLORS.primary,
-  COLORS.warning,
-  COLORS.danger,
+  "hsl(152 55% 42%)",
+  "hsl(221 70% 50%)",
+  "hsl(38 75% 52%)",
+  "hsl(0 65% 55%)",
 ];
 
-const tooltipStyle = {
+const CHART_PRIMARY_COLOR = "hsl(221 70% 50%)";
+
+const TOOLTIP_STYLE = {
   borderRadius: 12,
   border: "1px solid hsl(var(--border))",
   background: "hsl(var(--popover))",
@@ -75,30 +110,35 @@ const tooltipStyle = {
   padding: "8px 12px",
 };
 
+// Helper: Calculate Performance Band
+function getBand(score: number) {
+  if (score >= 120) return { label: "Exceptional", color: COLOR_THEMES.purple.text, icon: Star };
+  if (score >= 100) return { label: "Exceeds Expectations", color: COLOR_THEMES.emerald.text, icon: TrendingUp };
+  if (score >= 80) return { label: "Meets Expectations", color: COLOR_THEMES.blue.text, icon: Target };
+  if (score >= 60) return { label: "Needs Improvement", color: COLOR_THEMES.amber.text, icon: Clock };
+  return { label: "Performance Improvement Plan", color: COLOR_THEMES.red.text, icon: AlertCircle };
+}
+
 function Dashboard() {
-  const navigate = useNavigate();
   const {
     globals, setGlobals, calc, employees, monthlyData,
     getAllTrends, getMonthlyStats, getMonthlyHistory,
     bonusRevealed, setBonusRevealed,
     refreshFromCloud,
+    submitKpiRequest, getEmployeeKpiRequest,
   } = useP4P();
+
   const { role: contextRole, user: contextUser } = useUser();
 
   const [detectedRole, setDetectedRole] = useState<string>("employee");
   const [welcomeTour, setWelcomeTour] = useState<Tour | null>(null);
   const [chainDashboardTour, setChainDashboardTour] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [trendMonths, setTrendMonths] = useState<string>("12");
 
-  // 👈 Track whether the welcome tour was queued on THIS mount.
   const welcomeShownRef = useRef(false);
 
-  // ============================================================
-  // EMPLOYEE RESOLUTION — synchronous, no async lookup, no spinner
-  // ============================================================
-  // Derive the employee directly from the store. `contextUser` is
-  // available synchronously, and `employees` is already loaded.
-  // This runs on every render but is cheap (array find).
+  // Synchronous Employee Resolution
   const employee = useMemo(() => {
     if (!contextUser) return null;
     return (
@@ -108,10 +148,7 @@ function Dashboard() {
     );
   }, [employees, contextUser]);
 
-  // ============================================================
-  // REGISTRATION WAITING — only when we know the user but the
-  // employee record hasn't synced from cloud yet.
-  // ============================================================
+  // Cloud Sync / Timeout Management
   const [waitingSince, setWaitingSince] = useState<number | null>(null);
   const [setupTimedOut, setSetupTimedOut] = useState(false);
 
@@ -125,7 +162,6 @@ function Dashboard() {
     setWaitingSince((prev) => prev ?? Date.now());
   }, [contextUser, employee]);
 
-  // After 10s of waiting, flip to "took too long"
   useEffect(() => {
     if (waitingSince === null) return;
     const elapsed = Date.now() - waitingSince;
@@ -134,7 +170,6 @@ function Dashboard() {
     return () => window.clearTimeout(timer);
   }, [waitingSince]);
 
-  // While waiting, force a cloud refresh every 3s
   useEffect(() => {
     if (waitingSince === null) return;
     const interval = window.setInterval(() => {
@@ -143,9 +178,7 @@ function Dashboard() {
     return () => window.clearInterval(interval);
   }, [waitingSince, refreshFromCloud]);
 
-  // ============================================================
-  // ROLE DETECTION
-  // ============================================================
+  // Role Detection
   useEffect(() => {
     if (contextUser?.email === "hr@aoholdings.net") {
       setDetectedRole("hr");
@@ -163,13 +196,9 @@ function Dashboard() {
   const role = detectedRole || contextRole || "employee";
   const isAdmin = role === "admin" || role === "hr";
 
-  // ============================================================
-  // TOURS
-  // ============================================================
+  // Guided Tours Logic
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!role) return;
-    if (welcomeShownRef.current) return;
+    if (typeof window === "undefined" || !role || welcomeShownRef.current) return;
 
     const employeeDone = isTourDone("employee_welcome");
     const hrDone = isTourDone("hr_welcome");
@@ -180,21 +209,14 @@ function Dashboard() {
     }
   }, [role]);
 
-  usePageTour(
-    welcomeTour,
-    !!role,
-    () => {
-      setTimeout(() => {
-        setChainDashboardTour(true);
-      }, 1200);
-    }
-  );
+  usePageTour(welcomeTour, !!role, () => {
+    setTimeout(() => setChainDashboardTour(true), 1200);
+  });
 
   const dashboardPageTour = role ? getDashboardTourForRole(role) : null;
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!role) return;
+    if (typeof window === "undefined" || !role) return;
     if (!welcomeShownRef.current) {
       setChainDashboardTour(true);
     }
@@ -202,9 +224,7 @@ function Dashboard() {
 
   usePageTour(dashboardPageTour, chainDashboardTour);
 
-  // ============================================================
-  // LOCAL GLOBALS (admin editable)
-  // ============================================================
+  // Local Admin Globals Form State
   const [localGlobals, setLocalGlobals] = useState({
     totalRevenue: globals.totalRevenue,
     p4pPercent: globals.p4pPercent,
@@ -219,7 +239,7 @@ function Dashboard() {
   const trends = getAllTrends();
   const stats = getMonthlyStats();
 
-  // ============ ADMIN: Monthly trend ============
+  // Admin: Monthly trend aggregator
   const monthlyTrendData = useMemo(() => {
     const months = monthlyData
       .filter((d) => !employees.find((e) => e.id === d.employeeId)?.isAdjunct)
@@ -232,11 +252,13 @@ function Dashboard() {
       grouped[key].total += d.performanceMultiplier;
       grouped[key].count++;
     }
-    return Object.values(grouped).map((g) => ({
+    const all = Object.values(grouped).map((g) => ({
       month: g.month,
       avgMultiplier: g.total / g.count,
     }));
-  }, [monthlyData, employees]);
+    const limit = trendMonths === "all" ? 9999 : Number(trendMonths);
+    return all.slice(-limit);
+  }, [monthlyData, employees, trendMonths]);
 
   const handleSaveGlobals = () => {
     setSaving(true);
@@ -246,7 +268,7 @@ function Dashboard() {
 
   const disabled = globals.totalRevenue <= 0;
 
-  // ============ EMPLOYEE DATA ============
+  // Employee Dataset Calculations
   const employeeHistory = useMemo(() => {
     if (!employee) return [];
     return getMonthlyHistory(employee.id);
@@ -330,14 +352,15 @@ function Dashboard() {
 
   const timelineData = useMemo(() => {
     if (employeeHistory.length === 0) return [];
+    const limit = trendMonths === "all" ? 9999 : Number(trendMonths);
     return [...employeeHistory]
       .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month))
-      .slice(-12)
+      .slice(-limit)
       .map((d) => ({
         month: `${new Date(d.year, d.month - 1, 1).toLocaleString("default", { month: "short" })} ${d.year}`,
         score: d.performanceMultiplier * 100,
       }));
-  }, [employeeHistory]);
+  }, [employeeHistory, trendMonths]);
 
   const kpiAchievementData = useMemo(() => {
     if (!employee?.categories) return [];
@@ -372,33 +395,38 @@ function Dashboard() {
       else statuses.Missed++;
     }
     return Object.entries(statuses)
-      .filter(([_, v]) => v > 0)
+      .filter(([, v]) => v > 0)
       .map(([name, value]) => ({ name, value }));
   }, [kpiAchievementData]);
 
-  const getBand = (score: number) => {
-    if (score >= 120) return { label: "Exceptional", color: "text-purple-600 dark:text-purple-400", icon: Star };
-    if (score >= 100) return { label: "Exceeds Expectations", color: "text-emerald-600 dark:text-emerald-400", icon: TrendingUp };
-    if (score >= 80) return { label: "Meets Expectations", color: "text-blue-600 dark:text-blue-400", icon: Target };
-    if (score >= 60) return { label: "Needs Improvement", color: "text-amber-600 dark:text-amber-400", icon: Clock };
-    return { label: "Performance Improvement Plan", color: "text-red-600 dark:text-red-400", icon: AlertCircle };
-  };
-
   const band = getBand(currentMonthScore);
 
-  // ============================================================
-  // RENDER GATES
-  // ============================================================
+  // KPI Request Logic
+  const hasNoKpis = !!employee && (employee.categories?.length ?? 0) === 0;
+  const pendingKpiRequest = employee ? getEmployeeKpiRequest(employee.id) : null;
+  const [requestingKpis, setRequestingKpis] = useState(false);
 
-  // Case 1: We don't yet know who's logged in — brief initial check.
-  // This only happens on cold page load, for a fraction of a second.
+  const handleRequestKpis = async () => {
+    if (!employee) return;
+    setRequestingKpis(true);
+    try {
+      await submitKpiRequest(employee.id);
+      showToast.success(
+        "Request sent",
+        "HR will be notified and assign your KPIs shortly."
+      );
+    } catch (err: any) {
+      showToast.error("Could not send request", err.message || "Try again");
+    } finally {
+      setRequestingKpis(false);
+    }
+  };
+
+  // Guard Screen States
   if (!contextUser) {
     return <PageLoader text="Loading your dashboard…" />;
   }
 
-  // Case 2: We know the user, but their employee record hasn't arrived.
-  // This only happens during a fresh registration while cloud sync is
-  // catching up.
   if (!employee && !isAdmin) {
     return (
       <SettingUpScreen
@@ -412,7 +440,7 @@ function Dashboard() {
     );
   }
 
-  // ============ ADMIN DASHBOARD ============
+  // ==================== ADMIN VIEW ====================
   if (isAdmin) {
     return (
       <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
@@ -443,9 +471,7 @@ function Dashboard() {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3 min-w-0">
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                bonusRevealed
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                bonusRevealed ? COLOR_THEMES.emerald.subtleBg + " " + COLOR_THEMES.emerald.text : COLOR_THEMES.amber.subtleBg + " " + COLOR_THEMES.amber.text
               }`}>
                 {bonusRevealed ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
               </div>
@@ -532,17 +558,40 @@ function Dashboard() {
 
         <div className="grid lg:grid-cols-3 gap-4" data-tour="dashboard-trend">
           <div className="lg:col-span-2">
-            <SectionCard title="Monthly Performance Trend" description={`${monthlyTrendData.length} months tracked`} icon={<Activity className="h-4 w-4" />} noPadding>
+            <SectionCard
+              title="Monthly Performance Trend"
+              description={`${monthlyTrendData.length} month${monthlyTrendData.length === 1 ? "" : "s"} shown`}
+              icon={<Activity className="h-4 w-4" />}
+              action={
+                <Select value={trendMonths} onValueChange={setTrendMonths}>
+                  <SelectTrigger className="h-8 w-[130px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3">Last 3 months</SelectItem>
+                    <SelectItem value="6">Last 6 months</SelectItem>
+                    <SelectItem value="12">Last 12 months</SelectItem>
+                    <SelectItem value="all">All time</SelectItem>
+                  </SelectContent>
+                </Select>
+              }
+              noPadding
+            >
               <div className="p-4 h-72">
                 {monthlyTrendData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={monthlyTrendData}>
-                      <defs><linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COLORS.primary} stopOpacity={0.35} /><stop offset="100%" stopColor={COLORS.primary} stopOpacity={0.02} /></linearGradient></defs>
+                      <defs>
+                        <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={CHART_PRIMARY_COLOR} stopOpacity={0.35} />
+                          <stop offset="100%" stopColor={CHART_PRIMARY_COLOR} stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid strokeDasharray="3 3" opacity={0.1} vertical={false} />
                       <XAxis dataKey="month" fontSize={11} axisLine={false} tickLine={false} />
                       <YAxis domain={[0, 2]} fontSize={11} axisLine={false} tickLine={false} width={30} />
-                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [fmtNum(v, 2), "Avg Multiplier"]} />
-                      <Area type="monotone" dataKey="avgMultiplier" stroke={COLORS.primary} strokeWidth={2.5} fill="url(#trendFill)" dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 6 }} />
+                      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [fmtNum(v, 2), "Avg Multiplier"]} />
+                      <Area type="monotone" dataKey="avgMultiplier" stroke={CHART_PRIMARY_COLOR} strokeWidth={2.5} fill="url(#trendFill)" dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 6 }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
@@ -584,7 +633,7 @@ function Dashboard() {
               <SectionCard title="Rising Stars" icon={<Award className="h-4 w-4 text-emerald-600" />} action={<Badge variant="outline" className="text-emerald-600 border-emerald-500/30">{stats.risingStars.length}</Badge>}>
                 <div className="flex flex-wrap gap-2">
                   {stats.risingStars.slice(0, 8).map((name, i) => (
-                    <motion.div key={i} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}>
+                    <motion.div key={name} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}>
                       <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20">{name}</Badge>
                     </motion.div>
                   ))}
@@ -595,7 +644,7 @@ function Dashboard() {
               <SectionCard title="Underachievers" icon={<AlertTriangle className="h-4 w-4 text-red-600" />} action={<Badge variant="outline" className="text-red-600 border-red-500/30">{stats.underachievers.length}</Badge>}>
                 <div className="flex flex-wrap gap-2">
                   {stats.underachievers.slice(0, 8).map((name, i) => (
-                    <motion.div key={i} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}>
+                    <motion.div key={name} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}>
                       <Badge variant="secondary" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20">{name}</Badge>
                     </motion.div>
                   ))}
@@ -631,10 +680,68 @@ function Dashboard() {
     );
   }
 
-  // ============ EMPLOYEE DASHBOARD ============
+  // ==================== EMPLOYEE VIEW ====================
   return (
     <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
       <KpiUpdatesBanner />
+
+      {hasNoKpis && (
+        <Card
+          className={`p-4 border ${
+            pendingKpiRequest
+              ? "bg-blue-500/5 border-blue-500/30"
+              : "bg-amber-500/5 border-amber-500/30"
+          }`}
+        >
+          <div className="flex items-start gap-3 flex-wrap">
+            <div
+              className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                pendingKpiRequest
+                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              }`}
+            >
+              {pendingKpiRequest ? (
+                <Clock className="h-4 w-4" />
+              ) : (
+                <AlertCircle className="h-4 w-4" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold">
+                {pendingKpiRequest
+                  ? "KPI request pending"
+                  : "Your KPIs haven't been assigned yet"}
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {pendingKpiRequest
+                  ? `Request sent ${new Date(pendingKpiRequest.createdAt).toLocaleDateString()}. HR will assign them shortly.`
+                  : "You can't be measured or earn bonus until HR assigns your KPIs. Send a request to let them know."}
+              </div>
+            </div>
+            {!pendingKpiRequest && (
+              <Button
+                size="sm"
+                onClick={handleRequestKpis}
+                disabled={requestingKpis}
+                className="gap-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white shrink-0"
+              >
+                {requestingKpis ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    Sending…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Request KPIs from HR
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
 
       <div data-tour="dashboard-header">
         <PageHeader
@@ -675,7 +782,7 @@ function Dashboard() {
         <Tabs defaultValue="overview" onValueChange={setActiveTab}>
           <TabsList className="grid w-full max-w-md grid-cols-3">
             <TabsTrigger value="overview" className="gap-2"><BarChart3 className="h-4 w-4" /> Overview</TabsTrigger>
-            <TabsTrigger value="categories" className="gap-2"><PieChart className="h-4 w-4" /> Categories</TabsTrigger>
+            <TabsTrigger value="categories" className="gap-2"><PieChartIcon className="h-4 w-4" /> Categories</TabsTrigger>
             <TabsTrigger value="insights" className="gap-2"><Zap className="h-4 w-4" /> Insights</TabsTrigger>
           </TabsList>
 
@@ -686,12 +793,17 @@ function Dashboard() {
                   {timelineData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={timelineData}>
-                        <defs><linearGradient id="empTrend" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COLORS.primary} stopOpacity={0.3} /><stop offset="100%" stopColor={COLORS.primary} stopOpacity={0.02} /></linearGradient></defs>
+                        <defs>
+                          <linearGradient id="empTrend" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={CHART_PRIMARY_COLOR} stopOpacity={0.3} />
+                            <stop offset="100%" stopColor={CHART_PRIMARY_COLOR} stopOpacity={0.02} />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid strokeDasharray="3 3" opacity={0.1} vertical={false} />
                         <XAxis dataKey="month" fontSize={11} axisLine={false} tickLine={false} />
                         <YAxis domain={[0, 150]} fontSize={11} axisLine={false} tickLine={false} width={30} />
-                        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
-                        <Area type="monotone" dataKey="score" stroke={COLORS.primary} strokeWidth={2.5} fill="url(#empTrend)" dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 6 }} />
+                        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
+                        <Area type="monotone" dataKey="score" stroke={CHART_PRIMARY_COLOR} strokeWidth={2.5} fill="url(#empTrend)" dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 6 }} />
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
@@ -701,7 +813,7 @@ function Dashboard() {
               </SectionCard>
 
               <div className="grid md:grid-cols-2 gap-4">
-                <SectionCard title="Category Performance" description="Weighted scores" icon={<PieChart className="h-4 w-4" />} noPadding>
+                <SectionCard title="Category Performance" description="Weighted scores" icon={<PieChartIcon className="h-4 w-4" />} noPadding>
                   <div className="p-4 h-64">
                     {categoryScores.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
@@ -709,12 +821,12 @@ function Dashboard() {
                           <CartesianGrid strokeDasharray="3 3" opacity={0.1} horizontal={false} />
                           <XAxis type="number" domain={[0, 100]} fontSize={11} axisLine={false} tickLine={false} />
                           <YAxis type="category" dataKey="name" fontSize={11} axisLine={false} tickLine={false} width={90} />
-                          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
-                          <Bar dataKey="score" fill={COLORS.primary} radius={[0, 6, 6, 0]} />
+                          <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [`${fmtNum(v, 1)}%`, "Score"]} />
+                          <Bar dataKey="score" fill={CHART_PRIMARY_COLOR} radius={[0, 6, 6, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (
-                      <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories" />
+                      <EmptyState icon={<PieChartIcon className="h-6 w-6" />} title="No categories" />
                     )}
                   </div>
                 </SectionCard>
@@ -725,9 +837,9 @@ function Dashboard() {
                       <ResponsiveContainer width="100%" height="100%">
                         <RePieChart>
                           <Pie data={kpiStatusData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={4} dataKey="value" label={(entry: any) => `${entry.name} ${entry.value}`} labelLine={false}>
-                            {kpiStatusData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={0} />)}
+                            {kpiStatusData.map((_, i) => <Cell key={`cell-${i}`} fill={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={0} />)}
                           </Pie>
-                          <Tooltip contentStyle={tooltipStyle} />
+                          <Tooltip contentStyle={TOOLTIP_STYLE} />
                         </RePieChart>
                       </ResponsiveContainer>
                     ) : (
@@ -748,12 +860,14 @@ function Dashboard() {
               {categoryScores.length > 0 ? (
                 <div className="grid md:grid-cols-2 gap-4">
                   {categoryScores.map((cat: any, i: number) => {
-                    const status = cat.score >= 100 ? "Exceeded" : cat.score >= 70 ? "On Track" : cat.score >= 50 ? "At Risk" : "Missed";
-                    const color = status === "Exceeded" ? "emerald" : status === "On Track" ? "blue" : status === "At Risk" ? "amber" : "red";
+                    const key: ThemeKey = cat.score >= 100 ? "emerald" : cat.score >= 70 ? "blue" : cat.score >= 50 ? "amber" : "red";
+                    const theme = COLOR_THEMES[key];
+                    const statusText = cat.score >= 100 ? "Exceeded" : cat.score >= 70 ? "On Track" : cat.score >= 50 ? "At Risk" : "Missed";
                     const totalKpiWeight = cat.kpis.reduce((s: number, k: any) => s + (k.weight || 0), 0);
+
                     return (
-                      <motion.div key={i} variants={fadeUp} layout {...cardHover}>
-                        <Card className={`p-5 border-l-4 border-l-${color}-500`}>
+                      <motion.div key={cat.name || i} variants={fadeUp} layout {...cardHover}>
+                        <Card className={`p-5 border-l-4 ${theme.border}`}>
                           <div className="flex items-start justify-between gap-3 mb-3">
                             <div className="min-w-0">
                               <h4 className="font-semibold text-sm truncate">{cat.name}</h4>
@@ -762,8 +876,8 @@ function Dashboard() {
                               </p>
                             </div>
                             <div className="text-right shrink-0">
-                              <div className={`text-2xl font-bold text-${color}-600 dark:text-${color}-400`}>{fmtNum(cat.score, 1)}%</div>
-                              <Badge variant="outline" className={`text-[10px] mt-1 text-${color}-600 border-${color}-500/30`}>{status}</Badge>
+                              <div className={`text-2xl font-bold ${theme.text}`}>{fmtNum(cat.score, 1)}%</div>
+                              <Badge variant="outline" className={`text-[10px] mt-1 ${theme.text} border-current/30`}>{statusText}</Badge>
                             </div>
                           </div>
 
@@ -781,7 +895,7 @@ function Dashboard() {
                           </div>
 
                           <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden mt-3">
-                            <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, cat.score)}%` }} transition={{ duration: 0.8, delay: i * 0.1 }} className={`h-full rounded-full bg-${color}-500`} />
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, cat.score)}%` }} transition={{ duration: 0.8, delay: i * 0.1 }} className={`h-full rounded-full ${theme.bg}`} />
                           </div>
                         </Card>
                       </motion.div>
@@ -789,7 +903,7 @@ function Dashboard() {
                   })}
                 </div>
               ) : (
-                <EmptyState icon={<PieChart className="h-6 w-6" />} title="No categories yet" description="Categories will appear once you have KPIs assigned." />
+                <EmptyState icon={<PieChartIcon className="h-6 w-6" />} title="No categories yet" description="Categories will appear once you have KPIs assigned." />
               )}
             </motion.div>
           </TabsContent>

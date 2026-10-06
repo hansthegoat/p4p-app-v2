@@ -53,31 +53,27 @@ export function BonusGate({ value, className = "", compact = false }: BonusGateP
   // ─── Compact: just the dots, matching the font size ─────
   if (compact) {
     return (
-      <span
-        className={`inline-flex items-center gap-1.5 tabular-nums ${className}`}
-        aria-label="Amount hidden"
-      >
-        <span className="tracking-[0.15em] text-foreground/30 select-none animate-[bonusBreath_2.8s_ease-in-out_infinite]">
+      <span className={`inline-flex items-center gap-1.5 tabular-nums ${className}`}>
+        <span aria-hidden="true" className="tracking-[0.15em] text-foreground/30 select-none animate-[bonusBreath_2.8s_ease-in-out_infinite]">
           ••••••
         </span>
-        <Lock className="h-3 w-3 text-foreground/25" />
+        <Lock className="h-3 w-3 text-foreground/25" aria-hidden="true" />
+        <span className="sr-only">Amount hidden</span>
       </span>
     );
   }
 
   // ─── Full: dots + quiet caption ─────────────────────────
   return (
-    <span
-      className={`inline-flex flex-col items-start gap-1 ${className}`}
-      aria-label="Amount hidden until HR reveals"
-    >
+    <span className={`inline-flex flex-col items-start gap-1 ${className}`}>
       <span className="inline-flex items-center gap-2">
-        <span className="tracking-[0.15em] text-foreground/30 select-none animate-[bonusBreath_2.8s_ease-in-out_infinite]">
+        <span aria-hidden="true" className="tracking-[0.15em] text-foreground/30 select-none animate-[bonusBreath_2.8s_ease-in-out_infinite]">
           ••••••
         </span>
-        <Lock className="h-3.5 w-3.5 text-foreground/25" />
+        <Lock className="h-3.5 w-3.5 text-foreground/25" aria-hidden="true" />
+        <span className="sr-only">Amount hidden until HR reveals</span>
       </span>
-      <span className="text-[10px] text-muted-foreground/70 italic tracking-wide">
+      <span aria-hidden="true" className="text-[10px] text-muted-foreground/70 italic tracking-wide">
         Revealed after HR publishes the cycle
       </span>
     </span>

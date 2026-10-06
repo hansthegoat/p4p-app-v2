@@ -13,6 +13,7 @@ import {
   Target,
   FileSpreadsheet,
   FileText,
+  TrendingUp,
   UserCheck,
   User,
   ClipboardCheck,
@@ -55,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "KPI Framework", to: "/kpi-framework", icon: FileSpreadsheet, roles: ["hr", "admin"], group: "admin" },
   { label: "Grade Points", to: "/grades", icon: Target, roles: ["hr", "admin"], group: "admin" },
   { label: "Calculation Trace", to: "/trace", icon: FileText, roles: ["hr", "admin"], group: "admin" },
+  { label: "Performance Trends", to: "/trends", icon: TrendingUp, roles: ["hr", "admin"], group: "admin" },
 ];
 
 const GROUP_LABELS: Record<string, string> = {
@@ -325,14 +327,13 @@ export function AppLayout({ children }: AppLayoutProps) {
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{
                 duration: 0.32,
                 ease: [0.22, 1, 0.36, 1],
               }}
-              style={{ willChange: "opacity, transform" }}
             >
               {children}
             </motion.div>

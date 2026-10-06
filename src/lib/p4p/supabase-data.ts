@@ -1,6 +1,5 @@
 // src/lib/p4p/supabase-data.ts
 // All Supabase database operations for P4P
-// Updated for schema v2 (org_id, role_status, kpi_requests, clean FKs)
 
 import { supabase } from "@/lib/supabase";
 import { newId } from "./defaults";
@@ -686,6 +685,7 @@ function mapEmployeeFromDB(row: any): Employee {
     joinDate: row.join_date || new Date().toISOString().slice(0, 10),
     monthsWorked: row.months_worked ?? 12,
     roleType: normalizeRoleType(row.role_type),
+    roleStatus: row.role_status || "active",
     categories: row.categories || [],
     kpis: row.kpis || [],
     needsKpiSetup: row.needs_kpi_setup ?? false,
@@ -712,6 +712,7 @@ function mapEmployeeToDB(
     join_date: emp.joinDate,
     months_worked: emp.monthsWorked,
     role_type: normalizeRoleType(emp.roleType),
+    role_status: emp.roleStatus || "active",   // ← THIS WAS MISSING
     categories: emp.categories || [],
     kpis: emp.kpis || [],
     needs_kpi_setup: (emp as any).needsKpiSetup ?? false,

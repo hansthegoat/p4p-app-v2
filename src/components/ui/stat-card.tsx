@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { fadeUp, hoverLift } from "@/lib/motion";
@@ -47,13 +47,12 @@ export function StatCard({
   size = "default",
   pulse = "none",
 }: StatCardProps) {
+  const prefersReducedMotion = useReducedMotion();
   const styles = ACCENT_STYLES[accent];
-  const TrendIcon =
-    trend !== undefined && trend > 0
-      ? ArrowUpRight
-      : trend !== undefined && trend < 0
-      ? ArrowDownRight
-      : null;
+
+  const trendDirection =
+    trend === undefined ? null : trend > 0 ? "up" : trend < 0 ? "down" : null;
+  const TrendIcon = trendDirection === "up" ? ArrowUpRight : trendDirection === "down" ? ArrowDownRight : null;
 
   const valueSize =
     size === "large"
@@ -63,12 +62,17 @@ export function StatCard({
   const pulseClass = PULSE_CLASSES[pulse];
 
   return (
-    <motion.div variants={fadeUp} {...hoverLift} className="h-full">
+    <motion.div
+      variants={fadeUp}
+      {...(prefersReducedMotion ? {} : hoverLift)}
+      className="h-full"
+    >
       <Card
         className={`relative overflow-hidden p-5 h-full group cursor-default transition-all duration-300 ${pulseClass}`}
       >
-        {/* Gradient glow on hover */}
+        {/* Gradient glow on hover — decorative */}
         <div
+          aria-hidden="true"
           className={`absolute -top-8 -right-8 w-24 h-24 rounded-full ${styles.bg} opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl`}
         />
 
@@ -77,16 +81,16 @@ export function StatCard({
             {label}
           </span>
           <div
+            aria-hidden="true"
             className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${styles.bg} ${styles.text} ring-1 ${styles.ring}`}
           >
             {icon}
           </div>
         </div>
 
-        {/* ✅ Value now uses default foreground (black in light mode) */}
         <div
           className={`relative font-bold tracking-tight truncate text-foreground ${valueSize} leading-tight`}
-          title={String(value)}
+          title={typeof value === "string" ? value : undefined}
         >
           {value}
         </div>
@@ -95,10 +99,16 @@ export function StatCard({
           <div className="relative flex items-center gap-1 mt-2 text-xs text-muted-foreground">
             {TrendIcon && (
               <TrendIcon
+                aria-hidden="true"
                 className={`h-3.5 w-3.5 shrink-0 ${
-                  trend! > 0 ? "text-emerald-500" : "text-red-500"
+                  trendDirection === "up" ? "text-emerald-500" : "text-red-500"
                 }`}
               />
+            )}
+            {trendDirection && (
+              <span className="sr-only">
+                {trendDirection === "up" ? "Trending up. " : "Trending down. "}
+              </span>
             )}
             {sub && <span className="truncate">{sub}</span>}
           </div>

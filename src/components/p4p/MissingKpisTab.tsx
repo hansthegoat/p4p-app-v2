@@ -19,12 +19,25 @@ interface Group {
 }
 
 export function MissingKpisTab({ onPickRole }: Props) {
-  const { employees } = useP4P();
+  const { employees, kpiRequests } = useP4P();
   const [search, setSearch] = useState("");
 
   const groups = useMemo<Group[]>(() => {
+    // Employees who have an active pending KPI request belong in the
+    // Requests tab, not here — they've already asked HR for help.
+    const requestedIds = new Set(
+      kpiRequests
+        .filter((r) => r.status === "pending")
+        .map((r) => r.employeeId)
+    );
+
     const affected = employees.filter(
-      (e) => e.roleType !== "hr" && e.roleType !== "admin" && !e.isAdjunct && employeeNeedsKpis(e)
+      (e) =>
+        e.roleType !== "hr" &&
+        e.roleType !== "admin" &&
+        !e.isAdjunct &&
+        employeeNeedsKpis(e) &&
+        !requestedIds.has(e.id)
     );
 
     const byKey = new Map<string, Group>();
@@ -42,7 +55,7 @@ export function MissingKpisTab({ onPickRole }: Props) {
         a.department.localeCompare(b.department) ||
         a.role.localeCompare(b.role)
     );
-  }, [employees]);
+  }, [employees, kpiRequests]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return groups;

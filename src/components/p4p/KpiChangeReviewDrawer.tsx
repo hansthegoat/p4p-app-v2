@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useP4P } from "@/lib/p4p/store";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ interface Props {
   onClose: () => void;
   reviewerId: string;
   reviewerName: string;
-  mode?: "supervisor" | "hr";   // 👈 NEW
+  mode?: "supervisor" | "hr";
 }
 
 export function KpiChangeReviewDrawer({
@@ -24,7 +25,7 @@ export function KpiChangeReviewDrawer({
   onClose,
   reviewerId,
   reviewerName,
-  mode = "supervisor",   // 👈 default
+  mode = "supervisor",
 }: Props) {
   const {
     commentOnKpiUpdateRequest,
@@ -39,6 +40,11 @@ export function KpiChangeReviewDrawer({
   const [rejectMode, setRejectMode] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [updateTemplate, setUpdateTemplate] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (request) {
@@ -50,6 +56,7 @@ export function KpiChangeReviewDrawer({
   }, [request?.id]);
 
   if (!request) return null;
+  if (!mounted) return null;
 
   const employee = employees.find((e) => e.id === request.employeeId);
   const comments = getKpiUpdateComments(request.id);
@@ -59,7 +66,7 @@ export function KpiChangeReviewDrawer({
     if (!commentText.trim()) return;
     setSubmitting(true);
     try {
-      const authorRole: "supervisor" | "hr" | "admin" =
+      const authorRole: "supervisor" | "hr" =
         mode === "hr" ? "hr" : "supervisor";
       await commentOnKpiUpdateRequest(
         request.id,
@@ -126,7 +133,7 @@ export function KpiChangeReviewDrawer({
     }
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {request && (
         <>
@@ -144,7 +151,6 @@ export function KpiChangeReviewDrawer({
             transition={{ type: "spring", stiffness: 320, damping: 32 }}
             className="fixed top-0 right-0 bottom-0 z-[70] w-full max-w-lg bg-background border-l border-border shadow-2xl flex flex-col"
           >
-            {/* Header */}
             <div className="flex items-start justify-between p-5 border-b border-border/60">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
@@ -165,9 +171,7 @@ export function KpiChangeReviewDrawer({
               </button>
             </div>
 
-            {/* Body */}
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
-              {/* Score summary */}
               <div className="p-4 rounded-lg bg-muted/30 border border-border/60">
                 <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">
                   Score impact
@@ -190,7 +194,6 @@ export function KpiChangeReviewDrawer({
                 </div>
               </div>
 
-              {/* Diff list */}
               <div>
                 <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">
                   {request.diffs.length} change{request.diffs.length === 1 ? "" : "s"}
@@ -226,7 +229,6 @@ export function KpiChangeReviewDrawer({
                 </div>
               </div>
 
-              {/* Discussion */}
               <div>
                 <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
                   <MessageSquare className="h-3 w-3" /> Discussion ({comments.length})
@@ -242,7 +244,7 @@ export function KpiChangeReviewDrawer({
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-semibold">{c.authorName}</span>
                         <Badge variant="outline" className="text-[9px] h-4 px-1.5">
-                          {c.authorRole === "supervisor" ? "Supervisor" : "HR"}
+                          {c.authorRole === "supervisor" ? "Supervisor" : c.authorRole === "employee" ? "Employee" : "HR"}
                         </Badge>
                       </div>
                       <p className="text-muted-foreground">{c.text}</p>
@@ -276,7 +278,6 @@ export function KpiChangeReviewDrawer({
               </div>
             </div>
 
-            {/* Footer — decision */}
             <div className="p-5 border-t border-border/60 space-y-3">
               {mode === "hr" ? (
                 <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/20 text-[11px] text-blue-800 dark:text-blue-300 text-center">
@@ -323,7 +324,6 @@ export function KpiChangeReviewDrawer({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {/* 👈 Template write-back opt-in */}
                   {mode === "supervisor" && (
                     <label className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20 cursor-pointer hover:bg-blue-500/10 transition-colors">
                       <input
@@ -369,7 +369,8 @@ export function KpiChangeReviewDrawer({
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useP4P } from "@/lib/p4p/store";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,11 @@ export function SupervisorKpiEditorDrawer({ employee, onClose, onSaved }: Props)
   const [saving, setSaving] = useState(false);
   const [justifyOpen, setJustifyOpen] = useState(false);
   const [justification, setJustification] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (employee) {
@@ -47,6 +53,7 @@ export function SupervisorKpiEditorDrawer({ employee, onClose, onSaved }: Props)
   }, [draft, employee]);
 
   if (!employee) return null;
+  if (!mounted) return null;
 
   const canSave = hasChanges && totalWeight === 100;
 
@@ -142,7 +149,7 @@ export function SupervisorKpiEditorDrawer({ employee, onClose, onSaved }: Props)
     }
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {employee && (
         <>
@@ -160,7 +167,6 @@ export function SupervisorKpiEditorDrawer({ employee, onClose, onSaved }: Props)
             transition={{ type: "spring", stiffness: 320, damping: 32 }}
             className="fixed top-0 right-0 bottom-0 z-[70] w-full max-w-3xl bg-background border-l border-border shadow-2xl flex flex-col"
           >
-            {/* Header */}
             <div className="flex items-start justify-between p-5 border-b border-border/60">
               <div className="min-w-0">
                 <h2 className="text-base font-semibold">Edit KPIs</h2>
@@ -176,9 +182,7 @@ export function SupervisorKpiEditorDrawer({ employee, onClose, onSaved }: Props)
               </button>
             </div>
 
-            {/* Body */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              {/* Weight banner */}
               <div
                 className={`p-3 rounded-lg border flex items-center justify-between ${
                   totalWeight === 100
@@ -196,7 +200,6 @@ export function SupervisorKpiEditorDrawer({ employee, onClose, onSaved }: Props)
                 )}
               </div>
 
-              {/* Category list */}
               {draft.map((cat, idx) => (
                 <div key={cat.id} className="rounded-lg border border-border overflow-hidden">
                   <div className="p-3 bg-muted/30 border-b border-border/50">
@@ -239,7 +242,6 @@ export function SupervisorKpiEditorDrawer({ employee, onClose, onSaved }: Props)
                     </div>
                   </div>
 
-                  {/* KPI list */}
                   <div className="divide-y divide-border/50">
                     {cat.kpis.length === 0 ? (
                       <div className="p-4 text-center text-xs text-muted-foreground">
@@ -328,7 +330,6 @@ export function SupervisorKpiEditorDrawer({ employee, onClose, onSaved }: Props)
               </Button>
             </div>
 
-            {/* Footer */}
             <div className="p-5 border-t border-border/60">
               {justifyOpen ? (
                 <div className="space-y-2">
@@ -384,6 +385,7 @@ export function SupervisorKpiEditorDrawer({ employee, onClose, onSaved }: Props)
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

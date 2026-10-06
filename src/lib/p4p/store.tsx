@@ -20,7 +20,7 @@ import type {
   KPI,
   KpiUpdateRequest,
   KpiDiffItem,
-  KpiUpdateComment,   // 👈 ADD
+  KpiUpdateComment,
   KpiRequest,
 } from "./types";
 import { newId } from "./defaults";
@@ -58,8 +58,6 @@ import {
   fetchAppSettings,
   upsertAppSetting,
 } from "./supabase-data";
-import { DEFAULT_ORG_ID } from "./constants";
-
 
 // ============================================
 // STATE TYPES
@@ -74,7 +72,7 @@ interface State {
   appraisals: AppraisalRequest[];
   notifications: Notification[];
   kpiUpdateRequests: KpiUpdateRequest[];
-  kpiRequests: KpiRequest[];   // 👈 ADD
+  kpiRequests: KpiRequest[];
   bonusRevealed: boolean;
 }
 
@@ -86,14 +84,12 @@ interface Ctx extends State {
   setGrades: (g: GradePoint[]) => void;
   resetGrades: () => void;
   upsertEmployee: (e: Employee) => void;
-  removeEmployee: (id: string) => void;
   clearEmployees: () => void;
   loadDemo: () => void;
   setEmployees: (list: Employee[]) => void;
 
   calc: CalcResult;
 
-  saveMonthlySnapshot: (employeeId: string, year: number, month: number) => void;
   getMonthlyHistory: (employeeId: string) => MonthlyPerformance[];
   getPerformanceTrend: (employeeId: string) => PerformanceTrend | null;
   getAllTrends: () => PerformanceTrend[];
@@ -107,9 +103,10 @@ interface Ctx extends State {
   saveTemplate: (template: KPITemplate) => void;
   getTemplate: (department: string, role: string) => KPITemplate | undefined;
   getAllTemplates: () => Record<string, KPITemplate>;
-  applyTemplateToEmployees: (department: string, role: string, template: KPITemplate) => number;
 
   hardDeleteEmployee: (id: string) => void;
+  validateEmployeeRole: (employeeId: string, validatorName: string) => Promise<void>;
+  rejectEmployeeRole: (employeeId: string, validatorName: string) => Promise<void>;
 
   submitAppraisal: (employeeId: string, period: string, year: number, month: number) => void;
   approveAppraisal: (id: string, reviewerId: string, reviewerName: string) => void;
@@ -132,20 +129,18 @@ interface Ctx extends State {
   getUnacknowledgedKpiUpdates: () => KpiUpdateRequest[];
   acknowledgeKpiUpdate: (id: string) => Promise<void>;
   commentKpiUpdate: (id: string, comment: string) => Promise<void>;
-  
+
   syncToCloud: () => Promise<void>;
   setBonusRevealed: (value: boolean) => Promise<void>;
   refreshFromCloud: () => Promise<void>;
 
-    // 👈 NEW — KPI requests
   submitKpiRequest: (employeeId: string, comment?: string) => Promise<{ id: string }>;
   getKpiRequests: () => KpiRequest[];
   getEmployeeKpiRequest: (employeeId: string) => KpiRequest | null;
   cancelKpiRequest: (id: string) => Promise<void>;
-  fulfillKpiRequest: (id: string) => Promise<void>;
 
-  getSupervisorPendingKpiUpdates: (supervisorId: string) => KpiUpdateRequest[]; 
-  commentOnKpiUpdateRequest: (requestId: string, authorId: string, authorName: string, authorRole: "hr" | "admin" | "supervisor", text: string) => Promise<void>;
+  getSupervisorPendingKpiUpdates: (supervisorId: string) => KpiUpdateRequest[];
+  commentOnKpiUpdateRequest: (requestId: string, authorId: string, authorName: string, authorRole: "hr" | "supervisor", text: string) => Promise<void>;
   approveKpiUpdateAsSupervisor: (
     requestId: string,
     supervisorId: string,
@@ -153,28 +148,60 @@ interface Ctx extends State {
     comment?: string,
     updateTemplate?: boolean
   ) => Promise<void>;
-  revertTemplateUpdate: (requestId: string) => Promise<void>;   // 👈 NEW
+  revertTemplateUpdate: (requestId: string) => Promise<void>;
   rejectKpiUpdateAsSupervisor: (requestId: string, supervisorId: string, supervisorName: string, reason: string) => Promise<void>;
   getKpiUpdateComments: (requestId: string) => KpiUpdateComment[];
 
-    // 👈 ADD THIS if missing
   supervisorUpdateEmployeeKpis: (
     employeeId: string,
     categories: Category[],
     justification: string
   ) => Promise<void>;
-
 }
 
 const C = createContext<Ctx | null>(null);
+
+// ============================================
+// NOTIFICATION DEDUPE
+// ============================================
+// Prevents the same notification (same user, type, message) from being
+// inserted more than once within a short window. Protects against
+// double-click, race conditions, and fast re-triggers.
+function dedupeNotifications(
+  existing: Notification[],
+  incoming: Notification[],
+  windowMs: number = 5 * 60 * 1000
+): Notification[] {
+  const now = Date.now();
+
+  // Build a set of "recent" keys already in state
+  const recentKeys = new Set<string>();
+  for (const n of existing) {
+    const age = now - new Date(n.createdAt).getTime();
+    if (age < windowMs) {
+      recentKeys.add(`${n.userId}|${n.type}|${n.message}`);
+    }
+  }
+
+  // Filter incoming, also removing duplicates within the incoming batch itself
+  const result: Notification[] = [];
+  const seen = new Set<string>();
+  for (const n of incoming) {
+    const key = `${n.userId}|${n.type}|${n.message}`;
+    if (recentKeys.has(key)) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(n);
+  }
+
+  return result;
+}
 
 // ============================================
 // LOAD INITIAL STATE
 // ============================================
 
 function loadInitial(): State {
-  // No localStorage. Cloud is the single source of truth.
-  // Fresh state until cloud fetch completes.
   return {
     globals: DEFAULT_GLOBALS,
     grades: DEFAULT_GRADES,
@@ -220,7 +247,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
         if (cancelled) return;
 
-        // Notifications are per-user. Fetch only for the signed-in employee.
         let cloudNotifications: Notification[] = [];
         try {
           const { getCurrentUser } = await import("@/lib/supabase");
@@ -262,7 +288,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         const { getCurrentUser } = await import("@/lib/supabase");
         const user = await getCurrentUser();
         if (!user) {
-          console.log("⏳ Not logged in — using localStorage only");
           setIsCloudSynced(false);
           return;
         }
@@ -285,7 +310,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
         if (cancelled) return;
 
-        // Notifications are per-user.
         let cloudNotifications: Notification[] = [];
         try {
           const { getCurrentUser } = await import("@/lib/supabase");
@@ -334,8 +358,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         } else if (event === "SIGNED_OUT") {
           setIsCloudSynced(false);
           setIsSyncing(false);
-          // Clear all in-memory state so the next user on this
-          // browser can't see the previous user's data.
           setState({
             globals: DEFAULT_GLOBALS,
             grades: DEFAULT_GRADES,
@@ -393,10 +415,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     upsertEmployeeDB(e).catch((err) => console.error("Cloud upsert employee failed:", err));
   }, []);
 
-  const removeEmployee = useCallback((id: string) => {
-    setState((s) => ({ ...s, employees: s.employees.filter((x) => x.id !== id) }));
-    deleteEmployeeDB(id).catch((err) => console.error("Cloud remove employee failed:", err));
-  }, []);
 
   const clearEmployees = useCallback(() => {
     setState((s) => ({ ...s, employees: [] }));
@@ -412,7 +430,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       appraisals: [],
       notifications: [],
       kpiUpdateRequests: [],
-      kpiRequests: [],   // 👈 ADD
+      kpiRequests: [],
       bonusRevealed: false,
     });
   }, []);
@@ -434,10 +452,95 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       kpiUpdateRequests: s.kpiUpdateRequests.filter((r) => r.employeeId !== id),
       kpiRequests: s.kpiRequests.filter((r) => r.employeeId !== id),
     }));
-    // Related rows (appraisals, monthly_performance, kpi_update_requests,
-    // kpi_requests) cascade-delete automatically via FK.
     deleteEmployeeDB(id).catch((err) => console.error("Cloud hard delete failed:", err));
   }, []);
+
+    const validateEmployeeRole = useCallback(
+    async (employeeId: string, validatorName: string) => {
+      const employee = state.employees.find((e) => e.id === employeeId);
+      if (!employee) throw new Error("Employee not found");
+      if (employee.roleStatus !== "pending") {
+        throw new Error("Employee is not awaiting validation");
+      }
+
+      const now = new Date().toISOString();
+      const updatedEmployee: Employee = {
+        ...employee,
+        roleStatus: "active",
+      };
+
+      const notif: Notification = {
+        id: newId(),
+        userId: employee.id,
+        type: "role_validated" as any,
+        message: `${validatorName} confirmed your role. Welcome to P4P!`,
+        link: "/dashboard",
+        read: false,
+        createdAt: now,
+      };
+
+      setState((s) => ({
+        ...s,
+        employees: s.employees.map((e) =>
+          e.id === employeeId ? updatedEmployee : e
+        ),
+        notifications: [...s.notifications, notif],
+      }));
+
+      try {
+        await upsertEmployeeDB(updatedEmployee);
+        await insertNotification(notif);
+      } catch (err) {
+        console.error("validateEmployeeRole persist error:", err);
+        throw err;
+      }
+    },
+    [state.employees]
+  );
+
+  const rejectEmployeeRole = useCallback(
+    async (employeeId: string, validatorName: string) => {
+      const employee = state.employees.find((e) => e.id === employeeId);
+      if (!employee) throw new Error("Employee not found");
+      if (employee.roleStatus !== "pending") {
+        throw new Error("Employee is not awaiting validation");
+      }
+
+      const now = new Date().toISOString();
+      const updatedEmployee: Employee = {
+        ...employee,
+        roleStatus: "rejected",
+        isManager: false,
+      };
+
+      const notif: Notification = {
+        id: newId(),
+        userId: employee.id,
+        type: "role_rejected" as any,
+        message: `${validatorName} reviewed your role request. You've been set as an Employee. Contact HR if this is a mistake.`,
+        link: "/profile",
+        read: false,
+        createdAt: now,
+      };
+
+      setState((s) => ({
+        ...s,
+        employees: s.employees.map((e) =>
+          e.id === employeeId ? updatedEmployee : e
+        ),
+        notifications: [...s.notifications, notif],
+      }));
+
+      try {
+        await upsertEmployeeDB(updatedEmployee);
+        await insertNotification(notif);
+      } catch (err) {
+        console.error("rejectEmployeeRole persist error:", err);
+        throw err;
+      }
+    },
+    [state.employees]
+  );
 
   // ============================================
   // CALC
@@ -450,44 +553,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   // ============================================
   // MONTHLY
   // ============================================
-  const saveMonthlySnapshot = useCallback(
-    (employeeId: string, year: number, month: number) => {
-      const employee = state.employees.find((e) => e.id === employeeId);
-      if (!employee || employee.isAdjunct) return;
-
-      const result = calc.perEmployee[employeeId];
-      if (!result) return;
-
-      const snapshot: MonthlyPerformance = {
-        year,
-        month,
-        employeeId,
-        kpis: employee.kpis.map((k) => ({ ...k })),
-        categories: employee.categories?.map((c) => ({
-          ...c,
-          kpis: c.kpis.map((k) => ({ ...k })),
-        })),
-        performanceMultiplier: result.performanceMultiplier,
-        bonusEligible: result.bonus,
-        createdAt: new Date().toISOString(),
-      };
-
-      setState((s) => {
-        const existing = s.monthlyData.findIndex(
-          (d) => d.employeeId === employeeId && d.year === year && d.month === month
-        );
-        const newData = [...s.monthlyData];
-        if (existing >= 0) newData[existing] = snapshot;
-        else newData.push(snapshot);
-        return { ...s, monthlyData: newData };
-      });
-
-      upsertMonthlyPerformance(snapshot).catch((err) =>
-        console.error("Cloud save monthly failed:", err)
-      );
-    },
-    [state.employees, calc]
-  );
 
   const getMonthlyHistory = useCallback(
     (employeeId: string): MonthlyPerformance[] =>
@@ -731,47 +796,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
   const getAllTemplates = useCallback(() => state.kpiTemplates, [state.kpiTemplates]);
 
-  const applyTemplateToEmployees = useCallback(
-    (department: string, role: string, template: KPITemplate): number => {
-      const toUpdate = state.employees.filter(
-        (e) => e.department === department && e.role === role && !e.isAdjunct
-      );
-      if (toUpdate.length === 0) return 0;
-
-      const updatedEmployees = state.employees.map((emp) => {
-        if (emp.department === department && emp.role === role && !emp.isAdjunct) {
-          const newCategories = template.categories.map((cat) => ({
-            id: cat.id || newId(),
-            name: cat.name,
-            weight: cat.weight,
-            kpis: cat.kpis.map((k) => ({
-              id: k.id || newId(),
-              description: k.description,
-              metric: k.metric,
-              target: k.target,
-              actual: 0,
-              weight: k.weight || 0,
-              measurementSource: k.measurementSource || "",
-            })),
-          }));
-          return { ...emp, categories: newCategories, needsKpiSetup: false };
-        }
-        return emp;
-      });
-
-      setState((s) => ({ ...s, employees: updatedEmployees }));
-
-      const affected = updatedEmployees.filter(
-        (e) => e.department === department && e.role === role && !e.isAdjunct
-      );
-      bulkUpsertEmployees(affected).catch((err) =>
-        console.error("Cloud apply template failed:", err)
-      );
-
-      return toUpdate.length;
-    },
-    [state.employees]
-  );
 
   // ============================================
   // EMAIL HELPERS
@@ -803,12 +827,12 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         let html = "";
 
         if (type === "submitted") {
-          const manager = employee.supervisorId
+          const supervisor = employee.supervisorId
             ? state.employees.find((e) => e.id === employee.supervisorId)
             : null;
-          if (manager?.email) recipients.push(manager.email);
+          if (supervisor?.email) recipients.push(supervisor.email);
           state.employees
-            .filter((e) => e.roleType === "admin" || e.roleType === "hr")
+            .filter((e) => e.roleType === "hr")
             .forEach((e) => {
               if (e.email && !recipients.includes(e.email)) recipients.push(e.email);
             });
@@ -853,6 +877,21 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     (employeeId: string, period: string, year: number, month: number) => {
       const employee = state.employees.find((e) => e.id === employeeId);
       if (!employee) return;
+
+      // Block duplicate submissions for the same period (only if pending or approved)
+      const existingActive = state.appraisals.find(
+        (a) =>
+          a.employeeId === employeeId &&
+          a.year === year &&
+          a.month === month &&
+          (a.status === "pending" || a.status === "approved")
+      );
+      if (existingActive) {
+        console.warn(
+          `Active appraisal already exists for ${employeeId} ${year}-${month}`
+        );
+        return;
+      }
 
       let totalWeightedScore = 0;
       let totalWeight = 0;
@@ -900,7 +939,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         comments: [],
       };
 
-      // Resolve real recipients — supervisor + HR.
       const recipients = new Map<string, Notification>();
       const now = new Date().toISOString();
 
@@ -934,7 +972,8 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           });
         });
 
-      const newNotifs = Array.from(recipients.values());
+      const rawNotifs = Array.from(recipients.values());
+      const newNotifs = dedupeNotifications(state.notifications, rawNotifs);
 
       setState((s) => ({
         ...s,
@@ -945,13 +984,15 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       upsertAppraisal(appraisal).catch((err) =>
         console.error("Cloud submit appraisal failed:", err)
       );
-      insertNotifications(newNotifs).catch((err) =>
-        console.error("Cloud insert notifications failed:", err)
-      );
+      if (newNotifs.length > 0) {
+        insertNotifications(newNotifs).catch((err) =>
+          console.error("Cloud insert notifications failed:", err)
+        );
+      }
 
       sendAppraisalNotification("submitted", appraisal);
     },
-    [state.employees, sendAppraisalNotification]
+    [state.employees, state.appraisals, state.notifications, sendAppraisalNotification]
   );
 
   const saveKPIProof = useCallback(
@@ -1068,7 +1109,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       const employee = state.employees.find((e) => e.id === employeeId);
       if (employee) {
         const hrAdmins = state.employees
-          .filter((e) => e.roleType === "admin" || e.roleType === "hr")
+          .filter((e) => e.roleType === "hr")
           .map((e) => e.email)
           .filter(Boolean);
 
@@ -1551,6 +1592,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       const newRequests: KpiUpdateRequest[] = [];
       const newNotifications: Notification[] = [];
       const updatedEmployees: Employee[] = [];
+      const fulfilledKpiRequestIds: string[] = [];
 
       for (const emp of affected) {
         const existing = emp.categories || [];
@@ -1560,14 +1602,11 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         const beforeScore = computeScore(existing);
         const afterScore = computeScore(merged);
 
-        // 👈 NEW — resolve supervisor ONCE
         const supervisor = emp.supervisorId
           ? state.employees.find((e) => e.id === emp.supervisorId)
           : null;
         const needsSupervisorApproval = !!supervisor;
 
-        // 👈 NEW — if there's already a pending request for this employee,
-        // update it in place instead of creating a duplicate.
         const existingPending = needsSupervisorApproval
           ? state.kpiUpdateRequests.find(
               (r) =>
@@ -1577,7 +1616,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
             )
           : null;
 
-        // If no supervisor gate → apply changes immediately
         if (!needsSupervisorApproval) {
           updatedEmployees.push({
             ...emp,
@@ -1586,23 +1624,13 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           });
         }
 
-               // 👈 FIX 1 — mark any pending KPI request from this employee as fulfilled
         const pendingKpiReq = state.kpiRequests.find(
           (r) => r.employeeId === emp.id && r.status === "pending"
         );
         if (pendingKpiReq) {
-          const fulfilledAt = new Date().toISOString();
-          setState((s) => ({
-            ...s,
-            kpiRequests: s.kpiRequests.map((r) =>
-              r.id === pendingKpiReq.id
-                ? { ...r, status: "fulfilled" as const, fulfilledAt }
-                : r
-            ),
-          }));
-        } 
+          fulfilledKpiRequestIds.push(pendingKpiReq.id);
+        }
 
-        // 👈 NEW — reuse existing pending request if one exists
         const req: KpiUpdateRequest = existingPending
           ? {
               ...existingPending,
@@ -1613,10 +1641,9 @@ export function P4PProvider({ children }: { children: ReactNode }) {
               proposedCategories: merged,
               beforeScore,
               afterScore,
-              status: "pending_supervisor_review",   // reset if it was back_to_hr
+              status: "pending_supervisor_review",
               pushedBy,
               pushedByName,
-              // keep: comments, assignedSupervisorId, assignedSupervisorName
             }
           : {
               id: newId(),
@@ -1641,41 +1668,32 @@ export function P4PProvider({ children }: { children: ReactNode }) {
               templateUpdateApplied: false,
             };
 
-        // If updating in place, don't double-add to newRequests
-        if (existingPending) {
-          // Track for the state update
-          newRequests.push(req);
-        } else {
-          newRequests.push(req);
-        }
+        newRequests.push(req);
 
         if (needsSupervisorApproval && supervisor) {
-          // Notify supervisor (action needed)
           newNotifications.push({
             id: newId(),
             userId: supervisor.id,
-            type: "appraisal_needs_revision" as any,
+            type: "kpi_update_pushed_supervisor" as any,
             message: `HR pushed KPI changes for ${emp.name} — review before it reaches them`,
             link: "/my-team",
             read: false,
             createdAt: now,
           });
-          // FYI to employee
           newNotifications.push({
             id: newId(),
             userId: emp.id,
-            type: "appraisal_needs_revision" as any,
+            type: "kpi_update_pushed_fyi" as any,
             message: `HR proposed KPI updates — awaiting your supervisor's review`,
             link: "/employee",
             read: false,
             createdAt: now,
           });
         } else {
-          // No supervisor — employee gets it directly
           newNotifications.push({
             id: newId(),
             userId: emp.id,
-            type: "appraisal_needs_revision" as any,
+            type: "kpi_update_pushed_direct" as any,
             message: `Your KPIs were updated — ${diffs.length} change${diffs.length > 1 ? "s" : ""} to review`,
             link: "/kpi-updates",
             read: false,
@@ -1705,8 +1723,13 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      const fulfilledAt = new Date().toISOString();
+      const dedupedNotifications = dedupeNotifications(
+        state.notifications,
+        newNotifications
+      );
+
       setState((s) => {
-        // 👈 NEW — merge new requests with existing (replace if same ID, else append)
         const existingIds = new Set(newRequests.map((r) => r.id));
         const otherRequests = s.kpiUpdateRequests.filter(
           (r) => !existingIds.has(r.id)
@@ -1719,7 +1742,12 @@ export function P4PProvider({ children }: { children: ReactNode }) {
             return found || emp;
           }),
           kpiUpdateRequests: [...otherRequests, ...newRequests],
-          notifications: [...s.notifications, ...newNotifications],
+          kpiRequests: s.kpiRequests.map((r) =>
+            fulfilledKpiRequestIds.includes(r.id)
+              ? { ...r, status: "fulfilled" as const, fulfilledAt }
+              : r
+          ),
+          notifications: [...s.notifications, ...dedupedNotifications],
         };
       });
 
@@ -1730,7 +1758,17 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         for (const req of newRequests) {
           await upsertKpiUpdateRequest(req);
         }
-        for (const n of newNotifications) {
+        for (const id of fulfilledKpiRequestIds) {
+          const req = state.kpiRequests.find((r) => r.id === id);
+          if (req) {
+            await upsertKpiRequest({
+              ...req,
+              status: "fulfilled",
+              fulfilledAt,
+            });
+          }
+        }
+        for (const n of dedupedNotifications) {
           await insertNotification(n);
         }
       } catch (err) {
@@ -1739,13 +1777,12 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
       return { affected: affected.length, created: newRequests.length };
     },
-    [state.employees, state.kpiRequests]
+    [state.employees, state.kpiRequests, state.kpiUpdateRequests]
   );
 
   const getKpiUpdateRequests = useCallback(
     (employeeId: string): KpiUpdateRequest[] =>
       state.kpiUpdateRequests
-        // 👈 Hide supervisor-pending ones from the employee view
         .filter(
           (r) =>
             r.employeeId === employeeId &&
@@ -1762,7 +1799,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
   const getUnacknowledgedKpiUpdates = useCallback(
     (): KpiUpdateRequest[] =>
-      // 👈 Only employee-visible statuses (supervisor-pending ones stay hidden)
       state.kpiUpdateRequests.filter(
         (r) => r.status === "unacknowledged" || r.status === "acknowledged"
       ),
@@ -1793,7 +1829,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         console.error("acknowledgeKpiUpdate save failed:", err)
       );
     },
-    [state.kpiUpdateRequests, state.employees]
+    [state.kpiUpdateRequests]
   );
 
   const commentKpiUpdate = useCallback(
@@ -1803,11 +1839,27 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
       const commentedAt = new Date().toISOString();
 
+      const threadComment: KpiUpdateComment = {
+        id: newId(),
+        authorId: req.employeeId,
+        authorName: "Employee",
+        authorRole: "employee",
+        text: comment,
+        timestamp: commentedAt,
+      };
+
+      const updatedComments = [...(req.comments || []), threadComment];
+
       setState((s) => ({
         ...s,
         kpiUpdateRequests: s.kpiUpdateRequests.map((r) =>
           r.id === id
-            ? { ...r, employeeComment: comment, commentedAt }
+            ? {
+                ...r,
+                employeeComment: comment,
+                commentedAt,
+                comments: updatedComments,
+              }
             : r
         ),
       }));
@@ -1816,13 +1868,14 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         ...req,
         employeeComment: comment,
         commentedAt,
+        comments: updatedComments,
       }).catch((err) => console.error("commentKpiUpdate save failed:", err));
     },
     [state.kpiUpdateRequests]
   );
 
   // ============================================
-  // 👈 NEW — KPI REQUESTS
+  // KPI REQUESTS
   // ============================================
 
   const submitKpiRequest = useCallback(
@@ -1830,7 +1883,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       const employee = state.employees.find((e) => e.id === employeeId);
       if (!employee) throw new Error("Employee not found");
 
-      // Block duplicates — one pending request max
       const existing = state.kpiRequests.find(
         (r) => r.employeeId === employeeId && r.status === "pending"
       );
@@ -1851,7 +1903,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         createdAt: now,
       };
 
-      // Notifications: HR (action) + supervisor (FYI if assigned)
       const notifs: Notification[] = [];
 
       state.employees
@@ -1860,9 +1911,9 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           notifs.push({
             id: newId(),
             userId: hr.id,
-            type: "appraisal_needs_revision" as any,
+            type: "kpi_request_submitted" as any,
             message: `${employee.name} requested KPIs for ${employee.department} · ${employee.role}`,
-            link: "/employees",
+            link: "/kpi-framework?view=requests",
             read: false,
             createdAt: now,
           });
@@ -1872,34 +1923,35 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         notifs.push({
           id: newId(),
           userId: employee.supervisorId,
-          type: "appraisal_needs_revision" as any,
+          type: "kpi_request_submitted" as any,
           message: `${employee.name} requested KPIs from HR (FYI)`,
-          link: "/employees",
+          link: "/kpi-framework?view=requests",
           read: false,
           createdAt: now,
         });
       }
 
+      const dedupedNotifs = dedupeNotifications(state.notifications, notifs);
+
       setState((s) => ({
         ...s,
         kpiRequests: [...s.kpiRequests, request],
-        notifications: [...s.notifications, ...notifs],
+        notifications: [...s.notifications, ...dedupedNotifs],
       }));
 
-      // 👇 Persist to cloud — these are the two lines to add
       upsertKpiRequest(request).catch((err) =>
         console.error("Cloud upsert kpi_request failed:", err)
       );
 
-      if (notifs.length > 0) {
-        insertNotifications(notifs).catch((err) =>
+      if (dedupedNotifs.length > 0) {
+        insertNotifications(dedupedNotifs).catch((err) =>
           console.error("KPI request notification failed:", err)
         );
       }
 
       return { id: request.id };
     },
-    [state.employees, state.kpiRequests]
+    [state.employees, state.kpiRequests, state.notifications]
   );
 
   const getKpiRequests = useCallback(
@@ -1943,32 +1995,9 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     [state.kpiRequests]
   );
 
-  const fulfillKpiRequest = useCallback(
-    async (id: string) => {
-      const req = state.kpiRequests.find((r) => r.id === id);
-      if (!req || req.status !== "pending") return;
-
-      const now = new Date().toISOString();
-      const updated: KpiRequest = {
-        ...req,
-        status: "fulfilled",
-        fulfilledAt: now,
-      };
-
-      setState((s) => ({
-        ...s,
-        kpiRequests: s.kpiRequests.map((r) => (r.id === id ? updated : r)),
-      }));
-
-      upsertKpiRequest(updated).catch((err) =>
-        console.error("Cloud fulfill kpi_request failed:", err)
-      );
-    },
-    [state.kpiRequests]
-  );
 
   // ============================================
-  // 👈 NEW — SUPERVISOR GATE
+  // SUPERVISOR GATE
   // ============================================
 
   const getSupervisorPendingKpiUpdates = useCallback(
@@ -1976,9 +2005,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       state.kpiUpdateRequests
         .filter((r) => {
           if (r.status !== "pending_supervisor_review") return false;
-          // Resolve the employee's CURRENT supervisor, not the snapshot
-          // stored on the request. Prevents stale approvals after a
-          // supervisor change.
           const emp = state.employees.find((e) => e.id === r.employeeId);
           return emp?.supervisorId === supervisorId;
         })
@@ -1994,7 +2020,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       requestId: string,
       authorId: string,
       authorName: string,
-      authorRole: "hr" | "admin" | "supervisor",
+      authorRole: "hr" | "supervisor",
       text: string
     ) => {
       const req = state.kpiUpdateRequests.find((r) => r.id === requestId);
@@ -2010,14 +2036,10 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       };
 
       const updatedComments = [...(req.comments || []), comment];
-      // 👈 Bounce between HR and supervisor
       let newStatus = req.status;
       if (authorRole === "supervisor" && req.status === "pending_supervisor_review") {
         newStatus = "back_to_hr";
-      } else if (
-        (authorRole === "hr" || authorRole === "admin") &&
-        req.status === "back_to_hr"
-      ) {
+      } else if (authorRole === "hr" && req.status === "back_to_hr") {
         newStatus = "pending_supervisor_review";
       }
 
@@ -2038,24 +2060,23 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         console.error("commentOnKpiUpdateRequest save failed:", err)
       );
 
-      // Notify the other side
       const notifs: Notification[] = [];
       if (authorRole === "supervisor" && req.pushedBy) {
         notifs.push({
           id: newId(),
           userId: req.pushedBy,
-          type: "appraisal_needs_revision" as any,
+          type: "kpi_update_comment_supervisor" as any,
           message: `${authorName} commented on KPI changes for ${req.department} · ${req.role}`,
           link: "/my-team",
           read: false,
           createdAt: new Date().toISOString(),
         });
-      } else if (authorRole === "hr" || authorRole === "admin") {
+      } else if (authorRole === "hr") {
         if (req.assignedSupervisorId) {
           notifs.push({
             id: newId(),
             userId: req.assignedSupervisorId,
-            type: "appraisal_needs_revision" as any,
+            type: "kpi_update_comment_hr" as any,
             message: `HR replied on KPI changes for ${req.department} · ${req.role}`,
             link: "/my-team",
             read: false,
@@ -2096,6 +2117,15 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       const employee = state.employees.find((e) => e.id === req.employeeId);
       if (!employee) throw new Error("Employee not found");
 
+      // Live authorization: only current supervisor (or HR) can approve
+      const isCurrentSupervisor = employee.supervisorId === supervisorId;
+      const isHR = state.employees.some(
+        (e) => e.id === supervisorId && e.roleType === "hr"
+      );
+      if (!isCurrentSupervisor && !isHR) {
+        throw new Error("You are not authorized to approve this request");
+      }
+
       const now = new Date().toISOString();
       const revertUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -2105,7 +2135,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         needsKpiSetup: false,
       };
 
-      // 👈 NEW — grab current template if we're going to overwrite it
       const templateKey = `${req.department}-${req.role}`;
       const currentTemplate = updateTemplate ? state.kpiTemplates[templateKey] : undefined;
       const previousCategories = currentTemplate?.categories;
@@ -2115,13 +2144,12 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         status: "unacknowledged",
         approvedBySupervisorAt: now,
         supervisorComment: comment,
-        updateTemplateRequested: updateTemplate,
-        updateTemplateApplied: updateTemplate,
+        templateUpdateRequested: updateTemplate,
+        templateUpdateApplied: updateTemplate,
         previousTemplate: updateTemplate ? previousCategories : undefined,
         canRevertUntil: updateTemplate ? revertUntil : undefined,
       };
 
-      // 👈 NEW — new template from approved categories
       const newTemplate: KPITemplate | null = updateTemplate
         ? {
             department: req.department,
@@ -2143,25 +2171,23 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           }
         : null;
 
-      // Employee notification
       const employeeNotif: Notification = {
         id: newId(),
         userId: employee.id,
-        type: "appraisal_needs_revision" as any,
+        type: "kpi_update_approved" as any,
         message: `Your KPIs were updated — ${req.diffs.length} change${req.diffs.length === 1 ? "" : "s"} to review`,
         link: "/kpi-updates",
         read: false,
         createdAt: now,
       };
 
-      // HR notifications — FYI + optional template update notice
       const hrNotifs: Notification[] = state.employees
-        .filter((e) => e.roleType === "hr" || e.roleType === "admin")
+        .filter((e) => e.roleType === "hr")
         .filter((e) => e.id !== supervisorId)
         .map((hr) => ({
           id: newId(),
           userId: hr.id,
-          type: "appraisal_approved" as any,
+          type: "kpi_update_approved" as any,
           message: updateTemplate
             ? `${supervisorName} approved KPI changes for ${employee.name} AND updated the standard template for ${req.department} · ${req.role}`
             : `${supervisorName} approved KPI changes for ${employee.name}`,
@@ -2170,7 +2196,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           createdAt: now,
         }));
 
-      // Apply state
       setState((s) => {
         const nextState: any = {
           ...s,
@@ -2183,7 +2208,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           notifications: [...s.notifications, employeeNotif, ...hrNotifs],
         };
 
-        // 👈 If updating template, overwrite kpiTemplates
         if (newTemplate) {
           nextState.kpiTemplates = {
             ...s.kpiTemplates,
@@ -2194,7 +2218,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         return nextState;
       });
 
-      // Persist
       try {
         await upsertEmployeeDB(updatedEmployee);
         await upsertKpiUpdateRequest(updatedReq);
@@ -2213,7 +2236,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     [state.kpiUpdateRequests, state.employees, state.kpiTemplates]
   );
 
-  // 👈 NEW — HR reverts a template write-back within the 3-day window
   const revertTemplateUpdate = useCallback(
     async (requestId: string) => {
       const req = state.kpiUpdateRequests.find((r) => r.id === requestId);
@@ -2244,14 +2266,13 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         templateRevertedAt: now,
       };
 
-      // Find HR who triggered the revert (for FYI to supervisor)
       const supervisorId = req.assignedSupervisorId;
       const notifs: Notification[] = [];
       if (supervisorId) {
         notifs.push({
           id: newId(),
           userId: supervisorId,
-          type: "appraisal_rejected" as any,
+          type: "kpi_update_reverted" as any,
           message: `HR reverted the template update for ${req.department} · ${req.role}`,
           link: "/my-team",
           read: false,
@@ -2284,6 +2305,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     },
     [state.kpiUpdateRequests, state.kpiTemplates]
   );
+
   const rejectKpiUpdateAsSupervisor = useCallback(
     async (
       requestId: string,
@@ -2302,13 +2324,12 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         supervisorComment: reason,
       };
 
-      // Notify HR
       const hrNotifs: Notification[] = state.employees
-        .filter((e) => e.roleType === "hr" || e.roleType === "admin")
+        .filter((e) => e.roleType === "hr")
         .map((hr) => ({
           id: newId(),
           userId: hr.id,
-          type: "appraisal_rejected" as any,
+          type: "kpi_update_rejected" as any,
           message: `${supervisorName} rejected KPI changes for ${req.employeeId.slice(0, 8)}…: "${reason.slice(0, 60)}${reason.length > 60 ? "…" : ""}"`,
           link: "/appraisals-review",
           read: false,
@@ -2336,7 +2357,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   );
 
   // ============================================
-  // 👈 NEW — SUPERVISOR DIRECT KPI EDIT
+  // SUPERVISOR DIRECT KPI EDIT
   // ============================================
 
   const supervisorUpdateEmployeeKpis = useCallback(
@@ -2397,7 +2418,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       const employeeNotif: Notification = {
         id: newId(),
         userId: employeeId,
-        type: "appraisal_needs_revision" as any,
+        type: "kpi_update_pushed_direct" as any,
         message: "Your KPIs were updated by your supervisor",
         link: "/kpi-updates",
         read: false,
@@ -2405,11 +2426,11 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       };
 
       const hrNotifs: Notification[] = state.employees
-        .filter((e) => e.roleType === "hr" || e.roleType === "admin")
+        .filter((e) => e.roleType === "hr")
         .map((hr) => ({
           id: newId(),
           userId: hr.id,
-          type: "appraisal_needs_revision" as any,
+          type: "kpi_update_pushed_direct" as any,
           message: `${supervisor?.name || "Supervisor"} updated KPIs for ${employee.name}`,
           link: "/appraisals-review",
           read: false,
@@ -2457,7 +2478,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       await upsertAppSetting("bonus_revealed", value);
     } catch (err) {
       console.error("setBonusRevealed persist failed:", err);
-      // revert on failure
       setState((s) => ({ ...s, bonusRevealed: !value }));
       throw err;
     }
@@ -2479,8 +2499,8 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       for (const r of state.kpiUpdateRequests) {
         await upsertKpiUpdateRequest(r);
       }
-      for (const r of state.kpiUpdateRequests) {
-        await upsertKpiUpdateRequest(r);
+      for (const r of state.kpiRequests) {
+        await upsertKpiRequest(r);
       }
       console.log("✅ Manual sync complete");
     } catch (err) {
@@ -2491,7 +2511,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     }
   }, [state]);
 
-    // 👈 Public: force a fresh pull from Supabase
   const refreshFromCloud = useCallback(async () => {
     setIsSyncing(true);
     try {
@@ -2506,7 +2525,6 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           fetchAppSettings(),
         ]);
 
-      // Notifications are per-user.
       let cloudNotifications: Notification[] = [];
       try {
         const { getCurrentUser } = await import("@/lib/supabase");
@@ -2552,12 +2570,10 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     setGrades,
     resetGrades,
     upsertEmployee,
-    removeEmployee,
     clearEmployees,
     loadDemo,
     setEmployees,
     calc,
-    saveMonthlySnapshot,
     getMonthlyHistory,
     getPerformanceTrend,
     getAllTrends,
@@ -2569,8 +2585,9 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     saveTemplate,
     getTemplate,
     getAllTemplates,
-    applyTemplateToEmployees,
     hardDeleteEmployee,
+    validateEmployeeRole,
+    rejectEmployeeRole,
     submitAppraisal,
     approveAppraisal,
     rejectAppraisal,
@@ -2590,27 +2607,23 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     acknowledgeKpiUpdate,
     commentKpiUpdate,
 
-    // 👈 NEW — supervisor gate
     getSupervisorPendingKpiUpdates,
     commentOnKpiUpdateRequest,
     approveKpiUpdateAsSupervisor,
-    revertTemplateUpdate,   // 👈 ADD
+    revertTemplateUpdate,
     rejectKpiUpdateAsSupervisor,
     getKpiUpdateComments,
     supervisorUpdateEmployeeKpis,
 
-    // 👈 NEW
     submitKpiRequest,
     getKpiRequests,
     getEmployeeKpiRequest,
     cancelKpiRequest,
-    fulfillKpiRequest,
     syncToCloud,
     setBonusRevealed,
     refreshFromCloud,
   };
 
-  // Dev-only: expose to window for console debugging
   if (typeof window !== "undefined" && import.meta.env.DEV) {
     (window as any).__p4p = value;
   }

@@ -44,6 +44,7 @@ export interface Employee {
   kpis: KPI[];
   categories?: Category[];
   roleType?: 'employee' | 'hr' | 'admin';
+  roleStatus?: 'pending' | 'active' | 'rejected';   // ← make sure this line exists
   supervisorId?: string;
   supervisorName?: string;
   isManager?: boolean;
@@ -351,7 +352,7 @@ export interface KpiUpdateComment {
   id: string;
   authorId: string;
   authorName: string;
-  authorRole: "hr" | "admin" | "supervisor";
+  authorRole: "hr" | "supervisor" | "employee";
   text: string;
   timestamp: string;
 }

@@ -20,7 +20,7 @@ export const DEFAULT_DEPARTMENTS = [
 ] as const;
 
 // ===== ALL ROLES (matching grade points) =====
-export const DEFAULT_ROLES = [,
+export const DEFAULT_ROLES = [
   "Executive President",
   "Head of Department",
   "Deputy Head of Department", // NEW ROLE – placed after Head of Department

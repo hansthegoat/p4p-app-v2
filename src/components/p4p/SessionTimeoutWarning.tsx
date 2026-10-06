@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Clock } from "lucide-react";
 
@@ -9,13 +11,20 @@ interface Props {
 }
 
 export function SessionTimeoutWarning({ open, secondsLeft, onStay, onLogout }: Props) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   if (!open) return null;
+  if (!mounted) return null;
 
   const mins = Math.floor(secondsLeft / 60);
   const secs = secondsLeft % 60;
   const label = `${mins}:${secs.toString().padStart(2, "0")}`;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-background border border-border rounded-lg shadow-2xl max-w-sm w-full p-6 text-center">
         <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-4">
@@ -39,6 +48,7 @@ export function SessionTimeoutWarning({ open, secondsLeft, onStay, onLogout }: P
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

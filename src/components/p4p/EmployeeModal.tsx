@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, Trash2, X, FolderPlus, AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -230,7 +231,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
   const hasTemplate = !!getTemplateForJobGrade(data.jobGrade);
   const managers = employees.filter((e) => e.isManager === true && e.id !== data.id);
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -723,6 +724,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

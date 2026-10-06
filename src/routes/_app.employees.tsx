@@ -16,7 +16,7 @@ import { staggerContainer, fadeUp } from "@/lib/motion";
 import {
   Search, UserPlus, Trash2, Edit2, Upload, FileSpreadsheet,
   X, Users, Award, TrendingUp, AlertTriangle, Mail, Building2,
-  AlertCircle,
+  AlertCircle, CheckCircle, Clock, ShieldCheck,
 } from "lucide-react";
 import { EmployeeModal } from "@/components/p4p/EmployeeModal";
 import { DeleteConfirmModal } from "@/components/p4p/DeleteConfirmModal";
@@ -32,6 +32,8 @@ function EmployeesPage() {
     clearEmployees,
     loadDemo,
     hardDeleteEmployee,
+    validateEmployeeRole,
+    rejectEmployeeRole,
   } = useP4P();
 
   const [search, setSearch] = useState("");
@@ -39,9 +41,43 @@ function EmployeesPage() {
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<any>(null);
+  const [validatingId, setValidatingId] = useState<string | null>(null);
 
   // ⭐ Exclude admins (they're operators, not employees)
   const realEmployees = employees.filter((e) => e.roleType !== "admin");
+    const pendingValidations = realEmployees.filter(
+    (e) => e.roleStatus === "pending"
+  );
+
+  const handleValidate = async (emp: any) => {
+    setValidatingId(emp.id);
+    try {
+      await validateEmployeeRole(emp.id, "HR");
+      showToast.success("Role validated", `${emp.name} is now active.`);
+    } catch (err: any) {
+      showToast.error("Could not validate", err.message || "Try again");
+    } finally {
+      setValidatingId(null);
+    }
+  };
+
+  const handleReject = async (emp: any) => {
+    if (
+      !confirm(
+        `Reject role request from ${emp.name}? They will be set as a regular employee.`
+      )
+    )
+      return;
+    setValidatingId(emp.id);
+    try {
+      await rejectEmployeeRole(emp.id, "HR");
+      showToast.success("Role rejected", `${emp.name} is now a regular Employee.`);
+    } catch (err: any) {
+      showToast.error("Could not reject", err.message || "Try again");
+    } finally {
+      setValidatingId(null);
+    }
+  };
 
   const filteredEmployees = realEmployees.filter((emp) => {
     const s = search.toLowerCase();
@@ -131,6 +167,61 @@ function EmployeesPage() {
           }
         />
       </div>
+      {/* Pending role validations */}
+      {pendingValidations.length > 0 && (
+        <motion.div variants={fadeUp}>
+          <Card className="p-4 bg-blue-500/5 border-blue-500/20 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <ShieldCheck className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-blue-800 dark:text-blue-300">
+                {pendingValidations.length} role request
+                {pendingValidations.length > 1 ? "s" : ""} awaiting review
+              </div>
+              <div className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">
+                These people signed up and selected a role. Confirm their role to activate them.
+              </div>
+              <div className="mt-3 space-y-2">
+                {pendingValidations.map((emp) => (
+                  <div
+                    key={emp.id}
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-background/60 border border-blue-500/20 flex-wrap"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">{emp.name}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {emp.department || "—"} · {emp.role || "—"} · {emp.email}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        size="sm"
+                        onClick={() => handleValidate(emp)}
+                        disabled={validatingId === emp.id}
+                        className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white h-8"
+                      >
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        Validate
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleReject(emp)}
+                        disabled={validatingId === emp.id}
+                        className="gap-1.5 text-red-600 hover:text-red-700 border-red-500/30 hover:bg-red-500/10 h-8"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Alert banner for missing KPIs */}
       {needsKpiCount > 0 && (
@@ -288,6 +379,18 @@ function EmployeesPage() {
                                     Needs KPIs
                                   </Badge>
                                 )}
+                                {emp.roleStatus === "pending" && (
+                                  <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 gap-1">
+                                    <Clock className="h-2.5 w-2.5" />
+                                    Pending Validation
+                                  </Badge>
+                                )}
+                                {emp.roleStatus === "rejected" && (
+                                  <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30 gap-1">
+                                    <AlertCircle className="h-2.5 w-2.5" />
+                                    Role Rejected
+                                  </Badge>
+                                )}
                               </div>
                               {emp.email && (
                                 <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -338,6 +441,32 @@ function EmployeesPage() {
 
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                            {emp.roleStatus === "pending" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 gap-1"
+                                  onClick={() => handleValidate(emp)}
+                                  disabled={validatingId === emp.id}
+                                  title="Validate role"
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  <span className="text-xs">Validate</span>
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 px-2 text-red-500 hover:text-red-700 hover:bg-red-500/10 gap-1"
+                                  onClick={() => handleReject(emp)}
+                                  disabled={validatingId === emp.id}
+                                  title="Reject role"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                  <span className="text-xs">Reject</span>
+                                </Button>
+                              </>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"

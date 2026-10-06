@@ -20,6 +20,8 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +33,7 @@ export function NotificationBell() {
     };
   }, []);
 
+  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -42,8 +45,30 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  // Close on Escape, restore focus to the trigger
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open]);
+
+  // Move focus into the panel when it opens
+  useEffect(() => {
+    if (!open || !panelRef.current) return;
+    const firstFocusable = panelRef.current.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    firstFocusable?.focus();
+  }, [open]);
+
   const me = employees.find(
-    (e) => e.authUserId === authUserId || (user?.email && e.email === user.email)
+    (e) => e.authUserId === authUserId || (user?.email && e.email === user.email),
   );
 
   const mine = me
@@ -51,7 +76,7 @@ export function NotificationBell() {
         .filter((n) => n.userId === me.id)
         .sort(
           (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         )
     : [];
 
@@ -72,6 +97,11 @@ export function NotificationBell() {
     }
   };
 
+  const unreadLabel =
+    unread.length === 0
+      ? "No unread notifications"
+      : `${unread.length} unread notification${unread.length === 1 ? "" : "s"}`;
+
   return (
     <div ref={wrapperRef} className="relative">
       <motion.div
@@ -80,13 +110,17 @@ export function NotificationBell() {
         transition={{ type: "spring", stiffness: 400, damping: 25 }}
       >
         <Button
+          ref={triggerRef}
           variant="ghost"
           size="icon"
           className="h-8 w-8 relative"
           onClick={() => setOpen((v) => !v)}
-          title="Notifications"
+          aria-label={`Notifications. ${unreadLabel}.`}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls="notification-panel"
         >
-          <Bell className="h-4 w-4" />
+          <Bell className="h-4 w-4" aria-hidden="true" />
           <AnimatePresence>
             {unread.length > 0 && (
               <motion.span
@@ -95,6 +129,7 @@ export function NotificationBell() {
                 animate={{ scale: 1 }}
                 exit={{ scale: 0 }}
                 transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                aria-hidden="true"
                 className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1"
               >
                 {unread.length > 9 ? "9+" : unread.length}
@@ -107,77 +142,92 @@ export function NotificationBell() {
       <AnimatePresence>
         {open && (
           <motion.div
+            ref={panelRef}
+            id="notification-panel"
+            role="dialog"
+            aria-label="Notifications"
             variants={dropdown}
             initial="hidden"
             animate="show"
             exit="exit"
             className="absolute right-0 top-10 w-80 max-h-[440px] flex flex-col rounded-lg border border-border bg-popover text-popover-foreground shadow-lg z-50 origin-top-right"
           >
-          <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50">
-            <div className="text-[13px] font-semibold">Notifications</div>
-            {unread.length > 0 && (
-              <button
-                onClick={markAllRead}
-                disabled={markingAll}
-                className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 disabled:opacity-50"
-              >
-                {markingAll ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <CheckCheck className="h-3 w-3" />
-                )}
-                Mark all read
-              </button>
-            )}
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {mine.length === 0 ? (
-              <div className="p-8 text-center">
-                <Bell className="h-6 w-6 text-muted-foreground/30 mx-auto mb-2" />
-                <div className="text-[12px] text-muted-foreground">
-                  No notifications
-                </div>
-              </div>
-            ) : (
-              mine.slice(0, 25).map((n) => (
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50">
+              <div className="text-[13px] font-semibold">Notifications</div>
+              {unread.length > 0 && (
                 <button
-                  key={n.id}
-                  onClick={() => handleClick(n)}
-                  className={`w-full text-left px-3 py-2.5 border-b border-border/30 hover:bg-accent/40 transition-colors flex items-start gap-2.5 ${
-                    !n.read ? "bg-primary/5" : ""
-                  }`}
+                  type="button"
+                  onClick={markAllRead}
+                  disabled={markingAll}
+                  className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 disabled:opacity-50"
                 >
-                  <div className="mt-0.5 shrink-0">
-                    <NotifIcon type={n.type} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] leading-snug">{n.message}</div>
-                    <div className="text-[10px] text-muted-foreground mt-1">
-                      {formatRelative(n.createdAt)}
-                    </div>
-                  </div>
-                  {!n.read && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-2" />
+                  {markingAll ? (
+                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <CheckCheck className="h-3 w-3" aria-hidden="true" />
                   )}
+                  Mark all read
                 </button>
-              ))
-            )}
-          </div>
-
-          {mine.length > 0 && (
-            <div className="p-2 border-t border-border/50">
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  navigate({ to: "/kpi-updates" });
-                }}
-                className="w-full text-center text-[11px] text-muted-foreground hover:text-foreground py-1"
-              >
-                View all KPI updates
-              </button>
+              )}
             </div>
-          )}
+
+            <div className="flex-1 overflow-y-auto">
+              {mine.length === 0 ? (
+                <div className="p-8 text-center">
+                  <Bell
+                    className="h-6 w-6 text-muted-foreground/30 mx-auto mb-2"
+                    aria-hidden="true"
+                  />
+                  <div className="text-[12px] text-muted-foreground">
+                    No notifications
+                  </div>
+                </div>
+              ) : (
+                mine.slice(0, 25).map((n) => (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={() => handleClick(n)}
+                    aria-label={`${n.read ? "" : "Unread. "}${n.message}. ${formatAbsolute(n.createdAt)}`}
+                    className={`w-full text-left px-3 py-2.5 border-b border-border/30 hover:bg-accent/40 transition-colors flex items-start gap-2.5 ${
+                      !n.read ? "bg-primary/5" : ""
+                    }`}
+                  >
+                    <div className="mt-0.5 shrink-0">
+                      <NotifIcon type={n.type} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px] leading-snug">{n.message}</div>
+                      <div className="text-[10px] text-muted-foreground mt-1">
+                        <span aria-hidden="true">{formatRelative(n.createdAt)}</span>
+                        <span className="sr-only">{formatAbsolute(n.createdAt)}</span>
+                      </div>
+                    </div>
+                    {!n.read && (
+                      <span
+                        aria-hidden="true"
+                        className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-2"
+                      />
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+
+            {mine.length > 0 && (
+              <div className="p-2 border-t border-border/50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate({ to: "/kpi-updates" });
+                  }}
+                  className="w-full text-center text-[11px] text-muted-foreground hover:text-foreground py-1"
+                >
+                  View all KPI updates
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -207,8 +257,14 @@ function NotifIcon({ type }: { type: string }) {
       Icon: MessageSquare,
       tone: "text-blue-600 dark:text-blue-400",
     },
-    trigger_pip: { Icon: AlertTriangle, tone: "text-amber-600 dark:text-amber-400" },
-    trigger_probation: { Icon: AlertTriangle, tone: "text-red-600 dark:text-red-400" },
+    trigger_pip: {
+      Icon: AlertTriangle,
+      tone: "text-amber-600 dark:text-amber-400",
+    },
+    trigger_probation: {
+      Icon: AlertTriangle,
+      tone: "text-red-600 dark:text-red-400",
+    },
     trigger_management_action: {
       Icon: AlertOctagon,
       tone: "text-red-700 dark:text-red-400",
@@ -216,7 +272,7 @@ function NotifIcon({ type }: { type: string }) {
   };
   const m = map[type] || { Icon: Bell, tone: "text-muted-foreground" };
   const I = m.Icon;
-  return <I className={`h-4 w-4 ${m.tone}`} />;
+  return <I className={`h-4 w-4 ${m.tone}`} aria-hidden="true" />;
 }
 
 function formatRelative(iso: string): string {
@@ -231,5 +287,12 @@ function formatRelative(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
+  });
+}
+
+function formatAbsolute(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
   });
 }

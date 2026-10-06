@@ -19,14 +19,24 @@ function filterAvailableSteps(steps: TourStep[]): TourStep[] {
 }
 
 function replayPopoverAnimation() {
-  const popover = document.querySelector(".p4p-tour-popover") as HTMLElement | null;
+  const popover = document.querySelector(
+    ".p4p-tour-popover",
+  ) as HTMLElement | null;
   if (!popover) return;
   popover.classList.remove("p4p-tour-enter");
   void popover.offsetWidth;
   popover.classList.add("p4p-tour-enter");
 }
 
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 function fireCelebration() {
+  // Respect users who have reduced motion enabled at the OS level.
+  if (prefersReducedMotion()) return;
+
   const colors = [
     "#FF6B6B",
     "#FFD93D",
@@ -83,10 +93,11 @@ function fireCelebration() {
 export function usePageTour(
   tour: Tour | null,
   enabled = true,
-  onComplete?: () => void   // 👈 NEW — fires after the tour finishes or is closed
+  onComplete?: () => void,
 ) {
   const hasRunRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
+  const driverRef = useRef<ReturnType<typeof driver> | null>(null);
 
   // Keep the callback ref fresh without re-triggering the effect
   useEffect(() => {
@@ -107,16 +118,13 @@ export function usePageTour(
 
       if (available.length === 0) {
         markTourDone(tour.key);
-        // Even if the tour was empty, let the caller know it's finished
         onCompleteRef.current?.();
         return;
       }
 
       hasRunRef.current = true;
 
-      let driverObj: ReturnType<typeof driver>;
-
-      driverObj = driver({
+      const driverObj = driver({
         ...BASE_DRIVER_CONFIG,
         steps: available.map((s) => ({
           element: s.element,
@@ -136,25 +144,36 @@ export function usePageTour(
         },
         onDestroyed: () => {
           markTourDone(tour.key);
-          // 👈 Fire the completion callback
+          driverRef.current = null;
           onCompleteRef.current?.();
         },
       });
 
+      driverRef.current = driverObj;
       driverObj.drive();
     };
 
-const t1 = window.setTimeout(tryRun, 1200);  // 👈 800 → 1200
-const t2 = window.setTimeout(() => {
-  if (!hasRunRef.current && !isTourDone(tour.key) && !cancelled) {
-    tryRun();
-  }
-}, 2200);                                     // 👈 1400 → 2200
+    const t1 = window.setTimeout(tryRun, 1200);
+    const t2 = window.setTimeout(() => {
+      if (!hasRunRef.current && !isTourDone(tour.key) && !cancelled) {
+        tryRun();
+      }
+    }, 2200);
 
     return () => {
       cancelled = true;
       window.clearTimeout(t1);
       window.clearTimeout(t2);
+      // If the component unmounts while the tour is active, tear it down so
+      // the overlay and focus trap don't get stuck on the page.
+      if (driverRef.current) {
+        try {
+          driverRef.current.destroy();
+        } catch {
+          /* driver may already be destroyed */
+        }
+        driverRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tour?.key, enabled]);

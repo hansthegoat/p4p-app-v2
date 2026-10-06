@@ -33,18 +33,22 @@ export function KpiUpdatesBanner() {
   if (pending === 0) return null;
 
   return (
-    <button
-      onClick={() => navigate({ to: "/kpi-updates" })}
-      className="w-full mb-4 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/15 transition-colors flex items-center gap-3 text-left"
-    >
-      <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
-      <div className="flex-1">
-        <div className="font-medium text-sm">KPI updates need your review</div>
-        <div className="text-xs text-muted-foreground">
-          HR proposed {pending} change{pending > 1 ? "s" : ""} to your KPIs.
+    <div role="status" aria-live="polite">
+      <button
+        type="button"
+        onClick={() => navigate({ to: "/kpi-updates" })}
+        aria-label={`KPI updates need your review. HR proposed ${pending} change${pending > 1 ? "s" : ""} to your KPIs. Review now.`}
+        className="w-full mb-4 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/15 transition-colors flex items-center gap-3 text-left"
+      >
+        <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
+        <div className="flex-1">
+          <div className="font-medium text-sm">KPI updates need your review</div>
+          <div className="text-xs text-muted-foreground">
+            HR proposed {pending} change{pending > 1 ? "s" : ""} to your KPIs.
+          </div>
         </div>
-      </div>
-      <ArrowRight className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-    </button>
+        <ArrowRight className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
+      </button>
+    </div>
   );
 }

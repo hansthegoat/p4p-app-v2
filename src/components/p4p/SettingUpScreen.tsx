@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { User, Clock } from "lucide-react";
 
@@ -17,6 +17,7 @@ interface Props {
 
 export function SettingUpScreen({ status = "loading", onRetry }: Props) {
   const [messageIndex, setMessageIndex] = useState(0);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (status === "timeout") return;
@@ -28,8 +29,15 @@ export function SettingUpScreen({ status = "loading", onRetry }: Props) {
 
   if (status === "timeout") {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center px-6 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-5">
+      <div
+        role="alert"
+        aria-live="assertive"
+        className="min-h-[60vh] flex flex-col items-center justify-center px-6 text-center"
+      >
+        <div
+          aria-hidden="true"
+          className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-5"
+        >
           <Clock className="h-6 w-6 text-amber-600 dark:text-amber-400" />
         </div>
         <h2 className="text-lg font-bold mb-2">Taking longer than expected</h2>
@@ -53,12 +61,18 @@ export function SettingUpScreen({ status = "loading", onRetry }: Props) {
 
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center px-6">
+      {/* Single SR announcement instead of the rotating visual messages */}
+      <div role="status" aria-live="polite" className="sr-only">
+        Setting up your account. This usually takes just a few seconds.
+      </div>
+
       {/* Animated orb */}
-      <div className="relative w-32 h-32 mb-6">
+      <div className="relative w-32 h-32 mb-6" aria-hidden="true">
         <svg
-          className="absolute inset-0 w-full h-full animate-[spin_2.4s_linear_infinite]"
+          className={`absolute inset-0 w-full h-full ${
+            prefersReducedMotion ? "" : "animate-[spin_2.4s_linear_infinite]"
+          }`}
           viewBox="0 0 128 128"
-          aria-hidden="true"
         >
           <circle
             cx="64"
@@ -73,9 +87,10 @@ export function SettingUpScreen({ status = "loading", onRetry }: Props) {
           />
         </svg>
         <svg
-          className="absolute inset-0 w-full h-full animate-[spin_4s_linear_infinite_reverse]"
+          className={`absolute inset-0 w-full h-full ${
+            prefersReducedMotion ? "" : "animate-[spin_4s_linear_infinite_reverse]"
+          }`}
           viewBox="0 0 128 128"
-          aria-hidden="true"
         >
           <circle
             cx="64"
@@ -101,14 +116,14 @@ export function SettingUpScreen({ status = "loading", onRetry }: Props) {
         This usually takes just a few seconds.
       </p>
 
-      <div className="h-5 flex items-center justify-center overflow-hidden">
+      <div className="h-5 flex items-center justify-center overflow-hidden" aria-hidden="true">
         <AnimatePresence mode="wait">
           <motion.p
             key={messageIndex}
-            initial={{ opacity: 0, y: 6 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.3 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
             className="text-xs text-muted-foreground"
           >
             {STATUS_MESSAGES[messageIndex]}

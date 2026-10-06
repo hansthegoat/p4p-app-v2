@@ -30,10 +30,11 @@ import {
   AlertCircle, Send, Loader2,
   Plus, Trash2, FolderPlus, Save,
   FileSpreadsheet, AlertTriangle, CheckCircle, Info, GripVertical, RotateCcw,
-  Layers, ListChecks, Building2, UserCog, Download, Upload, Users,
+  Layers, ListChecks, Building2, UserCog, Download, Upload, Users, Inbox,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { MissingKpisTab } from "@/components/p4p/MissingKpisTab";
+import { KpiRequestsTab } from "@/components/p4p/KpiRequestsTab";
 import type { KPITemplate } from "@/lib/p4p/types";
 import { newId } from "@/lib/p4p/defaults";
 import {
@@ -95,6 +96,7 @@ function KPIFrameworkPage() {
     pushTemplateToEmployees,
     previewTemplateDiff,
     employees,
+    kpiRequests,
   } = useP4P();
 
   const [activeTab, setActiveTab] = useState<string>("build");
@@ -118,7 +120,9 @@ function KPIFrameworkPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("view") === "missing") setActiveTab("missing");
+    const view = params.get("view");
+    if (view === "missing") setActiveTab("missing");
+    else if (view === "requests") setActiveTab("requests");
     const dept = params.get("dept");
     const role = params.get("role");
     if (dept) setSelectedDept(dept);
@@ -298,12 +302,24 @@ function KPIFrameworkPage() {
   };
 
   const handleImportApply = (imported: KPITemplate) => {
+    if (
+      !confirm(
+        `Replace the current ${selectedDept} · ${selectedRole} template with the imported one? Any unsaved changes will be lost.`
+      )
+    )
+      return;
     setTemplate(imported);
     saveTemplate(imported);
     showToast.success("Imported from Excel", "Template loaded. Review and push when ready.");
   };
 
   const handleBulkApply = async (imported: KPITemplate[]) => {
+    if (
+      !confirm(
+        `Import ${imported.length} template${imported.length === 1 ? "" : "s"}? Existing templates with the same department and role will be overwritten.`
+      )
+    )
+      return;
     for (const t of imported) {
       saveTemplate(t);
     }
@@ -539,10 +555,26 @@ function KPIFrameworkPage() {
 
       {/* 👈 Tabs: Build Templates vs Missing KPIs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} data-tour="framework-tabs">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-xl grid-cols-3">
           <TabsTrigger value="build" className="gap-2">
             <FileSpreadsheet className="h-4 w-4" />
             Build Templates
+          </TabsTrigger>
+          <TabsTrigger value="requests" className="gap-2">
+            <Inbox className="h-4 w-4" />
+            Requests
+            {(() => {
+              const pending = kpiRequests.filter((r) => r.status === "pending").length;
+              if (pending === 0) return null;
+              return (
+                <Badge
+                  variant="outline"
+                  className="ml-1 h-4 px-1.5 text-[10px] bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30"
+                >
+                  {pending}
+                </Badge>
+              );
+            })()}
           </TabsTrigger>
           <TabsTrigger value="missing" className="gap-2">
             <Users className="h-4 w-4" />
@@ -935,6 +967,17 @@ function KPIFrameworkPage() {
               </Card>
             </motion.div>
           )}
+        </TabsContent>
+
+        {/* ─────────── REQUESTS TAB ─────────── */}
+        <TabsContent value="requests" className="mt-4">
+          <KpiRequestsTab
+            onPickRole={(dept, role) => {
+              setSelectedDept(dept);
+              setSelectedRole(role);
+              setActiveTab("build");
+            }}
+          />
         </TabsContent>
 
         {/* ─────────── MISSING KPIs TAB ─────────── */}
