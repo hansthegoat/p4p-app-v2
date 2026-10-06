@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
@@ -12,7 +12,8 @@ import { supabase } from "@/lib/supabase";
 import { showToast } from "@/lib/toast";
 import { DEFAULT_ORG_ID } from "@/lib/p4p/constants";
 import { checkPassword, passwordColor } from "@/lib/p4p/password";
-import { Check, X, Eye, EyeOff } from "lucide-react";
+import { lookupInvite, type InviteLookup } from "@/lib/p4p/admin-data";
+import { Check, X, Eye, EyeOff, Sparkles, Building2 } from "lucide-react";
 
 const MANAGER_ROLES = [
   "President",
@@ -27,9 +28,9 @@ const MANAGER_ROLES = [
 
 const searchSchema = z.object({
   email: z.string().optional(),
+  invite: z.string().optional(),
 });
 
-/** Small reusable strength bar (used only under the Password field) */
 function StrengthBar({ value }: { value: string }) {
   const check = checkPassword(value);
   if (!value) return null;
@@ -68,6 +69,8 @@ function StrengthBar({ value }: { value: string }) {
 
 function RegisterForm() {
   const navigate = useNavigate();
+  const search = useSearch({ from: "/_auth/register" }) as { email?: string; invite?: string };
+  const inviteCode = search.invite || "";
   const { upsertEmployee, getTemplate } = useP4P();
 
   const [name, setName] = useState("");
@@ -82,18 +85,50 @@ function RegisterForm() {
   const [error, setError] = useState("");
   const [roles, setRoles] = useState<string[]>([]);
   const [pwCheck, setPwCheck] = useState(checkPassword(""));
+  const [invite, setInvite] = useState<InviteLookup | null>(null);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
 
   const departments = getDepartments();
 
   const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
   const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
+  // If invite code is present, look it up and prefill
   useEffect(() => {
-    if (department) {
+    if (!inviteCode) return;
+    let cancelled = false;
+    setInviteLoading(true);
+    lookupInvite(inviteCode)
+      .then((result) => {
+        if (cancelled) return;
+        if (!result) {
+          setInviteError(
+            "This invite link has expired or has already been used. Ask your administrator for a new one."
+          );
+        } else {
+          setInvite(result);
+          setName(result.invitee_name);
+          setEmail(result.invitee_email);
+          // HR's dept/role are pre-set by admin — kept on the employee row.
+          // The form fields below will be hidden while invite is present.
+          setDepartment("Human Resources");
+          setRole("Head of Department");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setInviteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [inviteCode]);
+
+  useEffect(() => {
+    if (!invite && department) {
       setRoles(getRolesForDepartment(department));
-      setRole("");
     }
-  }, [department]);
+  }, [department, invite]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,14 +149,11 @@ function RegisterForm() {
     }
 
     try {
-      const template = getTemplate(department, role);
-      const hasTemplate = !!template;
-
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { name, department, role },
+          data: { name, invite: inviteCode || undefined },
         },
       });
 
@@ -130,12 +162,17 @@ function RegisterForm() {
 
       const needsVerification = !authData.session;
 
+      // Store pending registration. When invite is present, we pass the
+      // invite details so verify-otp can claim the existing row.
       const pendingRegistration = {
         authUserId: authData.user.id,
         name,
         email,
         department,
         role,
+        inviteCode: inviteCode || undefined,
+        orgId: invite?.org_id || undefined,
+        inviteEmployeeId: invite?.employee_id || undefined,
       };
       localStorage.setItem(
         "p4p_pending_registration",
@@ -151,84 +188,75 @@ function RegisterForm() {
         return;
       }
 
-      const isManager = MANAGER_ROLES.some(
-        (r) => r.toLowerCase() === role.toLowerCase()
-      );
+      // No email verification — finalize immediately
+      if (invite) {
+        // Link to pre-created row
+        const { error: linkError } = await supabase
+          .from("employees")
+          .update({ auth_id: authData.user.id, invite_code: null })
+          .eq("invite_code", inviteCode);
+        if (linkError) {
+          console.error("Failed to link invite:", linkError);
+          showToast.error("Could not link invite", linkError.message);
+        }
+      } else {
+        // Fresh employee signup
+        const template = getTemplate(department, role);
+        const hasTemplate = !!template;
+        const isManager = MANAGER_ROLES.some(
+          (r) => r.toLowerCase() === role.toLowerCase()
+        );
 
-      const newEmployee = {
-        id: authData.user.id,
-        name,
-        email,
-        authUserId: authData.user.id,
-        department,
-        role,
-        jobGrade: template?.jobGrade || "4",
-        isAdjunct: false,
-        isSalesRole: false,
-        joinDate: new Date().toISOString().slice(0, 10),
-        monthsWorked: 12,
-        kpis: [],
-        categories: template
-          ? template.categories.map((cat: any) => ({
-              id: `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-              name: cat.name,
-              weight: cat.weight,
-              kpis: cat.kpis.map((k: any) => ({
-                id: `kpi_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                description: k.description,
-                metric: k.metric,
-                target: k.target,
-                actual: 0,
-                weight: 100,
-                measurementSource: k.measurementSource || "",
-              })),
-            }))
-          : [],
-        roleType: "employee" as const,
-        isManager,
-        supervisorId: "",
-        supervisorName: "",
-        needsKpiSetup: !hasTemplate,
-      };
+        const dbRow = {
+          id: authData.user.id,
+          org_id: DEFAULT_ORG_ID,
+          auth_id: authData.user.id,
+          name,
+          email: email.toLowerCase().trim(),
+          department,
+          role,
+          job_grade: template?.jobGrade || "4",
+          is_adjunct: false,
+          is_sales_role: false,
+          is_manager: isManager,
+          supervisor_id: null,
+          supervisor_name: null,
+          join_date: new Date().toISOString().slice(0, 10),
+          months_worked: 12,
+          role_type: "employee",
+          role_status: "active",
+          categories: template
+            ? template.categories.map((cat: any) => ({
+                id: `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                name: cat.name,
+                weight: cat.weight,
+                kpis: cat.kpis.map((k: any) => ({
+                  id: `kpi_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                  description: k.description,
+                  metric: k.metric,
+                  target: k.target,
+                  actual: 0,
+                  weight: 100,
+                  measurementSource: k.measurementSource || "",
+                })),
+              }))
+            : [],
+          kpis: [],
+          needs_kpi_setup: !hasTemplate,
+        };
 
-      const dbRow = {
-        id: newEmployee.id,
-        org_id: DEFAULT_ORG_ID,
-        auth_id: authData.user.id,
-        name: newEmployee.name,
-        email: newEmployee.email.toLowerCase().trim(),
-        department: newEmployee.department,
-        role: newEmployee.role,
-        job_grade: newEmployee.jobGrade,
-        is_adjunct: newEmployee.isAdjunct,
-        is_sales_role: newEmployee.isSalesRole,
-        is_manager: newEmployee.isManager,
-        supervisor_id: newEmployee.supervisorId || null,
-        supervisor_name: newEmployee.supervisorName || null,
-        join_date: newEmployee.joinDate,
-        months_worked: newEmployee.monthsWorked,
-        role_type: newEmployee.roleType,
-        role_status: "active",
-        categories: newEmployee.categories,
-        kpis: newEmployee.kpis,
-        needs_kpi_setup: newEmployee.needsKpiSetup,
-      };
+        const { error: dbError } = await supabase
+          .from("employees")
+          .upsert(dbRow, { onConflict: "id" });
 
-      const { error: dbError } = await supabase
-        .from("employees")
-        .upsert(dbRow, { onConflict: "id" });
-
-      if (dbError) {
-        console.error("Failed to save employee to Supabase:", dbError);
-        showToast.error("Profile sync failed", dbError.message);
+        if (dbError) {
+          console.error("Failed to save employee:", dbError);
+          showToast.error("Profile sync failed", dbError.message);
+        }
       }
 
-      upsertEmployee(newEmployee);
       localStorage.removeItem("p4p_pending_registration");
-
       showToast.success("Account Created!", "You're now logged in.");
-
-      // 👈 Fresh signup → always onboarding, and queue the welcome tour
       localStorage.removeItem("p4p_onboarding_done");
       localStorage.setItem("p4p_welcome_tour_pending", "true");
       navigate({ to: "/onboarding" });
@@ -241,16 +269,58 @@ function RegisterForm() {
   };
 
   const canSubmit =
-    !loading && department && role && pwCheck.ok && passwordsMatch;
+    !loading &&
+    name.trim() &&
+    email.trim() &&
+    pwCheck.ok &&
+    passwordsMatch &&
+    (invite || (department && role));
 
   return (
     <Card className="p-5">
       <div className="mb-4">
-        <h1 className="text-xl font-bold mb-0.5">Create your account</h1>
+        <h1 className="text-xl font-bold mb-0.5">
+          {invite ? "Accept your invitation" : "Create your account"}
+        </h1>
         <p className="text-xs text-muted-foreground">
-          Register to access your performance dashboard
+          {invite
+            ? `Complete your account setup for ${invite.org_name}`
+            : "Register to access your performance dashboard"}
         </p>
       </div>
+
+      {/* Invite banner */}
+      {inviteLoading && (
+        <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded mb-3 flex items-center gap-2">
+          <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          Validating invite...
+        </div>
+      )}
+
+      {invite && (
+        <div className="text-xs bg-violet-500/5 border border-violet-500/20 text-violet-800 dark:text-violet-300 p-3 rounded mb-3">
+          <div className="flex items-start gap-2">
+            <Building2 className="h-4 w-4 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold">You've been invited to {invite.org_name}</div>
+              <div className="text-[10.5px] opacity-80 mt-0.5">
+                You'll join as <strong>HR — Head of Department</strong>. Your
+                name and email are pre-filled below.
+              </div>
+              <div className="text-[11px] font-medium mt-2 pt-2 border-t border-violet-500/20">
+                👉 Set a password below to complete your account setup.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {inviteError && (
+        <div className="text-xs bg-red-500/5 border border-red-500/20 text-red-800 dark:text-red-300 p-3 rounded mb-3 flex items-start gap-2">
+          <Sparkles className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{inviteError}</span>
+        </div>
+      )}
 
       {error && (
         <div className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400 p-2.5 rounded mb-3">
@@ -259,7 +329,6 @@ function RegisterForm() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-3">
-        {/* Name + Email side by side */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label className="text-xs">Full Name</Label>
@@ -269,8 +338,8 @@ function RegisterForm() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              disabled={loading}
-              className="h-9 mt-1"
+              disabled={loading || !!invite}
+              className={`h-9 mt-1 ${invite ? "bg-muted/50" : ""}`}
             />
           </div>
           <div>
@@ -281,15 +350,13 @@ function RegisterForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              disabled={loading}
-              className="h-9 mt-1"
+              disabled={loading || !!invite}
+              className={`h-9 mt-1 ${invite ? "bg-muted/50" : ""}`}
             />
           </div>
         </div>
 
-        {/* Password + Confirm — password has strength bar, confirm shows only match */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-          {/* Password column */}
           <div>
             <Label className="text-xs">Password</Label>
             <div className="relative mt-1">
@@ -323,7 +390,6 @@ function RegisterForm() {
             <StrengthBar value={password} />
           </div>
 
-          {/* Confirm Password column */}
           <div>
             <Label className="text-xs">Confirm Password</Label>
             <div className="relative mt-1">
@@ -364,49 +430,58 @@ function RegisterForm() {
                 </button>
               </div>
             </div>
-            {/* 👈 Confirm password gets the full strength bar (same as Password) */}
             <StrengthBar value={confirmPassword} />
           </div>
         </div>
 
-        {/* Department + Role side by side */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <Label className="text-xs">Department</Label>
-            <Select value={department} onValueChange={setDepartment} disabled={loading}>
-              <SelectTrigger className="h-9 mt-1">
-                <SelectValue placeholder="Select department" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((dept, idx) => (
-                  <SelectItem key={`dept-${idx}-${dept}`} value={dept}>
-                    {dept}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* Dept / Role pickers — hidden when invite is present */}
+        {!invite && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Department</Label>
+              <Select value={department} onValueChange={setDepartment} disabled={loading}>
+                <SelectTrigger className="h-9 mt-1">
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((dept, idx) => (
+                    <SelectItem key={`dept-${idx}-${dept}`} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Role</Label>
+              <Select value={role} onValueChange={setRole} disabled={!department || loading}>
+                <SelectTrigger className="h-9 mt-1">
+                  <SelectValue
+                    placeholder={department ? "Select role" : "Select dept first"}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((r, idx) => (
+                    <SelectItem key={`role-${idx}-${r}`} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div>
-            <Label className="text-xs">Role</Label>
-            <Select value={role} onValueChange={setRole} disabled={!department || loading}>
-              <SelectTrigger className="h-9 mt-1">
-                <SelectValue
-                  placeholder={department ? "Select role" : "Select dept first"}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.map((r, idx) => (
-                  <SelectItem key={`role-${idx}-${r}`} value={r}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        )}
 
-        <Button type="submit" className="w-full h-9 mt-2" disabled={!canSubmit}>
-          {loading ? "Creating Account..." : "Register"}
+        <Button
+          type="submit"
+          className="w-full h-9 mt-2 bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-700 hover:to-violet-600 text-white"
+          disabled={!canSubmit}
+        >
+          {loading
+            ? "Creating Account..."
+            : invite
+            ? "Accept Invitation & Create Account"
+            : "Register"}
         </Button>
       </form>
     </Card>

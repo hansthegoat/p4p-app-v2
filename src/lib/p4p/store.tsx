@@ -1568,12 +1568,9 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
   const pushTemplateToEmployees = useCallback(
     async (department: string, role: string, template: KPITemplate) => {
-      const affected = state.employees.filter(
-        (e) => e.department === department && e.role === role && !e.isAdjunct
-      );
-
       let pushedBy: string | undefined;
       let pushedByName: string | undefined;
+      let pusherEmployeeId: string | undefined;
       try {
         const { data } = await supabase.auth.getUser();
         const user = data?.user;
@@ -1583,10 +1580,21 @@ export function P4PProvider({ children }: { children: ReactNode }) {
             (e) => e.authUserId === user.id || e.email === user.email
           );
           pushedByName = me?.name || user.email || "HR";
+          pusherEmployeeId = me?.id;
         }
       } catch {
         // Best-effort during push
       }
+
+      // Exclude the pusher themselves from the affected list.
+      // Anyone else — HR or not — is a legitimate target.
+      const affected = state.employees.filter(
+        (e) =>
+          e.department === department &&
+          e.role === role &&
+          !e.isAdjunct &&
+          e.id !== pusherEmployeeId
+      );
 
       const now = new Date().toISOString();
       const newRequests: KpiUpdateRequest[] = [];

@@ -58,3 +58,20 @@ export const uploadProofFile = async (
     return null;
   }
 };
+
+/**
+ * Check if the currently signed-in user is a platform Super Admin.
+ * Relies on RLS: the super_admins table only returns your own row
+ * (if you're in it). Non-admins get zero rows back.
+ */
+export async function isCurrentUserSuperAdmin(): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  const { data, error } = await supabase
+    .from("super_admins")
+    .select("auth_id")
+    .eq("auth_id", user.id)
+    .maybeSingle();
+  if (error) return false;
+  return !!data;
+}

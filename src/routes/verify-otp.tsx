@@ -146,68 +146,86 @@ function VerifyOtpPage() {
         try {
           const pending = JSON.parse(pendingRaw);
 
-          const { getTemplateByDepartmentAndRole } = await import("@/lib/p4p/kpi-templates");
-          const candidate = getTemplateByDepartmentAndRole(pending.department, pending.role);
+          // ── Path A: Invite — claim the pre-created employee row ──
+          if (pending.inviteCode && pending.inviteEmployeeId) {
+            const { error: linkError } = await supabase
+              .from("employees")
+              .update({
+                auth_id: data.user.id,
+                invite_code: null,
+                role_status: "active",
+              })
+              .eq("invite_code", pending.inviteCode)
+              .eq("id", pending.inviteEmployeeId);
 
-          // Detect placeholder fallback — HR hasn't built a real template yet.
-          const looksLikePlaceholder =
-            candidate?.categories?.length === 1 &&
-            candidate.categories[0]?.kpis?.length === 1 &&
-            /default|please configure/i.test(
-              `${candidate.categories[0]?.name || ""} ${candidate.categories[0]?.kpis?.[0]?.description || ""}`
+            if (linkError) {
+              console.error("Failed to claim invite row:", linkError);
+              showToast.error("Could not link invite", linkError.message);
+            } else {
+              showToast.success("Welcome!", "Your HR account is ready.");
+            }
+
+            await refreshFromCloud();
+            localStorage.removeItem("p4p_pending_registration");
+          } else {
+            // ── Path B: Standard signup — insert new employee row ──
+            const { getTemplateByDepartmentAndRole } = await import("@/lib/p4p/kpi-templates");
+            const candidate = getTemplateByDepartmentAndRole(pending.department, pending.role);
+
+            const looksLikePlaceholder =
+              candidate?.categories?.length === 1 &&
+              candidate.categories[0]?.kpis?.length === 1 &&
+              /default|please configure/i.test(
+                `${candidate.categories[0]?.name || ""} ${candidate.categories[0]?.kpis?.[0]?.description || ""}`
+              );
+
+            const template = looksLikePlaceholder ? undefined : candidate;
+            const hasTemplate = !!template;
+
+            const isManager = MANAGER_ROLES.some(
+              (r) => r.toLowerCase() === (pending.role || "").toLowerCase()
             );
 
-          const template = looksLikePlaceholder ? undefined : candidate;
-          const hasTemplate = !!template;
+            const employee: Employee = {
+              id: data.user.id,
+              authUserId: data.user.id,
+              name: pending.name,
+              email: pending.email,
+              department: pending.department,
+              role: pending.role,
+              jobGrade: template?.jobGrade || "4",
+              isAdjunct: false,
+              isSalesRole: false,
+              isManager,
+              supervisorId: "",
+              supervisorName: "",
+              joinDate: new Date().toISOString().slice(0, 10),
+              monthsWorked: 12,
+              roleType: "employee",
+              categories: template
+                ? template.categories.map((cat: any) => ({
+                    id: cat.id || `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                    name: cat.name,
+                    weight: cat.weight,
+                    kpis: cat.kpis.map((k: any) => ({
+                      id: k.id || `kpi_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                      description: k.description,
+                      metric: k.metric,
+                      target: k.target,
+                      actual: 0,
+                      weight: k.weight || 0,
+                      measurementSource: k.measurementSource || "",
+                    })),
+                  }))
+                : [],
+              kpis: [],
+              needsKpiSetup: !hasTemplate,
+            };
 
-          const isManager = MANAGER_ROLES.some(
-            (r) => r.toLowerCase() === (pending.role || "").toLowerCase()
-          );
-
-          const employee: Employee = {
-            id: data.user.id,
-            authUserId: data.user.id,
-            name: pending.name,
-            email: pending.email,
-            department: pending.department,
-            role: pending.role,
-            jobGrade: template?.jobGrade || "4",
-            isAdjunct: false,
-            isSalesRole: false,
-            isManager,
-            supervisorId: "",
-            supervisorName: "",
-            joinDate: new Date().toISOString().slice(0, 10),
-            monthsWorked: 12,
-            roleType: "employee",
-            categories: template
-              ? template.categories.map((cat: any) => ({
-                  id: cat.id || `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                  name: cat.name,
-                  weight: cat.weight,
-                  kpis: cat.kpis.map((k: any) => ({
-                    id: k.id || `kpi_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                    description: k.description,
-                    metric: k.metric,
-                    target: k.target,
-                    actual: 0,
-                    weight: k.weight || 0,
-                    measurementSource: k.measurementSource || "",
-                  })),
-                }))
-              : [],
-            kpis: [],
-            needsKpiSetup: !hasTemplate,
-          };
-
-          // Single cloud write — includes auth_id, org_id, role_status.
-          await insertEmployeeDB(employee);
-
-          // Pull fresh state from cloud so the dashboard sees the new row
-          // immediately, without relying on auth event timing.
-          await refreshFromCloud();
-
-          localStorage.removeItem("p4p_pending_registration");
+            await insertEmployeeDB(employee);
+            await refreshFromCloud();
+            localStorage.removeItem("p4p_pending_registration");
+          }
         } catch (storageErr) {
           console.error("Failed to finalize registration:", storageErr);
           showToast.error(
@@ -221,12 +239,9 @@ function VerifyOtpPage() {
       setSuccess(true);
       showToast.success("Email Verified!", "Your account is ready.");
 
-      // Fresh signup — always show onboarding. Set the welcome tour flag
-      // NOW so it fires even if the user skips onboarding.
       localStorage.removeItem("p4p_onboarding_done");
       localStorage.setItem("p4p_welcome_tour_pending", "true");
 
-      // Hold "Verified!" for 1.4s → fade out over 1.2s → navigate
       window.setTimeout(() => {
         setFadingOut(true);
         window.setTimeout(() => {
@@ -300,7 +315,6 @@ function VerifyOtpPage() {
       ? "bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400"
       : "bg-primary/10 border-primary/20 text-primary";
 
-  // ─── Success state (fades out) ───
   if (success) {
     return (
       <motion.div
@@ -335,7 +349,6 @@ function VerifyOtpPage() {
     );
   }
 
-  // ─── OTP entry state ───
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <motion.div
