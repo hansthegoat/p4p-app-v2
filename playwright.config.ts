@@ -10,7 +10,7 @@ export default defineConfig({
   timeout: 30000,
 
   use: {
-    baseURL: "http://localhost:8081/p4p-app-v2/",
+    baseURL: "http://localhost:8080/p4p-app-v2/",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     headless: true,
