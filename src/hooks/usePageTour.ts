@@ -107,6 +107,17 @@ export function usePageTour(
   useEffect(() => {
     if (!tour || !enabled) return;
     if (hasRunRef.current) return;
+
+    // Test/dev kill switch: skip all tours when explicitly disabled.
+    // Used by Playwright setups to prevent tour overlays from blocking
+    // clicks during automated tests. Never set in production.
+    if (
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("p4p_disable_tours") === "true"
+    ) {
+      return;
+    }
+
     if (isTourDone(tour.key)) return;
 
     let cancelled = false;

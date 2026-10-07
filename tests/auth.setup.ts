@@ -35,10 +35,11 @@ setup("authenticate as HR", async ({ page }) => {
   await page.evaluate(
     ({ key, value }) => {
       window.localStorage.setItem(key, value);
+      // Disable tours so overlays don't block test clicks
+      window.localStorage.setItem("p4p_disable_tours", "true");
     },
     { key: storageKey, value: JSON.stringify(data.session) }
   );
 
-  // 5. Save this state so other tests reuse it
   await page.context().storageState({ path: authFile });
 });

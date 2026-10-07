@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { waitForStoreSync } from "../../helpers/wait-for-store";
 
 const SUPABASE_URL =
   process.env.VITE_SUPABASE_URL ||
@@ -73,6 +74,9 @@ test.describe("Supervisor approves a pending KPI change", () => {
     await expect(
       page.getByRole("heading", { name: "My Team" })
     ).toBeVisible({ timeout: 15000 });
+
+    // 2. Wait for the store to finish its initial cloud fetch
+    await waitForStoreSync(page);
 
     // 2. Open Reviews tab
     await page.getByRole("tab", { name: /Reviews/ }).click();
