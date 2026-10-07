@@ -85,8 +85,6 @@ function AppraisalsReviewPage() {
       : pending;
     setPendingAppraisals(filteredPending);
 
-    loadAppraisals()
-
     const all: any[] = [];
     const targetEmployees = isManagerUser ? directReports : employees.map((e) => e.id);
     for (const empId of targetEmployees) {
@@ -96,14 +94,15 @@ function AppraisalsReviewPage() {
     setAllAppraisals(all);
   };
 
-  const handleApprove = (appraisalId: string) => {
-    setActionLoading(true);
-    approveAppraisal(appraisalId, user?.id || "reviewer", reviewerName);
-    loadAppraisals();
-    setSelectedAppraisal(null);
-    setActionLoading(false);
-    showToast.success("Appraisal Approved", "The appraisal has been approved.");
-  };
+const handleApprove = (appraisalId: string) => {
+  setActionLoading(true);
+  approveAppraisal(appraisalId, user?.id || "reviewer", reviewerName);
+  setSelectedAppraisal(null);
+  setActionLoading(false);
+  showToast.success("Appraisal Approved", "The appraisal has been approved.");
+  // Let React commit the store update first, then refresh the local view
+  setTimeout(() => loadAppraisals(), 0);
+};
 
   const handleReject = (appraisalId: string) => {
     setActionLoading(true);
@@ -164,7 +163,7 @@ function AppraisalsReviewPage() {
   const isHRorAdmin =
     currentEmployee?.roleType === "hr" ||
     currentEmployee?.roleType === "admin";
-    
+
 useEffect(() => {
   if (!isHRorAdmin) return;
 
