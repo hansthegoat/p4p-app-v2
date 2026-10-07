@@ -239,7 +239,7 @@ function Dashboard() {
   const trends = getAllTrends();
   const stats = getMonthlyStats();
 
-  // Admin: Monthly trend aggregator
+  // Admin: Monthly trend aggregator  
   const monthlyTrendData = useMemo(() => {
     const months = monthlyData
       .filter((d) => !employees.find((e) => e.id === d.employeeId)?.isAdjunct)
@@ -256,7 +256,7 @@ function Dashboard() {
       month: g.month,
       avgMultiplier: g.total / g.count,
     }));
-    const limit = trendMonths === "all" ? 9999 : Number(trendMonths);
+    const limit = trendMonths === "all" ? Number.MAX_SAFE_INTEGER : Number(trendMonths);
     return all.slice(-limit);
   }, [monthlyData, employees, trendMonths]);
 
@@ -352,7 +352,7 @@ function Dashboard() {
 
   const timelineData = useMemo(() => {
     if (employeeHistory.length === 0) return [];
-    const limit = trendMonths === "all" ? 9999 : Number(trendMonths);
+    const limit = trendMonths === "all" ? Number.MAX_SAFE_INTEGER : Number(trendMonths);
     return [...employeeHistory]
       .sort((a, b) => (a.year !== b.year ? a.year - b.year : a.month - b.month))
       .slice(-limit)
@@ -672,7 +672,7 @@ function Dashboard() {
           <Card className="p-4 bg-red-500/5 border-red-500/30">
             <div className="flex items-center gap-3">
               <AlertCircle className="h-5 w-5 text-red-600" />
-              <span className="text-sm text-red-900 dark:text-red-300">Total revenue is 0 — set a revenue value to enable calculations.</span>
+              <span className="text-sm text-red-900 dark:text-red-300">Total revenue is 0, set a revenue value to enable calculations.</span>
             </div>
           </Card>
         )}
@@ -788,7 +788,29 @@ function Dashboard() {
 
           <TabsContent value="overview" className="mt-4">
             <motion.div key="overview" variants={tabContent} initial="hidden" animate="show" className="space-y-4">
-              <SectionCard title="Performance Trend" description="Last 12 months" icon={<Activity className="h-4 w-4" />} noPadding>
+              <SectionCard
+                title="Performance Trend"
+                description={
+                  trendMonths === "all"
+                    ? `All ${timelineData.length} month${timelineData.length === 1 ? "" : "s"}`
+                    : `Last ${trendMonths} month${trendMonths === "1" ? "" : "s"}`
+                }
+                icon={<Activity className="h-4 w-4" />}
+                action={
+                  <Select value={trendMonths} onValueChange={setTrendMonths}>
+                    <SelectTrigger className="h-8 w-[130px] text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3">Last 3 months</SelectItem>
+                      <SelectItem value="6">Last 6 months</SelectItem>
+                      <SelectItem value="12">Last 12 months</SelectItem>
+                      <SelectItem value="all">All time</SelectItem>
+                    </SelectContent>
+                  </Select>
+                }
+                noPadding
+              >
                 <div className="p-4 h-72">
                   {timelineData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
@@ -940,7 +962,7 @@ function Dashboard() {
                       </div>
                     ))}
                     {kpiAchievementData.filter((k) => k.achievement < 70).length === 0 && (
-                      <p className="text-sm text-muted-foreground py-4 text-center">All KPIs are on track! 🎉</p>
+                      <p className="text-sm text-muted-foreground py-4 text-center">All KPIs are on track.</p>
                     )}
                   </div>
                 </SectionCard>

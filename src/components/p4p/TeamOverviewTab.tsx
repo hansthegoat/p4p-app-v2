@@ -242,7 +242,7 @@ export function TeamOverviewTab({ reports, onSelectReport }: Props) {
         <div className="mb-3">
           <h3 className="text-sm font-semibold">Your Reports</h3>
           <p className="text-xs text-muted-foreground">
-            Sorted by current score — click any card to see full details
+            Sorted by current score, click any card to see full details
           </p>
         </div>
 

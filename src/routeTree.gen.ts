@@ -22,6 +22,7 @@ import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AppTraceRouteImport } from './routes/_app.trace'
 import { Route as AppSupervisorsRouteImport } from './routes/_app.supervisors'
+import { Route as AppRewardSetupRouteImport } from './routes/_app.reward-setup'
 import { Route as AppProfileRouteImport } from './routes/_app.profile'
 import { Route as AppMyTeamRouteImport } from './routes/_app.my-team'
 import { Route as AppMyCalculationRouteImport } from './routes/_app.my-calculation'
@@ -97,6 +98,11 @@ const AppTraceRoute = AppTraceRouteImport.update({
 const AppSupervisorsRoute = AppSupervisorsRouteImport.update({
   id: '/supervisors',
   path: '/supervisors',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRewardSetupRoute = AppRewardSetupRouteImport.update({
+  id: '/reward-setup',
+  path: '/reward-setup',
   getParentRoute: () => AppRoute,
 } as any)
 const AppProfileRoute = AppProfileRouteImport.update({
@@ -184,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/my-calculation': typeof AppMyCalculationRoute
   '/my-team': typeof AppMyTeamRoute
   '/profile': typeof AppProfileRoute
+  '/reward-setup': typeof AppRewardSetupRoute
   '/supervisors': typeof AppSupervisorsRoute
   '/trace': typeof AppTraceRoute
   '/login': typeof AuthLoginRoute
@@ -209,6 +216,7 @@ export interface FileRoutesByTo {
   '/my-calculation': typeof AppMyCalculationRoute
   '/my-team': typeof AppMyTeamRoute
   '/profile': typeof AppProfileRoute
+  '/reward-setup': typeof AppRewardSetupRoute
   '/supervisors': typeof AppSupervisorsRoute
   '/trace': typeof AppTraceRoute
   '/login': typeof AuthLoginRoute
@@ -238,6 +246,7 @@ export interface FileRoutesById {
   '/_app/my-calculation': typeof AppMyCalculationRoute
   '/_app/my-team': typeof AppMyTeamRoute
   '/_app/profile': typeof AppProfileRoute
+  '/_app/reward-setup': typeof AppRewardSetupRoute
   '/_app/supervisors': typeof AppSupervisorsRoute
   '/_app/trace': typeof AppTraceRoute
   '/_auth/login': typeof AuthLoginRoute
@@ -266,6 +275,7 @@ export interface FileRouteTypes {
     | '/my-calculation'
     | '/my-team'
     | '/profile'
+    | '/reward-setup'
     | '/supervisors'
     | '/trace'
     | '/login'
@@ -291,6 +301,7 @@ export interface FileRouteTypes {
     | '/my-calculation'
     | '/my-team'
     | '/profile'
+    | '/reward-setup'
     | '/supervisors'
     | '/trace'
     | '/login'
@@ -319,6 +330,7 @@ export interface FileRouteTypes {
     | '/_app/my-calculation'
     | '/_app/my-team'
     | '/_app/profile'
+    | '/_app/reward-setup'
     | '/_app/supervisors'
     | '/_app/trace'
     | '/_auth/login'
@@ -429,6 +441,13 @@ declare module '@tanstack/react-router' {
       path: '/supervisors'
       fullPath: '/supervisors'
       preLoaderRoute: typeof AppSupervisorsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/reward-setup': {
+      id: '/_app/reward-setup'
+      path: '/reward-setup'
+      fullPath: '/reward-setup'
+      preLoaderRoute: typeof AppRewardSetupRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/profile': {
@@ -552,6 +571,7 @@ interface AppRouteChildren {
   AppMyCalculationRoute: typeof AppMyCalculationRoute
   AppMyTeamRoute: typeof AppMyTeamRoute
   AppProfileRoute: typeof AppProfileRoute
+  AppRewardSetupRoute: typeof AppRewardSetupRoute
   AppSupervisorsRoute: typeof AppSupervisorsRoute
   AppTraceRoute: typeof AppTraceRoute
 }
@@ -569,6 +589,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppMyCalculationRoute: AppMyCalculationRoute,
   AppMyTeamRoute: AppMyTeamRoute,
   AppProfileRoute: AppProfileRoute,
+  AppRewardSetupRoute: AppRewardSetupRoute,
   AppSupervisorsRoute: AppSupervisorsRoute,
   AppTraceRoute: AppTraceRoute,
 }

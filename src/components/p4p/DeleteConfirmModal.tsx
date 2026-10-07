@@ -81,7 +81,7 @@ export function DeleteConfirmModal({
               <div className="space-y-3 mb-6">
                 <div className="bg-red-50 border border-red-200 rounded-md p-3">
                   <p className="text-sm text-red-800">
-                    <strong>⚠️ Warning:</strong> You are about to permanently delete this employee's account.
+                    <strong>Warning:</strong> You are about to permanently delete this employee's account.
                   </p>
                 </div>
 

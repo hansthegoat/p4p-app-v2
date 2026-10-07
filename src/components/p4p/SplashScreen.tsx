@@ -14,7 +14,7 @@ export function SplashScreen() {
   const [messageIndex, setMessageIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
 
-  // 👈 Only render the portal after mount (SSR-safe)
+  // Only render the portal after mount (SSR-safe)
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -40,7 +40,7 @@ export function SplashScreen() {
 
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
 
-  // 👈 Render via portal to escape any transformed ancestors (Framer Motion wrappers)
+  // Render via portal to escape any transformed ancestors (Framer Motion wrappers)
   return createPortal(
     <div
       className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity ${
@@ -118,6 +118,6 @@ export function SplashScreen() {
         </div>
       </div>
     </div>,
-    document.body   // 👈 key line — renders to body, not inside transformed parents
+    document.body   // key line — renders to body, not inside transformed parents
   );
 }

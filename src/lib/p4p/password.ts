@@ -39,7 +39,7 @@ export function checkPassword(pw: string): PasswordCheck {
   }
 
   if (COMMON_PASSWORDS.has(pw.toLowerCase())) {
-    errors.push("Too common — pick something less guessable");
+    errors.push("Too common, pick something less guessable");
     score = 0;
   } else if (pw.length >= 12 && /[^a-zA-Z0-9]/.test(pw)) {
     score++;

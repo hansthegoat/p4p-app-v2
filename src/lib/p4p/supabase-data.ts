@@ -728,7 +728,7 @@ function mapEmployeeToDB(
 function normalizeRoleType(value: any): "employee" | "hr" {
   if (value === "hr") return "hr";
   if (value === "admin") {
-    console.warn("role_type 'admin' is deprecated — coercing to 'hr'");
+    console.warn("role_type 'admin' is deprecated, coercing to 'hr'");
     return "hr";
   }
   return "employee";

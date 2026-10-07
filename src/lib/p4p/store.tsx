@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { DEFAULT_GLOBALS, DEFAULT_GRADES, DEMO_EMPLOYEES } from "./defaults";
+import { DEFAULT_GLOBALS, DEFAULT_GRADES, DEFAULT_BONUS_CONFIG, DEMO_EMPLOYEES } from "./defaults";
 import { calculate } from "./calc";
 import { fmtNum } from "./calc";
 import type {
@@ -22,6 +22,7 @@ import type {
   KpiDiffItem,
   KpiUpdateComment,
   KpiRequest,
+  BonusConfig,
 } from "./types";
 import { newId } from "./defaults";
 import { sendEmail } from "@/lib/email";
@@ -35,6 +36,7 @@ import {
   kpiUpdateEmail,
 } from "@/lib/email-templates";
 import {
+  getCurrentOrgId,
   fetchAllEmployees,
   fetchAllTemplates,
   fetchAllMonthly,
@@ -65,6 +67,7 @@ import {
 
 interface State {
   globals: Globals;
+  bonusConfig: BonusConfig;
   grades: GradePoint[];
   employees: Employee[];
   monthlyData: MonthlyPerformance[];
@@ -81,6 +84,7 @@ interface Ctx extends State {
   isSyncing: boolean;
 
   setGlobals: (g: Partial<Globals>) => void;
+  saveBonusConfig: (config: BonusConfig) => Promise<void>;
   setGrades: (g: GradePoint[]) => void;
   resetGrades: () => void;
   upsertEmployee: (e: Employee) => void;
@@ -204,6 +208,7 @@ function dedupeNotifications(
 function loadInitial(): State {
   return {
     globals: DEFAULT_GLOBALS,
+    bonusConfig: DEFAULT_BONUS_CONFIG,
     grades: DEFAULT_GRADES,
     employees: [],
     monthlyData: [],
@@ -273,6 +278,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           kpiUpdateRequests: cloudKpiUpdates,
           kpiRequests: cloudKpiRequests,
           bonusRevealed: cloudSettings.bonus_revealed === true,
+          bonusConfig: (cloudSettings.bonus_config as BonusConfig) ?? s.bonusConfig,
         }));
 
         setIsCloudSynced(true);
@@ -353,13 +359,14 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       const { supabase } = await import("@/lib/supabase");
       const { data } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === "SIGNED_IN" && session?.user) {
-          console.log("🔐 Signed in — refetching from cloud");
+          console.log("Signed in. Refetching from cloud.");
           refetchFromCloud();
         } else if (event === "SIGNED_OUT") {
           setIsCloudSynced(false);
           setIsSyncing(false);
           setState({
             globals: DEFAULT_GLOBALS,
+            bonusConfig: DEFAULT_BONUS_CONFIG,
             grades: DEFAULT_GRADES,
             employees: [],
             monthlyData: [],
@@ -423,6 +430,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   const loadDemo = useCallback(() => {
     setState({
       globals: DEFAULT_GLOBALS,
+      bonusConfig: DEFAULT_BONUS_CONFIG,
       grades: DEFAULT_GRADES,
       employees: DEMO_EMPLOYEES,
       monthlyData: [],
@@ -546,7 +554,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   // CALC
   // ============================================
   const calc = useMemo(
-    () => calculate(state.employees, state.grades, state.globals),
+    () => calculate(state.employees, state.grades, state.globals, state.bonusConfig),
     [state]
   );
 
@@ -722,7 +730,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           employeeName: emp.name,
           type: "pip",
           severity: "warning",
-          message: `⚠️ PIP Required: 3 consecutive months of declining performance (${lastThree.map((m) => fmtNum(m.score, 2)).join(" → ")})`,
+          message: `PIP Required: 3 consecutive months of declining performance (${lastThree.map((m) => fmtNum(m.score, 2)).join(" → ")})`,
           triggeredAt: new Date().toISOString(),
           monthsData: lastThree,
         });
@@ -735,11 +743,11 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           employeeName: emp.name,
           type: "probation",
           severity: "danger",
-          message: `📋 Probation Period: 6 consecutive months below 0.7 (avg: ${fmtNum(lastSix.reduce((s, m) => s + m.score, 0) / 6, 2)})`,
+          message: `Probation Period: 6 consecutive months below 0.7 (avg: ${fmtNum(lastSix.reduce((s, m) => s + m.score, 0) / 6, 2)})`,
           triggeredAt: new Date().toISOString(),
           monthsData: lastSix,
-        });
-      }
+        }); 
+        }   
 
       const lastNine = months.slice(-9);
       if (lastNine.length === 9 && lastNine.every((m) => m.score < 0.7)) {
@@ -748,7 +756,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           employeeName: emp.name,
           type: "management_action",
           severity: "critical",
-          message: `🔴 Management Action Required: 9 consecutive months below 0.7 (avg: ${fmtNum(lastNine.reduce((s, m) => s + m.score, 0) / 9, 2)})`,
+          message: `Management Action Required: 9 consecutive months below 0.7 (avg: ${fmtNum(lastNine.reduce((s, m) => s + m.score, 0) / 9, 2)})`,
           triggeredAt: new Date().toISOString(),
           monthsData: lastNine,
         });
@@ -1683,7 +1691,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
             id: newId(),
             userId: supervisor.id,
             type: "kpi_update_pushed_supervisor" as any,
-            message: `HR pushed KPI changes for ${emp.name} — review before it reaches them`,
+            message: `HR pushed KPI changes for ${emp.name}, review before it reaches them`,
             link: "/my-team",
             read: false,
             createdAt: now,
@@ -1692,7 +1700,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
             id: newId(),
             userId: emp.id,
             type: "kpi_update_pushed_fyi" as any,
-            message: `HR proposed KPI updates — awaiting your supervisor's review`,
+            message: `HR proposed KPI updates, awaiting your supervisor's review`,
             link: "/employee",
             read: false,
             createdAt: now,
@@ -1702,7 +1710,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
             id: newId(),
             userId: emp.id,
             type: "kpi_update_pushed_direct" as any,
-            message: `Your KPIs were updated — ${diffs.length} change${diffs.length > 1 ? "s" : ""} to review`,
+            message: `Your KPIs were updated, ${diffs.length} change${diffs.length > 1 ? "s" : ""} to review`,
             link: "/kpi-updates",
             read: false,
             createdAt: now,
@@ -2183,7 +2191,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         id: newId(),
         userId: employee.id,
         type: "kpi_update_approved" as any,
-        message: `Your KPIs were updated — ${req.diffs.length} change${req.diffs.length === 1 ? "" : "s"} to review`,
+        message: `Your KPIs were updated, ${req.diffs.length} change${req.diffs.length === 1 ? "" : "s"} to review`,
         link: "/kpi-updates",
         read: false,
         createdAt: now,
@@ -2491,6 +2499,58 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const saveBonusConfig = useCallback(
+    async (config: BonusConfig) => {
+      const previous = state.bonusConfig;
+      const previousGlobals = state.globals;
+
+      // Optimistic update + mirror into legacy globals for pages that
+      // still read them (e.g. Trace)
+      setState((s) => ({
+        ...s,
+        bonusConfig: config,
+        globals: {
+          ...s.globals,
+          totalRevenue: config.periodInputs.revenue ?? s.globals.totalRevenue,
+          p4pPercent: config.revenuePercent,
+          adjunctPercent: config.adjunctPercent,
+          floor: config.floor,
+          cap: config.cap,
+          prorationOn: config.prorationOn,
+          salesMultiplier: config.salesMultiplier,
+        },
+      }));
+
+      try {
+        await upsertAppSetting("bonus_config", config);
+
+        // Audit entry (best-effort; does not block save on failure)
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase.from("audit_log").insert({
+              id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              org_id: getCurrentOrgId(),
+              user_id: user.id,
+              action: "update_bonus_config",
+              entity_type: "org",
+              entity_id: getCurrentOrgId(),
+              details: { sourceType: config.sourceType },
+              created_at: new Date().toISOString(),
+            });
+          }
+        } catch (auditErr) {
+          console.warn("Audit log write failed (non-fatal):", auditErr);
+        }
+      } catch (err) {
+        console.error("saveBonusConfig persist failed:", err);
+        setState((s) => ({ ...s, bonusConfig: previous, globals: previousGlobals }));
+        throw err;
+      }
+    },
+    [state.bonusConfig, state.globals]
+  );
+
   const syncToCloud = useCallback(async () => {
     setIsSyncing(true);
     try {
@@ -2510,7 +2570,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       for (const r of state.kpiRequests) {
         await upsertKpiRequest(r);
       }
-      console.log("✅ Manual sync complete");
+      console.log("Manual sync complete");
     } catch (err) {
       console.error("Manual sync failed:", err);
       throw err;
@@ -2575,6 +2635,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     isCloudSynced,
     isSyncing,
     setGlobals,
+    saveBonusConfig,
     setGrades,
     resetGrades,
     upsertEmployee,

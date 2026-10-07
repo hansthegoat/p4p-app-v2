@@ -96,9 +96,9 @@ function ThemedToaster() {
   );
 }
 
-/** 👈 NEW — wraps the Outlet in a page-transition animation */
+/** NEW — wraps the Outlet in a page-transition animation */
 function AnimatedOutlet() {
-  // 👈 The page transition now lives inside AppLayout — it wraps only the
+  // The page transition now lives inside AppLayout — it wraps only the
   // main content area. This keeps the sidebar out of any transformed
   // ancestor so `position: sticky` works correctly.
   return <Outlet />;
@@ -113,7 +113,7 @@ function RootComponent() {
         <P4PProvider>
           <UserProvider>
             <SplashScreen />
-            {/* 👈 replaced <Outlet /> with <AnimatedOutlet /> */}
+            {/* replaced <Outlet /> with <AnimatedOutlet /> */}
             {/*<SplashScreen/>*/}
             <AnimatedOutlet />
             <ThemedToaster />

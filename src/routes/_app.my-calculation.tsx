@@ -128,7 +128,7 @@ function MyCalculationPage() {
 
   return (
     <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
-      {/* 👈 ADDED data-tour wrapper */}
+      {/* ADDED data-tour wrapper */}
       <div data-tour="calculation-header">
       <PageHeader
         title="My Calculation"

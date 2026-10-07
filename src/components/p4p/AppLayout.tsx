@@ -13,7 +13,6 @@ import {
   Target,
   FileSpreadsheet,
   FileText,
-  TrendingUp,
   UserCheck,
   User,
   ClipboardCheck,
@@ -23,6 +22,7 @@ import {
   Calculator,
   RefreshCw,
   History,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePageTour } from "@/hooks/usePageTour";
@@ -54,9 +54,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Employees", to: "/employees", icon: Users, roles: ["hr", "admin"], group: "team" },
   { label: "Supervisors", to: "/supervisors", icon: UserCheck, roles: ["hr", "admin"], group: "team" },
   { label: "KPI Framework", to: "/kpi-framework", icon: FileSpreadsheet, roles: ["hr", "admin"], group: "admin" },
+  { label: "Reward Setup", to: "/reward-setup", icon: Wallet, roles: ["hr", "admin"], group: "admin" },
   { label: "Grade Points", to: "/grades", icon: Target, roles: ["hr", "admin"], group: "admin" },
   { label: "Calculation Trace", to: "/trace", icon: FileText, roles: ["hr", "admin"], group: "admin" },
-  { label: "Performance Trends", to: "/trends", icon: TrendingUp, roles: ["hr", "admin"], group: "admin" },
+  { label: "Audit Log", to: "/audit-log", icon: History, roles: ["hr", "admin"], group: "admin" },
 ];
 
 const GROUP_LABELS: Record<string, string> = {
@@ -75,7 +76,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
   // ============================================================
-  // 👈 SYNCHRONOUS DERIVATIONS — no async, no lag
+  // SYNCHRONOUS DERIVATIONS — no async, no lag
   // ============================================================
 
   // Resolve the employee record for the current user.
@@ -280,7 +281,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile top bar */}
-      <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-slate-900 px-4 dark:bg-slate-950 lg:hidden">
+<header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-slate-900 px-4 dark:bg-slate-950 md:hidden">
         <Button
           variant="ghost"
           size="icon"
@@ -302,10 +303,10 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Body */}
       <div className="flex">
         {/* Desktop full-height sidebar */}
-        <aside
-          data-tour="sidebar"
-          className="hidden lg:flex lg:flex-col w-64 border-r border-slate-800 sticky top-0 h-screen overflow-hidden"
-        >
+      <aside
+        data-tour="sidebar"
+        className="hidden md:flex md:flex-col w-64 border-r border-slate-800 sticky top-0 h-screen overflow-hidden"
+      >
           {sidebarContent()}
         </aside>
 
@@ -316,7 +317,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm"
               onClick={() => setMobileMenuOpen(false)}
             />
-            <aside className="fixed top-14 left-0 bottom-0 w-64 border-r border-slate-800 z-50 lg:hidden">
+<aside className="fixed top-14 left-0 bottom-0 w-64 border-r border-slate-800 z-50 md:hidden">
               {sidebarContent(() => setMobileMenuOpen(false))}
             </aside>
           </>

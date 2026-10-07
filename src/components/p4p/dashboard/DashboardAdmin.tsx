@@ -370,7 +370,7 @@ export function DashboardAdmin() {
         <Card className="p-4 bg-red-500/5 border-red-500/30" role="alert">
           <div className="flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-red-600" aria-hidden="true" />
-            <span className="text-sm text-red-900 dark:text-red-300">Total revenue is 0 — set a revenue value to enable saving.</span>
+            <span className="text-sm text-red-900 dark:text-red-300">Total revenue is 0. Set a revenue value to enable saving.</span>
           </div>
         </Card>
       )}

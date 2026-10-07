@@ -116,7 +116,7 @@ function KPIFrameworkPage() {
   const [excelImportOpen, setExcelImportOpen] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
-  // 👈 Read URL query params ONCE on mount (after state declarations)
+  // Read URL query params ONCE on mount (after state declarations)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -553,7 +553,7 @@ function KPIFrameworkPage() {
         />
       </div>
 
-      {/* 👈 Tabs: Build Templates vs Missing KPIs */}
+      {/* Tabs: Build Templates vs Missing KPIs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} data-tour="framework-tabs">
         <TabsList className="grid w-full max-w-xl grid-cols-3">
           <TabsTrigger value="build" className="gap-2">
@@ -644,7 +644,7 @@ function KPIFrameworkPage() {
                       </>
                     ) : (
                       <span className="text-[11px] text-muted-foreground">
-                        Bulk mode — actions affect every template
+                        Bulk mode, actions affect every template
                       </span>
                     )}
                   </div>
@@ -785,10 +785,15 @@ function KPIFrameworkPage() {
                                     : "bg-amber-50 border border-amber-200 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
                                 }`}
                               >
-                                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                {kpiWeightOver ? (
+                                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                ) : kpiWeightOk ? (
+                                  <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+                                ) : (
+                                  <Info className="h-3.5 w-3.5 shrink-0" />
+                                )}
                                 <span>
-                                  {kpiWeightOver ? "⚠️ KPI weights over 100%! " : kpiWeightOk ? "✅ KPI weights balanced. " : "📊 "}
-                                  KPI Total: <strong>{kpiWeight}%</strong>
+                                  KPI total: <strong>{kpiWeight}%</strong>
                                   {!kpiWeightOver && !kpiWeightOk && <> · Need <strong>{100 - kpiWeight}%</strong> more</>}
                                 </span>
                               </div>
@@ -798,7 +803,7 @@ function KPIFrameworkPage() {
                           <div className="p-4 space-y-3">
                             {cat.kpis.length === 0 ? (
                               <div className="text-[11px] text-muted-foreground text-center py-6 border border-dashed border-border/50 rounded-lg">
-                                No KPIs yet — add one below
+                                No KPIs yet, Add one below.
                               </div>
                             ) : (
                               <div className="space-y-2">

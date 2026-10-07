@@ -112,7 +112,7 @@ function GradesPage() {
       variants={staggerContainer}
       className="space-y-6"
     >
-      {/* 👈 ADDED data-tour wrapper */}
+      {/* ADDED data-tour wrapper */}
       <div data-tour="grades-header">
         <PageHeader
           title="Grade Points"
@@ -171,7 +171,7 @@ function GradesPage() {
         </motion.div>
       )}
 
-      {/* Stats — 👈 ADDED data-tour */}
+      {/* Stats — ADDED data-tour */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="grades-stats">
         <StatCard
           icon={<Award className="h-4 w-4" />}
@@ -204,7 +204,7 @@ function GradesPage() {
         />
       </div>
 
-      {/* Grades table — 👈 ADDED data-tour */}
+      {/* Grades table — ADDED data-tour */}
       <motion.div variants={fadeUp} data-tour="grades-table">
         <SectionCard
           title="Grade Points Table"
@@ -319,7 +319,7 @@ function GradesPage() {
         </SectionCard>
       </motion.div>
 
-      {/* Info card — 👈 ADDED data-tour */}
+      {/* Info card — ADDED data-tour */}
       <motion.div variants={fadeUp} data-tour="grades-info">
         <Card className="p-5 bg-blue-500/5 border-blue-500/20">
           <div className="flex items-start gap-3">
@@ -337,7 +337,7 @@ function GradesPage() {
                 </li>
                 <li className="flex items-start gap-2">
                   <ChevronRight className="h-3 w-3 mt-0.5 shrink-0" />
-                  Point values <strong>weight employee bonuses</strong> — higher points mean larger share of the pool.
+                  Point values <strong>weight employee bonuses</strong>, higher points mean larger share of the pool.
                 </li>
                 <li className="flex items-start gap-2">
                   <ChevronRight className="h-3 w-3 mt-0.5 shrink-0" />

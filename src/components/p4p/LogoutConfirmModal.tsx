@@ -2,8 +2,8 @@ import { LogOut, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { createPortal } from "react-dom";        // 👈 NEW
-import { useEffect, useState } from "react";     // 👈 NEW
+import { createPortal } from "react-dom";        // NEW
+import { useEffect, useState } from "react";     // NEW
 
 interface LogoutConfirmModalProps {
   open: boolean;
@@ -12,15 +12,15 @@ interface LogoutConfirmModalProps {
 }
 
 export function LogoutConfirmModal({ open, onClose, onConfirm }: LogoutConfirmModalProps) {
-  const [mounted, setMounted] = useState(false);  // 👈 NEW
+  const [mounted, setMounted] = useState(false);  // NEW
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted) return null;                      // 👈 NEW
+  if (!mounted) return null;                      // NEW
 
-  return createPortal(                            // 👈 NEW — wrap everything
+  return createPortal(                            // NEW — wrap everything
     <AnimatePresence>
       {open && (
         <>
@@ -85,6 +85,6 @@ export function LogoutConfirmModal({ open, onClose, onConfirm }: LogoutConfirmMo
         </>
       )}
     </AnimatePresence>,
-    document.body                                 // 👈 key line
+    document.body                                 // key line
   );
 }

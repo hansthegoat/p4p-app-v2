@@ -8,7 +8,7 @@ export function initSentry() {
 
   const dsn = import.meta.env.VITE_SENTRY_DSN;
   if (!dsn) {
-    console.warn("⚠️ VITE_SENTRY_DSN not set — Sentry disabled");
+    console.warn("VITE_SENTRY_DSN not set. Sentry disabled");
     return;
   }
 
@@ -34,7 +34,7 @@ export function initSentry() {
   });
 
   initialized = true;
-  console.log("✅ Sentry initialized");
+  console.log("Sentry initialized");
 
   // Expose to window in dev for manual testing
   if (import.meta.env.DEV) {

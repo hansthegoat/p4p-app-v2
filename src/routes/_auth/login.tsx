@@ -42,7 +42,7 @@ function LoginPage() {
       await login(email, password);
       clearThrottle(email);
 
-      // 👈 Show splash, then navigate after it fades
+      // Show splash, then navigate after it fades
       setShowSplash(true);
       window.setTimeout(() => {
         navigate({ to: "/dashboard" });
@@ -63,7 +63,7 @@ function LoginPage() {
     }
   };
 
-  // 👈 Show the splash overlay while we hand off to the dashboard
+  // Show the splash overlay while we hand off to the dashboard
   if (showSplash) {
     return <SplashScreen />;
   }

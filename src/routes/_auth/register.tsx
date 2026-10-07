@@ -304,11 +304,11 @@ function RegisterForm() {
             <div className="flex-1">
               <div className="font-semibold">You've been invited to {invite.org_name}</div>
               <div className="text-[10.5px] opacity-80 mt-0.5">
-                You'll join as <strong>HR — Head of Department</strong>. Your
+                You'll join as <strong>HR, Head of Department</strong>. Your
                 name and email are pre-filled below.
               </div>
               <div className="text-[11px] font-medium mt-2 pt-2 border-t border-violet-500/20">
-                👉 Set a password below to complete your account setup.
+                Set a password below to complete your account setup.
               </div>
             </div>
           </div>

@@ -458,7 +458,7 @@ button:not(:disabled):active,
     transition: none;
   }
 }
-/* 👈 Auth form cross-fade — only the form content animates, nothing else */
+/* Auth form cross-fade — only the form content animates, nothing else */
 .auth-form-enter {
   animation: authFormEnter 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }

@@ -123,7 +123,7 @@ function ProfilePage() {
             <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
               <strong>No supervisor assigned.</strong> Contact HR to get a
-              supervisor set up — you'll need one before you can submit
+              supervisor set up. You'll need one before you can submit
               appraisals.
             </div>
           </div>

@@ -102,7 +102,7 @@ function EmployeesPage() {
   };
 
   const handleClearAll = () => {
-    if (confirm("⚠️ Delete ALL employees? This cannot be undone.")) {
+    if (confirm("Delete ALL employees? This cannot be undone.")) {
       clearEmployees();
       showToast.success("All Cleared", "All employees have been removed.");
     }
@@ -139,7 +139,7 @@ function EmployeesPage() {
       variants={staggerContainer}
       className="space-y-6"
     >
-      {/* 👈 ADDED data-tour wrapper */}
+      {/* ADDED data-tour wrapper */}
       <div data-tour="employees-header">
         <PageHeader
           title="Employees"
@@ -242,7 +242,7 @@ function EmployeesPage() {
         </motion.div>
       )}
 
-      {/* Stats — 👈 ADDED data-tour */}
+      {/* Stats — ADDED data-tour */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="employees-stats">
         <StatCard
           icon={<Users className="h-4 w-4" />}
@@ -276,7 +276,7 @@ function EmployeesPage() {
         />
       </div>
 
-      {/* Search — 👈 ADDED data-tour */}
+      {/* Search — ADDED data-tour */}
       <motion.div variants={fadeUp} data-tour="employees-search">
         <Card className="p-4">
           <div className="relative">
@@ -291,7 +291,7 @@ function EmployeesPage() {
         </Card>
       </motion.div>
 
-      {/* Table — 👈 ADDED data-tour */}
+      {/* Table — ADDED data-tour */}
       <motion.div variants={fadeUp} data-tour="employees-list">
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">

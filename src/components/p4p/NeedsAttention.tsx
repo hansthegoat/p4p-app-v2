@@ -57,7 +57,7 @@ function Widget({
 
   const t = tones[tone];
 
-  // 👈 Handle ctaTo strings that include a ?query — TanStack Router needs
+  // Handle ctaTo strings that include a ?query — TanStack Router needs
   // `to` and `search` separately.
   const handleClick = () => {
     if (ctaTo.includes("?")) {
@@ -179,7 +179,7 @@ export function NeedsAttention() {
           />
         )}
 
-        {/* 👈 Fixed — this block was missing its Widget wrapper */}
+        {/* Fixed — this block was missing its Widget wrapper */}
         {noKpis.length > 0 && (
           <Widget
             icon={Target}
@@ -204,7 +204,7 @@ export function NeedsAttention() {
           />
         )}
 
-        {/* 👈 Fixed link — was /audit-log (broken), now points to KPI Updates tab */}
+        {/* Fixed link — was /audit-log (broken), now points to KPI Updates tab */}
         {unackedUpdates.length > 0 && (
           <Widget
             icon={Bell}

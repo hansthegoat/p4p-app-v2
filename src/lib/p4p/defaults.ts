@@ -1,4 +1,4 @@
-import type { Employee, GradePoint, Globals } from "./types";
+import type { Employee, GradePoint, Globals, BonusConfig } from "./types";
 
 export const DEFAULT_GRADES: GradePoint[] = [
   { code: "B", name: "President", points: 100 },
@@ -39,14 +39,20 @@ export const DEMO_EMPLOYEES: Employee[] = [
   {
     id: id(), name: "Jane Adjunct", jobGrade: "5", isAdjunct: true, isSalesRole: false,
     joinDate: "2025-01-01", monthsWorked: 12, kpis: [], categories: [],
+    email: "",
+    department: "",
+    role: ""
   },
   {
     id: id(), name: "John Adjunct", jobGrade: "6", isAdjunct: true, isSalesRole: false,
     joinDate: "2025-01-01", monthsWorked: 12, kpis: [], categories: [],
+    email: "",
+    department: "",
+    role: ""
   },
   {
     id: id(), name: "Alice Johnson", jobGrade: "G", isAdjunct: false, isSalesRole: true,
-    joinDate: "2025-01-15", monthsWorked: 12, kpis: [], 
+    joinDate: "2025-01-15", monthsWorked: 12, kpis: [],
     categories: [
       {
         id: id(),
@@ -67,6 +73,9 @@ export const DEMO_EMPLOYEES: Employee[] = [
         ],
       },
     ],
+    email: "",
+    department: "",
+    role: ""
   },
   {
     id: id(), name: "Bob Smith", jobGrade: "4", isAdjunct: false, isSalesRole: false,
@@ -82,6 +91,9 @@ export const DEMO_EMPLOYEES: Employee[] = [
         ],
       },
     ],
+    email: "",
+    department: "",
+    role: ""
   },
   {
     id: id(), name: "Carol Davis", jobGrade: "1", isAdjunct: false, isSalesRole: true,
@@ -104,5 +116,25 @@ export const DEMO_EMPLOYEES: Employee[] = [
         ],
       },
     ],
+    email: "",
+    department: "",
+    role: ""
   },
 ];
+
+export const DEFAULT_BONUS_CONFIG: BonusConfig = {
+  sourceType: "revenue_percent",
+  revenuePercent: 5,
+  profitPercent: 10,
+  fixedAmount: 500000,
+  addOn: null,
+  adjunctPercent: 10,
+  floor: 0.5,
+  cap: 1.5,
+  prorationOn: true,
+  salesMultiplier: 1,
+  periodInputs: {
+    revenue: 5000000,
+    profit: 1000000,
+  },
+};

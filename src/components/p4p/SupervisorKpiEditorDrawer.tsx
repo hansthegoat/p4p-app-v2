@@ -336,7 +336,7 @@ export function SupervisorKpiEditorDrawer({ employee, onClose, onSaved }: Props)
                   <div className="flex items-start gap-2 p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20">
                     <AlertTriangle className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                     <div className="text-[11px] text-blue-800 dark:text-blue-300">
-                      Justification is required — the employee and HR will see it.
+                      Justification is required, the employee and HR will see it.
                     </div>
                   </div>
                   <textarea

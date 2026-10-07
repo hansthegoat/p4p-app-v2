@@ -31,7 +31,7 @@ function AppraisalsReviewPage() {
   const navigate = useNavigate();
   const {
     employees, getPendingAppraisals, getEmployeeAppraisals,
-    approveAppraisal, rejectAppraisal, requestChanges, addAppraisalComment, kpiUpdateRequests,   // 👈 ADD
+    approveAppraisal, rejectAppraisal, requestChanges, addAppraisalComment, kpiUpdateRequests,   // ADD
   } = useP4P();
 
   const [loading, setLoading] = useState(true);
@@ -209,14 +209,14 @@ useEffect(() => {
   const approvedCount = allAppraisals.filter((a) => a.status === "approved").length;
   const rejectedCount = allAppraisals.filter((a) => a.status === "rejected").length;
   const revisionCount = allAppraisals.filter((a) => a.status === "needs_revision").length;
-  // 👈 NEW — pending KPI changes across the org
+  // NEW — pending KPI changes across the org
   const kpiUpdatesPendingCount = kpiUpdateRequests.filter(
     (r) => r.status === "back_to_hr" || r.status === "pending_supervisor_review"
   ).length;
 
   return (
     <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
-      {/* 👈 ADDED data-tour wrapper */}
+      {/* ADDED data-tour wrapper */}
       <div data-tour="review-header">
       <PageHeader
         title="Review Appraisals"
@@ -226,7 +226,7 @@ useEffect(() => {
       />
       </div>
 
-      {/* 👈 ADDED data-tour */}
+      {/* ADDED data-tour */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="review-stats">
         <StatCard icon={<Clock className="h-4 w-4" />} label="Pending" value={pendingAppraisals.length} accent="primary" size="large" pulse={pendingAppraisals.length > 0 ? "blue" : "none"} />
         <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Approved" value={approvedCount} accent="success" size="large" />

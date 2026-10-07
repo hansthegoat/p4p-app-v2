@@ -472,7 +472,7 @@ function EmployeePortal() {
                       <strong className="text-foreground">{employee.department}</strong> ·{" "}
                       <strong className="text-foreground">{employee.role}</strong>.
                       <br />
-                      Your KPIs will appear here once they're assigned — usually within 1–2 business days.
+                      Your KPIs will appear here once they're assigned, usually within 1–2 business days.
                     </p>
                     <Button
                       onClick={handleRequestKpis}
@@ -612,7 +612,7 @@ function EmployeePortal() {
               )}
               <p className={`text-xs leading-relaxed ${hasApprovedData ? "text-emerald-800 dark:text-emerald-300" : "text-blue-800 dark:text-blue-300"}`}>
                 {hasApprovedData
-                  ? "This period has approved data. You can edit and resubmit — new approval will replace the old data."
+                  ? "This period has approved data. You can edit and resubmit. New approval will replace the old data."
                   : "Enter your actuals, add comments, and upload support files. Click Submit for Appraisal when ready."}
               </p>
             </Card>
@@ -923,7 +923,7 @@ function EmployeePortal() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border/50">
               <div className="flex items-start gap-2 text-xs text-muted-foreground max-w-md">
                 <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                <span>Data saves only after manager approval. Submit any month/year — resubmit anytime.</span>
+                <span>Data saves only after manager approval. Submit any month/year, resubmit anytime.</span>
               </div>
               <Button
                 onClick={handleSubmitForAppraisal}

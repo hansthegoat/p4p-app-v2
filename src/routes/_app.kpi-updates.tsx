@@ -77,7 +77,7 @@ function KpiUpdatesPage() {
     setLoading(req.id);
     try {
       await p4p.acknowledgeKpiUpdate(req.id);
-      showToast.success("Acknowledged", "Thanks — HR has been notified.");
+      showToast.success("Acknowledged", "Thanks, HR has been notified.");
     } catch (err: any) {
       showToast.error("Could not acknowledge", err.message);
     } finally {
@@ -102,7 +102,7 @@ function KpiUpdatesPage() {
 
   return (
     <div className="p-3 sm:p-6 max-w-3xl mx-auto">
-      {/* 👈 ADDED data-tour */}
+      {/* ADDED data-tour */}
       <div
         className="mb-5 sm:mb-6 flex items-start sm:items-center gap-2 sm:gap-3"
         data-tour="kpi-updates-header"
@@ -119,7 +119,7 @@ function KpiUpdatesPage() {
         </div>
       </div>
 
-      {/* 👈 ADDED data-tour */}
+      {/* ADDED data-tour */}
       {needsAck.length === 0 && history.length === 0 && (
         <Card className="p-8 text-center" data-tour="kpi-updates-empty">
           <CheckCircle className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
@@ -130,7 +130,7 @@ function KpiUpdatesPage() {
         </Card>
       )}
 
-      {/* 👈 ADDED data-tour */}
+      {/* ADDED data-tour */}
       {needsAck.length > 0 && (
         <div className="space-y-4 mb-8" data-tour="kpi-updates-needs-ack">
           <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
@@ -159,7 +159,7 @@ function KpiUpdatesPage() {
         </div>
       )}
 
-      {/* 👈 ADDED data-tour */}
+      {/* ADDED data-tour */}
       {history.length > 0 && (
         <div className="space-y-4" data-tour="kpi-updates-history">
           <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">

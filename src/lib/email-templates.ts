@@ -330,6 +330,6 @@ export function kpiUpdateEmail(data: {
 
   return baseLayout(
     content,
-    `HR updated your KPIs — ${changeCount} change${changeCount > 1 ? "s" : ""}`
+    `HR updated your KPIs, ${changeCount} change${changeCount > 1 ? "s" : ""}`
   );
 }

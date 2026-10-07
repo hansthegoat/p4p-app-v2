@@ -105,7 +105,7 @@ function SupervisorsPage() {
       variants={staggerContainer}
       className="space-y-6"
     >
-      {/* 👈 ADDED data-tour wrapper */}
+      {/* ADDED data-tour wrapper */}
       <div data-tour="supervisors-header">
         <PageHeader
           title="Supervisor Assignment"
@@ -119,7 +119,7 @@ function SupervisorsPage() {
         />
       </div>
 
-      {/* Stats — 👈 ADDED data-tour */}
+      {/* Stats — ADDED data-tour */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="supervisors-stats">
         <StatCard
           icon={<Users className="h-4 w-4" />}
@@ -153,7 +153,7 @@ function SupervisorsPage() {
         />
       </div>
 
-      {/* Managers list — 👈 ADDED data-tour */}
+      {/* Managers list — ADDED data-tour */}
       <motion.div variants={fadeUp} data-tour="supervisors-managers">
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
@@ -206,7 +206,7 @@ function SupervisorsPage() {
         </Card>
       </motion.div>
 
-      {/* Employee table — 👈 ADDED data-tour */}
+      {/* Employee table — ADDED data-tour */}
       <motion.div variants={fadeUp} data-tour="supervisors-list">
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">

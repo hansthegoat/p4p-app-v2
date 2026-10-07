@@ -27,7 +27,7 @@ export function ChangePasswordModal({ open, onClose }: ChangePasswordModalProps)
   const [error, setError] = useState("");
   const [pwCheck, setPwCheck] = useState(checkPassword(""));
 
-  // 👈 password visibility toggles
+  // password visibility toggles
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNext, setShowNext] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -49,7 +49,7 @@ export function ChangePasswordModal({ open, onClose }: ChangePasswordModalProps)
     onClose();
   };
 
-  // 👈 live match check (only shows once user types in confirm)
+  // live match check (only shows once user types in confirm)
   const confirmTouched = confirm.length > 0;
   const passwordsMatch = next === confirm && confirm.length > 0;
   const confirmMismatch = confirmTouched && !passwordsMatch;
@@ -221,7 +221,7 @@ export function ChangePasswordModal({ open, onClose }: ChangePasswordModalProps)
             )}
           </div>
 
-          {/* Confirm new password — 👈 with visibility toggle + live match check */}
+          {/* Confirm new password — with visibility toggle + live match check */}
           <div>
             <Label>Confirm new password</Label>
             <div className="relative">
@@ -261,7 +261,7 @@ export function ChangePasswordModal({ open, onClose }: ChangePasswordModalProps)
               </div>
             </div>
 
-            {/* 👈 live feedback under the confirm field */}
+            {/* live feedback under the confirm field */}
             {confirmTouched && (
               <div className="mt-1.5 text-[11px]">
                 {passwordsMatch ? (

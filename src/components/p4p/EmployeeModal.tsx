@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AlertTriangle, CheckCircle, Info } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -382,10 +383,15 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                           : "bg-blue-50 border border-blue-200 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400"
                       }`}
                     >
-                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                      {weightStats.isOver ? (
+                        <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                      ) : weightStats.isComplete ? (
+                        <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                      ) : (
+                        <Info className="h-4 w-4 flex-shrink-0" />
+                      )}
                       <span className="text-xs sm:text-sm">
-                        {weightStats.isOver ? "⚠️ Over 100%! " : weightStats.isComplete ? "✅ Perfect! " : "📊 "}
-                        Category Total: <strong>{weightStats.total}%</strong>
+                        Category total: <strong>{weightStats.total}%</strong>
                         {!weightStats.isOver && !weightStats.isComplete && (
                           <> · Remaining: <strong>{weightStats.remaining}%</strong></>
                         )}
@@ -449,10 +455,15 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                                     : "bg-amber-50 border border-amber-200 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
                                 }`}
                               >
-                                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                                {kpiStats.isOver ? (
+                                  <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                                ) : kpiStats.isComplete ? (
+                                  <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                                ) : (
+                                  <Info className="h-3.5 w-3.5 flex-shrink-0" />
+                                )}
                                 <span>
-                                  {kpiStats.isOver ? "⚠️ KPI weights over 100%! " : kpiStats.isComplete ? "✅ KPI weights perfect! " : "📊 "}
-                                  KPI Total: <strong>{kpiStats.total}%</strong>
+                                  KPI total: <strong>{kpiStats.total}%</strong>
                                   {!kpiStats.isOver && !kpiStats.isComplete && (
                                     <> · Need <strong>{100 - kpiStats.total}%</strong> more</>
                                   )}

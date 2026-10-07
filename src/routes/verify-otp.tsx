@@ -443,7 +443,7 @@ function VerifyOtpPage() {
                   {expired ? (
                     <>
                       <AlertCircle className="h-3 w-3" />
-                      Code expired — request a new one
+                      Code expired, Request a new one.
                     </>
                   ) : (
                     <>
@@ -521,7 +521,7 @@ function VerifyOtpPage() {
               <Sparkles className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
               <p className="text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed">
                 Check your spam folder if you don't see the code within 2 minutes.
-                The code expires after 5 minutes — use the resend button if needed.
+                The code expires after 5 minutes. Use the resend button if needed.
               </p>
             </div>
           </div>

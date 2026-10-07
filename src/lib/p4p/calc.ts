@@ -1,9 +1,9 @@
-import type { CalcResult, Employee, GradePoint, Globals, KPI, Category } from "./types";
+import type { CalcResult, Employee, GradePoint, Globals, BonusConfig, KPI, Category } from "./types";
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /**
- * 👈 Who participates in the bonus pool?
+ * Who participates in the bonus pool?
  * - Adjuncts: get a fixed adjunct bonus (separate pool)
  * - Employees + HR: get pool share based on grade points × multiplier
  * - Admins: system/developer accounts — NOT in the bonus calculation
@@ -68,25 +68,68 @@ export function performanceMultiplier(kpis: KPI[], floor: number, cap: number): 
   const ratio = sum / count;
   return clamp(ratio, floor, cap);
 }
+/**
+ * Computes the total bonus pool from the bonus configuration.
+ *
+ * Supports three source types:
+ *   - revenue_percent: revenue for the period × revenuePercent
+ *   - profit_percent:  profit for the period  × profitPercent
+ *   - fixed_amount:    a flat amount, ignoring period inputs
+ *
+ * An optional add-on (a fixed top-up) is added on top of the base.
+ */
+export function computeTotalPool(config: BonusConfig): number {
+  let base = 0;
+
+  switch (config.sourceType) {
+    case "revenue_percent": {
+      const revenue = config.periodInputs.revenue ?? 0;
+      base = revenue * (config.revenuePercent / 100);
+      break;
+    }
+    case "profit_percent": {
+      const profit = config.periodInputs.profit ?? 0;
+      base = profit * (config.profitPercent / 100);
+      break;
+    }
+    case "fixed_amount": {
+      base = config.fixedAmount;
+      break;
+    }
+  }
+
+  const addOn = config.addOn?.amount ?? 0;
+  return base + addOn;
+}
 
 export function calculate(
   employees: Employee[],
   grades: GradePoint[],
   g: Globals,
+  config?: BonusConfig,
 ): CalcResult {
   const warnings: string[] = [];
-  const floor = Math.min(g.floor, g.cap);
-  const cap = Math.max(g.floor, g.cap);
-  if (g.floor > g.cap) warnings.push("Floor was greater than cap — values swapped.");
+
+  // Prefer the new BonusConfig when provided. Fall back to legacy
+  // Globals for backward compatibility until the store is migrated.
+  const rawFloor = config ? config.floor : g.floor;
+  const rawCap = config ? config.cap : g.cap;
+  const floor = Math.min(rawFloor, rawCap);
+  const cap = Math.max(rawFloor, rawCap);
+  if (rawFloor > rawCap) warnings.push("Floor was greater than cap. Values swapped.");
 
   const gradeMap = new Map(grades.map((x) => [x.code, x.points]));
 
-  const totalPool = (Number(g.totalRevenue) || 0) * ((Number(g.p4pPercent) || 0) / 100);
-  const adjFrac = clamp((Number(g.adjunctPercent) || 0) / 100, 0, 1);
+  const totalPool = config
+    ? computeTotalPool(config)
+    : (Number(g.totalRevenue) || 0) * ((Number(g.p4pPercent) || 0) / 100);
+
+  const adjunctPercent = config ? config.adjunctPercent : g.adjunctPercent;
+  const adjFrac = clamp((Number(adjunctPercent) || 0) / 100, 0, 1);
   const adjunctPool = totalPool * adjFrac;
   const employeePool = totalPool * (1 - adjFrac);
 
-  // 👈 Exclude admins only — HR is a real employee and is included
+  // Exclude admins only — HR is a real employee and is included
   const participants = employees.filter(isPayrollParticipant);
   const excludedCount = employees.length - participants.length;
 
@@ -147,16 +190,19 @@ export function calculate(
       // No KPIs = not yet measured = no bonus.
       // Previously defaulted to 1.0 which granted a full unearned share.
       pm = 0;
-      warnings.push(`${e.name}: no KPIs assigned — bonus set to 0 until measured.`);
+      warnings.push(`${e.name}: no KPIs assigned, bonus set to 0 until measured.`);
     }
     
+    const prorationOn = config ? config.prorationOn : g.prorationOn;
+    const salesMultiplierValue = config ? config.salesMultiplier : g.salesMultiplier;
+
     let months = Number(e.monthsWorked);
-    if (g.prorationOn && (!months || months <= 0)) {
-      warnings.push(`${e.name}: months worked missing — defaulted to 12.`);
+    if (prorationOn && (!months || months <= 0)) {
+      warnings.push(`${e.name}: months worked missing. Defaulted to 12.`);
       months = 12;
     }
-    const proration = g.prorationOn ? clamp(months / 12, 0, 1) : 1;
-    const salesMult = e.isSalesRole ? (Number(g.salesMultiplier) || 1) : 1;
+    const proration = prorationOn ? clamp(months / 12, 0, 1) : 1;
+    const salesMult = e.isSalesRole ? (Number(salesMultiplierValue) || 1) : 1;
     const weight = gp * pm * proration * salesMult;
     
     weights.push({ 
@@ -172,7 +218,7 @@ export function calculate(
   }
 
   const sumWeights = weights.reduce((s, w) => s + w.weight, 0);
-  if (nonAdjuncts.length > 0 && sumWeights <= 0) warnings.push("Sum of weights is 0 — no bonuses can be distributed to non-adjuncts.");
+  if (nonAdjuncts.length > 0 && sumWeights <= 0) warnings.push("Sum of weights is 0, no bonuses can be distributed to non-adjuncts.");
 
   const valuePerUnit = sumWeights > 0 ? employeePool / sumWeights : 0;
 
@@ -203,7 +249,7 @@ export function calculate(
   }
 
   const totalBonusPaid = (sumWeights > 0 ? employeePool : 0) + (adjuncts.length > 0 ? adjunctPool : 0);
-  // 👈 Average is across participants only (HR + employees + adjuncts, NOT admins)
+  // Average is across participants only (HR + employees + adjuncts, NOT admins)
   const avgBonus = participants.length > 0 ? totalBonusPaid / participants.length : 0;
 
   if (excludedCount > 0) {

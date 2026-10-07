@@ -109,11 +109,11 @@ function TracePage() {
       variants={staggerContainer}
       className="space-y-6"
     >
-      {/* 👈 ADDED data-tour wrapper */}
+      {/* ADDED data-tour wrapper */}
       <div data-tour="trace-header">
         <PageHeader
           title="Calculation Trace"
-          description="Full breakdown of how each employee's bonus is calculated — from grade points to final payout."
+          description="Full breakdown of how each employee's bonus is calculated, from grade points to final payout."
           icon={<Calculator className="h-6 w-6" />}
           actions={
             <Button variant="outline" size="sm" onClick={exportTrace} className="gap-2">
@@ -123,7 +123,7 @@ function TracePage() {
         />
       </div>
 
-      {/* Pool Overview — 👈 ADDED data-tour */}
+      {/* Pool Overview — ADDED data-tour */}
       <motion.div variants={fadeUp} data-tour="trace-pool">
         <Card className="p-5 bg-gradient-to-r from-primary/5 via-background to-background border-primary/20">
           <div className="flex items-center gap-2 mb-4">
@@ -173,7 +173,7 @@ function TracePage() {
         </Card>
       </motion.div>
 
-      {/* Stats — 👈 ADDED data-tour */}
+      {/* Stats — ADDED data-tour */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="trace-stats">
         <StatCard
           icon={<Users className="h-4 w-4" />}
@@ -205,7 +205,7 @@ function TracePage() {
         />
       </div>
 
-      {/* Filters — 👈 ADDED data-tour */}
+      {/* Filters — ADDED data-tour */}
       <motion.div variants={fadeUp} data-tour="trace-filters">
         <Card className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -243,7 +243,7 @@ function TracePage() {
         </Card>
       </motion.div>
 
-      {/* Trace list — 👈 ADDED data-tour */}
+      {/* Trace list — ADDED data-tour */}
       <motion.div variants={fadeUp} data-tour="trace-list">
         <SectionCard
           title="Employee Calculation Traces"
@@ -522,7 +522,7 @@ function TracePage() {
         </SectionCard>
       </motion.div>
 
-      {/* Info footer — 👈 ADDED data-tour */}
+      {/* Info footer — ADDED data-tour */}
       <motion.div variants={fadeUp} data-tour="trace-info">
         <Card className="p-5 bg-blue-500/5 border-blue-500/20">
           <div className="flex items-start gap-3">

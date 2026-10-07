@@ -30,7 +30,7 @@ function AuditLogPage() {
     <div className="space-y-6">
       <PageHeader
         title="Audit Log"
-        description="Every KPI change HR has pushed — who sent it, who received it, and whether they've acknowledged."
+        description="Every KPI change HR has pushed; who sent it, who received it, and whether they've acknowledged."
         icon={<History className="h-6 w-6" />}
         actions={
           <div className="flex gap-1 p-1 rounded-lg bg-muted border border-border">

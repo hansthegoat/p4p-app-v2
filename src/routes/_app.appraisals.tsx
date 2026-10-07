@@ -120,7 +120,7 @@ function AppraisalsPage() {
 
   return (
     <motion.div initial="hidden" animate="show" variants={staggerContainer} className="space-y-6">
-      {/* 👈 ADDED data-tour wrapper */}
+      {/* ADDED data-tour wrapper */}
       <div data-tour="appraisals-header">
       <PageHeader
         title="My Appraisals"
@@ -130,7 +130,7 @@ function AppraisalsPage() {
         actions={<Button variant="outline" size="sm" onClick={() => { setAppraisals(getEmployeeAppraisals(employee.id)); showToast.success("Refreshed", "Appraisal list updated."); }} className="gap-2"><RefreshCw className="h-4 w-4" /> Refresh</Button>}
       />
       </div>
-      {/* 👈 ADDED data-tour */}
+      {/* ADDED data-tour */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4" data-tour="appraisals-stats">
         <StatCard icon={<FileText className="h-4 w-4" />} label="Total Appraisals" value={appraisals.length} accent="primary" size="large" />
         <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Approved" value={approvedCount} accent="success" size="large" />

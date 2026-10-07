@@ -43,7 +43,7 @@ const EMPLOYEE_WELCOME: Tour = {
       popover: {
         title: "Your navigation",
         description:
-          "Everything you need is on the left. Pages open as you click them — you can always come back here.",
+          "Everything you need is on the left. Pages open as you click them  you can always come back here.",
         side: "right",
         align: "start",
       },
@@ -159,7 +159,7 @@ const EMPLOYEE_DASHBOARD_TOUR: Tour = {
       popover: {
         title: "Your performance dashboard",
         description:
-          "This is your home base. Your current score, YTD average, estimated bonus, and months tracked — all live up top.",
+          "This is your home base. Your current score, YTD average, estimated bonus, and months tracked all live up top.",
         side: "bottom",
         align: "center",
       },
@@ -209,7 +209,7 @@ const ADMIN_DASHBOARD_TOUR: Tour = {
       popover: {
         title: "Your command center",
         description:
-          "Live overview of pools, payouts, performance signals, and monthly trends — for the whole company.",
+          "Live overview of pools, payouts, performance signals, and monthly trends for the whole company.",
         side: "bottom",
         align: "center",
       },
@@ -239,7 +239,7 @@ const ADMIN_DASHBOARD_TOUR: Tour = {
       popover: {
         title: "The numbers at a glance",
         description:
-          "Revenue, total pool, adjunct pool, employee pool, headcount, and average bonus — updated as settings change.",
+          "Revenue, total pool, adjunct pool, employee pool, headcount, and average bonus  updated as settings change.",
         side: "top",
         align: "center",
       },
@@ -295,7 +295,7 @@ const MY_CALCULATION_TOUR: Tour = {
       popover: {
         title: "How your bonus is calculated",
         description:
-          "Every step of the formula is traced here — no hidden math. You can see exactly which KPIs contributed.",
+          "Every step of the formula is traced here no hidden math. You can see exactly which KPIs contributed.",
         side: "bottom",
         align: "center",
       },
@@ -315,7 +315,7 @@ const MY_CALCULATION_TOUR: Tour = {
       popover: {
         title: "Step by step",
         description:
-          "Each section walks through one piece of the formula — Grade Points, Value per Point, your Multiplier, and more.",
+          "Each section walks through one piece of the formula. Grade Points, Value per Point, your Multiplier, and more.",
         side: "top",
         align: "center",
       },
@@ -325,7 +325,7 @@ const MY_CALCULATION_TOUR: Tour = {
       popover: {
         title: "What if you improved?",
         description:
-          "See what your bonus would be if you hit every target, or reached 120% — a clear target to aim for.",
+          "See what your bonus would be if you hit every target, or reached 120%, a clear target to aim for.",
         side: "top",
         align: "center",
       },
@@ -341,7 +341,7 @@ const PROFILE_TOUR: Tour = {
       popover: {
         title: "Your profile",
         description:
-          "Your name, role, department, and grade — the info HR has on file for you.",
+          "Your name, role, department, and grade - the info HR has on file for you.",
         side: "bottom",
         align: "center",
       },
@@ -377,7 +377,7 @@ const APPRAISALS_TOUR: Tour = {
       popover: {
         title: "Your appraisals",
         description:
-          "Every monthly appraisal you've submitted lives here — with its status, score, and reviewer.",
+          "Every monthly appraisal you've submitted lives here with its status, score, and reviewer.",
         side: "bottom",
         align: "center",
       },
@@ -433,7 +433,7 @@ const APPRAISALS_REVIEW_TOUR: Tour = {
       popover: {
         title: "Queue at a glance",
         description:
-          "Pending, approved, revision requests, and rejections — everything you need to see what needs action.",
+          "Pending, approved, revision requests, and rejections; everything you need to see what needs action.",
         side: "bottom",
         align: "center",
       },
@@ -460,7 +460,7 @@ const KPI_FRAMEWORK_TOUR: Tour = {
       popover: {
         title: "KPI Framework",
         description:
-          "Build weighted KPI templates for every department and role — or check who still needs one.",
+          "Build weighted KPI templates for every department and role. Or check who still needs one.",
         side: "bottom",
         align: "center",
       },
@@ -490,7 +490,7 @@ const KPI_FRAMEWORK_TOUR: Tour = {
       popover: {
         title: "Pick a department and role",
         description:
-          "Choose from the dropdowns to edit that template — or click 'Missing KPIs' above to find groups that need one.",
+          "Choose from the dropdowns to edit that template. Or click 'Missing KPIs' above to find groups that need one.",
         side: "bottom",
         align: "center",
       },
@@ -572,7 +572,7 @@ const KPI_UPDATES_TOUR: Tour = {
       popover: {
         title: "Acknowledged changes",
         description:
-          "Once you've acknowledged an update, it moves here. HR has been notified — nothing else is needed from you.",
+          "Once you've acknowledged an update, it moves here. HR has been notified, nothing else is needed from you.",
         side: "top",
         align: "center",
       },
@@ -628,7 +628,7 @@ const SUPERVISORS_TOUR: Tour = {
 
 // My Team tour — for supervisors and managers
 const MY_TEAM_TOUR: Tour = {
-  key: "page_my_team_v2",   // 👈 new key so it re-fires even if you saw the old version
+  key: "page_my_team_v2",   // new key so it re-fires even if you saw the old version
   steps: [
     {
       element: '[data-tour="my-team-header"]',
@@ -675,14 +675,14 @@ const MY_TEAM_TOUR: Tour = {
       popover: {
         title: "KPI changes awaiting you",
         description:
-          "When HR pushes KPI changes for your reports, they land here first. You review, comment back to HR, and approve — the employee only sees it after you sign off.",
+          "When HR pushes KPI changes for your reports, they land here first. You review, comment back to HR, and approve. The employee only sees it after you sign off.",
         side: "top",
         align: "center",
       },
     },
   ],
 };
-// 👈 NEW — Grade Points tour
+// NEW — Grade Points tour
 const GRADES_TOUR: Tour = {
   key: "page_grades",
   steps: [
@@ -728,7 +728,7 @@ const GRADES_TOUR: Tour = {
     },
   ],
 };
-// 👈 NEW — Calculation Trace tour
+// NEW — Calculation Trace tour
 const TRACE_TOUR: Tour = {
   key: "page_trace",
   steps: [
@@ -737,7 +737,7 @@ const TRACE_TOUR: Tour = {
       popover: {
         title: "Calculation Trace",
         description:
-          "This is the audit view — every employee's bonus traced from grade points to final payout. Nothing hidden.",
+          "This is the audit view. Every employee's bonus is traced from grade points to final payout. Nothing hidden.",
         side: "bottom",
         align: "center",
       },
@@ -777,7 +777,7 @@ const TRACE_TOUR: Tour = {
       popover: {
         title: "Click any row to expand",
         description:
-          "Each row opens a full breakdown — Grade & Weight, Performance Multiplier, Category Breakdown, and the final formula. Great for answering 'why is my bonus this number?'",
+          "Each row opens a full breakdown. Grade & Weight, Performance Multiplier, Category Breakdown, and the final formula. Great for answering 'why is my bonus this number?'",
         side: "top",
         align: "center",
       },
@@ -800,9 +800,9 @@ export const PAGE_TOURS: Record<string, Tour> = {
   "/employees": EMPLOYEES_TOUR,
   "/kpi-updates": KPI_UPDATES_TOUR,
   "/supervisors": SUPERVISORS_TOUR,
-  "/grades": GRADES_TOUR,   // 👈 ADD THIS LINE
-  "/trace": TRACE_TOUR,   // 👈 ADD THIS LINE
-  "/my-team": MY_TEAM_TOUR,   // 👈 ADD
+  "/grades": GRADES_TOUR,   // ADD THIS LINE
+  "/trace": TRACE_TOUR,   // ADD THIS LINE
+  "/my-team": MY_TEAM_TOUR,   // ADD
 };
 
 export function getWelcomeTourForRole(role: string): Tour {
@@ -810,7 +810,7 @@ export function getWelcomeTourForRole(role: string): Tour {
   return EMPLOYEE_WELCOME;
 }
 
-/** 👈 Role-aware dashboard tour. */
+/** Role-aware dashboard tour. */
 export function getDashboardTourForRole(role: string): Tour {
   if (role === "hr" || role === "admin") return ADMIN_DASHBOARD_TOUR;
   return EMPLOYEE_DASHBOARD_TOUR;

@@ -407,3 +407,33 @@ export interface KpiUpdateRequest {
   canRevertUntil?: string;
   templateRevertedAt?: string;
 }
+export type BonusSourceType =
+  | "revenue_percent"
+  | "profit_percent"
+  | "fixed_amount";
+
+export interface BonusConfig {
+  /** Which source determines the total pool */
+  sourceType: BonusSourceType;
+
+  /** All three values stored so switching sources preserves what was typed */
+  revenuePercent: number;
+  profitPercent: number;
+  fixedAmount: number;
+
+  /** Optional fixed top-up added to the pool */
+  addOn: { label: string; amount: number } | null;
+
+  /** Distribution rules — same as the old Globals fields */
+  adjunctPercent: number;
+  floor: number;
+  cap: number;
+  prorationOn: boolean;
+  salesMultiplier: number;
+
+  /** Inputs HR updates each cycle */
+  periodInputs: {
+    revenue: number | null;
+    profit: number | null;
+  };
+}
