@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { AnimatedNumber } from "@/components/p4p/AnimatedNumber";
@@ -6,8 +6,6 @@ import { useP4P } from "@/lib/p4p/store";
 import { fmtGHS, fmtNum } from "@/lib/p4p/calc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -42,7 +40,7 @@ import {
 import {
   TrendingUp, Wallet, Users, UserCheck, DollarSign,
   Sparkles, Target, Calendar, Award, AlertTriangle,
-  Settings, Save, RefreshCw, Activity, PieChart as PieChartIcon,
+  RefreshCw, Activity, PieChart as PieChartIcon,
   BarChart3, CheckCircle, Clock, Star, Zap, Info, AlertCircle, Eye, EyeOff,
 } from "lucide-react";
 import {
@@ -120,10 +118,12 @@ function getBand(score: number) {
 }
 
 function Dashboard() {
+  const navigate = useNavigate();
+
   const {
-    globals, setGlobals, calc, employees, monthlyData,
+    globals, calc, employees, monthlyData,
     getAllTrends, getMonthlyStats, getMonthlyHistory,
-    bonusRevealed, setBonusRevealed,
+    bonusRevealed, bonusConfig,
     refreshFromCloud,
     submitKpiRequest, getEmployeeKpiRequest,
   } = useP4P();
@@ -225,16 +225,6 @@ function Dashboard() {
   usePageTour(dashboardPageTour, chainDashboardTour);
 
   // Local Admin Globals Form State
-  const [localGlobals, setLocalGlobals] = useState({
-    totalRevenue: globals.totalRevenue,
-    p4pPercent: globals.p4pPercent,
-    adjunctPercent: globals.adjunctPercent,
-    floor: globals.floor,
-    cap: globals.cap,
-    prorationOn: globals.prorationOn,
-    salesMultiplier: globals.salesMultiplier,
-  });
-  const [saving, setSaving] = useState(false);
 
   const trends = getAllTrends();
   const stats = getMonthlyStats();
@@ -260,11 +250,6 @@ function Dashboard() {
     return all.slice(-limit);
   }, [monthlyData, employees, trendMonths]);
 
-  const handleSaveGlobals = () => {
-    setSaving(true);
-    setGlobals(localGlobals);
-    setTimeout(() => setSaving(false), 500);
-  };
 
   const disabled = globals.totalRevenue <= 0;
 
@@ -470,82 +455,35 @@ function Dashboard() {
         <Card className="p-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3 min-w-0">
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                bonusRevealed ? COLOR_THEMES.emerald.subtleBg + " " + COLOR_THEMES.emerald.text : COLOR_THEMES.amber.subtleBg + " " + COLOR_THEMES.amber.text
-              }`}>
-                {bonusRevealed ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary">
+                <Wallet className="h-4 w-4" />
               </div>
               <div className="min-w-0">
                 <div className="text-[13px] font-semibold">
-                  Bonus visibility: {bonusRevealed ? "Revealed" : "Hidden"}
+                  Reward Setup
                 </div>
                 <div className="text-[11px] text-muted-foreground">
-                  {bonusRevealed
-                    ? "Employees can see their bonus amounts."
-                    : "Employees see a locked placeholder until you reveal."}
+                  {bonusConfig.sourceType === "revenue_percent" &&
+                    `Revenue · ${bonusConfig.revenuePercent}% of ${fmtGHS(bonusConfig.periodInputs.revenue ?? 0)}`}
+                  {bonusConfig.sourceType === "profit_percent" &&
+                    `Profit · ${bonusConfig.profitPercent}% of ${fmtGHS(bonusConfig.periodInputs.profit ?? 0)}`}
+                  {bonusConfig.sourceType === "fixed_amount" &&
+                    `Fixed · ${fmtGHS(bonusConfig.fixedAmount)}`}
+                  {bonusConfig.addOn && ` · + ${fmtGHS(bonusConfig.addOn.amount)} add-on`}
+                  {" · "}
+                  {bonusRevealed ? "Bonuses visible" : "Bonuses hidden"}
                 </div>
               </div>
             </div>
             <Button
               size="sm"
-              onClick={async () => {
-                try {
-                  await setBonusRevealed(!bonusRevealed);
-                  showToast.success(
-                    !bonusRevealed ? "Bonuses revealed" : "Bonuses hidden",
-                    !bonusRevealed
-                      ? "All employees can now see their amounts."
-                      : "Employees see the locked placeholder again."
-                  );
-                } catch (err: any) {
-                  showToast.error("Could not update", err.message);
-                }
-              }}
-              className={`gap-2 ${
-                bonusRevealed
-                  ? "bg-background border border-border text-foreground hover:bg-accent"
-                  : "bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white"
-              }`}
+              onClick={() => navigate({ to: "/reward-setup" })}
+              className="gap-2"
             >
-              {bonusRevealed ? "Hide bonuses" : "Reveal bonuses"}
+              Configure
             </Button>
           </div>
         </Card>
-
-        <div data-tour="global-settings">
-          <SectionCard
-            title="Global P4P Settings"
-            description="Controls revenue, pool allocation, and thresholds"
-            icon={<Settings className="h-4 w-4" />}
-            action={<Button size="sm" onClick={handleSaveGlobals} disabled={saving} className="gap-1.5">{saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}Save</Button>}
-          >
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {[
-                { key: "totalRevenue", label: "Revenue (GHS)", step: undefined },
-                { key: "p4pPercent", label: "P4P %", step: undefined },
-                { key: "adjunctPercent", label: "Adjunct %", step: undefined },
-                { key: "floor", label: "Floor", step: "0.01" },
-                { key: "cap", label: "Cap", step: "0.01" },
-                { key: "salesMultiplier", label: "Sales Mult.", step: "0.01" },
-              ].map((f) => (
-                <div key={f.key}>
-                  <Label className="text-xs text-muted-foreground">{f.label}</Label>
-                  <Input type="number" step={f.step} className="mt-1 h-9" value={(localGlobals as any)[f.key]} onChange={(e) => setLocalGlobals((prev) => ({ ...prev, [f.key]: Number(e.target.value) }))} />
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-border/50 text-xs text-muted-foreground">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={localGlobals.prorationOn} onChange={(e) => setLocalGlobals((prev) => ({ ...prev, prorationOn: e.target.checked }))} className="h-3.5 w-3.5 rounded accent-primary" />
-                Proration On
-              </label>
-              <span className="ml-auto flex items-center gap-4">
-                <span>P4P Pool: <strong className="text-foreground">{fmtGHS(calc.totalPool)}</strong></span>
-                <span>Employee Pool: <strong className="text-foreground">{fmtGHS(calc.employeePool)}</strong></span>
-              </span>
-            </div>
-          </SectionCard>
-        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" data-tour="dashboard-stats">
           <StatCard icon={<DollarSign className="h-4 w-4" />} label="Revenue" value={fmtGHS(globals.totalRevenue)} sub={`${globals.p4pPercent}% to P4P`} accent="primary" />
