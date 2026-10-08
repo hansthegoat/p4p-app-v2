@@ -9,57 +9,37 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VerifyOtpRouteImport } from './routes/verify-otp'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as OnboardingRouteImport } from './routes/onboarding'
-import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
-import { Route as AdminRouteImport } from './routes/admin'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AuthRouteRouteImport } from './routes/_auth/route'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AdminIndexRouteImport } from './routes/admin.index'
-import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
-import { Route as AuthLoginRouteImport } from './routes/_auth/login'
-import { Route as AppTraceRouteImport } from './routes/_app.trace'
-import { Route as AppSupervisorsRouteImport } from './routes/_app.supervisors'
-import { Route as AppRewardSetupRouteImport } from './routes/_app.reward-setup'
-import { Route as AppProfileRouteImport } from './routes/_app.profile'
-import { Route as AppMyTeamRouteImport } from './routes/_app.my-team'
-import { Route as AppMyCalculationRouteImport } from './routes/_app.my-calculation'
-import { Route as AppKpiUpdatesRouteImport } from './routes/_app.kpi-updates'
-import { Route as AppKpiFrameworkRouteImport } from './routes/_app.kpi-framework'
-import { Route as AppGradesRouteImport } from './routes/_app.grades'
-import { Route as AppEmployeesRouteImport } from './routes/_app.employees'
-import { Route as AppEmployeeRouteImport } from './routes/_app.employee'
-import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
-import { Route as AppAuditLogRouteImport } from './routes/_app.audit-log'
-import { Route as AppAppraisalsReviewRouteImport } from './routes/_app.appraisals-review'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as VerifyOtpRouteImport } from './routes/verify-otp'
 import { Route as AppAppraisalsRouteImport } from './routes/_app.appraisals'
+import { Route as AppAppraisalsReviewRouteImport } from './routes/_app.appraisals-review'
+import { Route as AppAuditLogRouteImport } from './routes/_app.audit-log'
+import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppEmployeeRouteImport } from './routes/_app.employee'
+import { Route as AppEmployeesRouteImport } from './routes/_app.employees'
+import { Route as AppGradesRouteImport } from './routes/_app.grades'
+import { Route as AppKpiFrameworkRouteImport } from './routes/_app.kpi-framework'
+import { Route as AppKpiUpdatesRouteImport } from './routes/_app.kpi-updates'
+import { Route as AppMyCalculationRouteImport } from './routes/_app.my-calculation'
+import { Route as AppMyTeamRouteImport } from './routes/_app.my-team'
+import { Route as AppProfileRouteImport } from './routes/_app.profile'
+import { Route as AppRewardSetupRouteImport } from './routes/_app.reward-setup'
+import { Route as AppSupervisorsRouteImport } from './routes/_app.supervisors'
+import { Route as AppTraceRouteImport } from './routes/_app.trace'
+import { Route as AuthLoginRouteImport } from './routes/_auth/login'
+import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminTenantsIdRouteImport } from './routes/admin.tenants.$id'
 
-const VerifyOtpRoute = VerifyOtpRouteImport.update({
-  id: '/verify-otp',
-  path: '/verify-otp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OnboardingRoute = OnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
-  id: '/forgot-password',
-  path: '/forgot-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -70,89 +50,34 @@ const AuthRouteRoute = AuthRouteRouteImport.update({
   id: '/_auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminIndexRoute = AdminIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AdminRoute,
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AuthRegisterRoute = AuthRegisterRouteImport.update({
-  id: '/register',
-  path: '/register',
-  getParentRoute: () => AuthRouteRoute,
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AuthLoginRoute = AuthLoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => AuthRouteRoute,
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AppTraceRoute = AppTraceRouteImport.update({
-  id: '/trace',
-  path: '/trace',
-  getParentRoute: () => AppRoute,
+const VerifyOtpRoute = VerifyOtpRouteImport.update({
+  id: '/verify-otp',
+  path: '/verify-otp',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AppSupervisorsRoute = AppSupervisorsRouteImport.update({
-  id: '/supervisors',
-  path: '/supervisors',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppRewardSetupRoute = AppRewardSetupRouteImport.update({
-  id: '/reward-setup',
-  path: '/reward-setup',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppProfileRoute = AppProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppMyTeamRoute = AppMyTeamRouteImport.update({
-  id: '/my-team',
-  path: '/my-team',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppMyCalculationRoute = AppMyCalculationRouteImport.update({
-  id: '/my-calculation',
-  path: '/my-calculation',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppKpiUpdatesRoute = AppKpiUpdatesRouteImport.update({
-  id: '/kpi-updates',
-  path: '/kpi-updates',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppKpiFrameworkRoute = AppKpiFrameworkRouteImport.update({
-  id: '/kpi-framework',
-  path: '/kpi-framework',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppGradesRoute = AppGradesRouteImport.update({
-  id: '/grades',
-  path: '/grades',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppEmployeesRoute = AppEmployeesRouteImport.update({
-  id: '/employees',
-  path: '/employees',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppEmployeeRoute = AppEmployeeRouteImport.update({
-  id: '/employee',
-  path: '/employee',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppDashboardRoute = AppDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppAuditLogRoute = AppAuditLogRouteImport.update({
-  id: '/audit-log',
-  path: '/audit-log',
+const AppAppraisalsRoute = AppAppraisalsRouteImport.update({
+  id: '/appraisals',
+  path: '/appraisals',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAppraisalsReviewRoute = AppAppraisalsReviewRouteImport.update({
@@ -160,10 +85,85 @@ const AppAppraisalsReviewRoute = AppAppraisalsReviewRouteImport.update({
   path: '/appraisals-review',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAppraisalsRoute = AppAppraisalsRouteImport.update({
-  id: '/appraisals',
-  path: '/appraisals',
+const AppAuditLogRoute = AppAuditLogRouteImport.update({
+  id: '/audit-log',
+  path: '/audit-log',
   getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEmployeeRoute = AppEmployeeRouteImport.update({
+  id: '/employee',
+  path: '/employee',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEmployeesRoute = AppEmployeesRouteImport.update({
+  id: '/employees',
+  path: '/employees',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppGradesRoute = AppGradesRouteImport.update({
+  id: '/grades',
+  path: '/grades',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppKpiFrameworkRoute = AppKpiFrameworkRouteImport.update({
+  id: '/kpi-framework',
+  path: '/kpi-framework',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppKpiUpdatesRoute = AppKpiUpdatesRouteImport.update({
+  id: '/kpi-updates',
+  path: '/kpi-updates',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMyCalculationRoute = AppMyCalculationRouteImport.update({
+  id: '/my-calculation',
+  path: '/my-calculation',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMyTeamRoute = AppMyTeamRouteImport.update({
+  id: '/my-team',
+  path: '/my-team',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfileRoute = AppProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRewardSetupRoute = AppRewardSetupRouteImport.update({
+  id: '/reward-setup',
+  path: '/reward-setup',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSupervisorsRoute = AppSupervisorsRouteImport.update({
+  id: '/supervisors',
+  path: '/supervisors',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTraceRoute = AppTraceRouteImport.update({
+  id: '/trace',
+  path: '/trace',
+  getParentRoute: () => AppRoute,
+} as any)
+const AuthLoginRoute = AuthLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthRegisterRoute = AuthRegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminTenantsIdRoute = AdminTenantsIdRouteImport.update({
   id: '/tenants/$id',
@@ -352,39 +352,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/verify-otp': {
-      id: '/verify-otp'
-      path: '/verify-otp'
-      fullPath: '/verify-otp'
-      preLoaderRoute: typeof VerifyOtpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/onboarding': {
-      id: '/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof OnboardingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/forgot-password': {
-      id: '/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof ForgotPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -401,123 +373,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/': {
-      id: '/admin/'
-      path: '/'
-      fullPath: '/admin/'
-      preLoaderRoute: typeof AdminIndexRouteImport
-      parentRoute: typeof AdminRoute
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_auth/register': {
-      id: '/_auth/register'
-      path: '/register'
-      fullPath: '/register'
-      preLoaderRoute: typeof AuthRegisterRouteImport
-      parentRoute: typeof AuthRouteRoute
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_auth/login': {
-      id: '/_auth/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof AuthLoginRouteImport
-      parentRoute: typeof AuthRouteRoute
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_app/trace': {
-      id: '/_app/trace'
-      path: '/trace'
-      fullPath: '/trace'
-      preLoaderRoute: typeof AppTraceRouteImport
-      parentRoute: typeof AppRoute
+    '/verify-otp': {
+      id: '/verify-otp'
+      path: '/verify-otp'
+      fullPath: '/verify-otp'
+      preLoaderRoute: typeof VerifyOtpRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_app/supervisors': {
-      id: '/_app/supervisors'
-      path: '/supervisors'
-      fullPath: '/supervisors'
-      preLoaderRoute: typeof AppSupervisorsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/reward-setup': {
-      id: '/_app/reward-setup'
-      path: '/reward-setup'
-      fullPath: '/reward-setup'
-      preLoaderRoute: typeof AppRewardSetupRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/profile': {
-      id: '/_app/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof AppProfileRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/my-team': {
-      id: '/_app/my-team'
-      path: '/my-team'
-      fullPath: '/my-team'
-      preLoaderRoute: typeof AppMyTeamRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/my-calculation': {
-      id: '/_app/my-calculation'
-      path: '/my-calculation'
-      fullPath: '/my-calculation'
-      preLoaderRoute: typeof AppMyCalculationRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/kpi-updates': {
-      id: '/_app/kpi-updates'
-      path: '/kpi-updates'
-      fullPath: '/kpi-updates'
-      preLoaderRoute: typeof AppKpiUpdatesRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/kpi-framework': {
-      id: '/_app/kpi-framework'
-      path: '/kpi-framework'
-      fullPath: '/kpi-framework'
-      preLoaderRoute: typeof AppKpiFrameworkRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/grades': {
-      id: '/_app/grades'
-      path: '/grades'
-      fullPath: '/grades'
-      preLoaderRoute: typeof AppGradesRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/employees': {
-      id: '/_app/employees'
-      path: '/employees'
-      fullPath: '/employees'
-      preLoaderRoute: typeof AppEmployeesRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/employee': {
-      id: '/_app/employee'
-      path: '/employee'
-      fullPath: '/employee'
-      preLoaderRoute: typeof AppEmployeeRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/dashboard': {
-      id: '/_app/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AppDashboardRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/audit-log': {
-      id: '/_app/audit-log'
-      path: '/audit-log'
-      fullPath: '/audit-log'
-      preLoaderRoute: typeof AppAuditLogRouteImport
+    '/_app/appraisals': {
+      id: '/_app/appraisals'
+      path: '/appraisals'
+      fullPath: '/appraisals'
+      preLoaderRoute: typeof AppAppraisalsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/appraisals-review': {
@@ -527,12 +422,117 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAppraisalsReviewRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/appraisals': {
-      id: '/_app/appraisals'
-      path: '/appraisals'
-      fullPath: '/appraisals'
-      preLoaderRoute: typeof AppAppraisalsRouteImport
+    '/_app/audit-log': {
+      id: '/_app/audit-log'
+      path: '/audit-log'
+      fullPath: '/audit-log'
+      preLoaderRoute: typeof AppAuditLogRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/employee': {
+      id: '/_app/employee'
+      path: '/employee'
+      fullPath: '/employee'
+      preLoaderRoute: typeof AppEmployeeRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/employees': {
+      id: '/_app/employees'
+      path: '/employees'
+      fullPath: '/employees'
+      preLoaderRoute: typeof AppEmployeesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/grades': {
+      id: '/_app/grades'
+      path: '/grades'
+      fullPath: '/grades'
+      preLoaderRoute: typeof AppGradesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/kpi-framework': {
+      id: '/_app/kpi-framework'
+      path: '/kpi-framework'
+      fullPath: '/kpi-framework'
+      preLoaderRoute: typeof AppKpiFrameworkRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/kpi-updates': {
+      id: '/_app/kpi-updates'
+      path: '/kpi-updates'
+      fullPath: '/kpi-updates'
+      preLoaderRoute: typeof AppKpiUpdatesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/my-calculation': {
+      id: '/_app/my-calculation'
+      path: '/my-calculation'
+      fullPath: '/my-calculation'
+      preLoaderRoute: typeof AppMyCalculationRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/my-team': {
+      id: '/_app/my-team'
+      path: '/my-team'
+      fullPath: '/my-team'
+      preLoaderRoute: typeof AppMyTeamRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/profile': {
+      id: '/_app/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AppProfileRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/reward-setup': {
+      id: '/_app/reward-setup'
+      path: '/reward-setup'
+      fullPath: '/reward-setup'
+      preLoaderRoute: typeof AppRewardSetupRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/supervisors': {
+      id: '/_app/supervisors'
+      path: '/supervisors'
+      fullPath: '/supervisors'
+      preLoaderRoute: typeof AppSupervisorsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/trace': {
+      id: '/_app/trace'
+      path: '/trace'
+      fullPath: '/trace'
+      preLoaderRoute: typeof AppTraceRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_auth/login': {
+      id: '/_auth/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof AuthLoginRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/_auth/register': {
+      id: '/_auth/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof AuthRegisterRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/tenants/$id': {
       id: '/admin/tenants/$id'

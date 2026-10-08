@@ -1,20 +1,28 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Plus, Trash2, X, FolderPlus, AlertCircle } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  X,
+  FolderPlus,
+  AlertTriangle,
+  CheckCircle,
+  Info,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, CheckCircle, Info } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
+import { LockedField } from "@/components/p4p/LockedField";
 import { getTemplateForJobGrade } from "@/lib/p4p/kpi-templates";
 import { useP4P } from "@/lib/p4p/store";
 import { showToast } from "@/lib/toast";
 import type { Employee, KPI, Category } from "@/lib/p4p/types";
-import { newId } from "@/lib/p4p/defaults";
+import { newId, getFieldSource, unlockField } from "@/lib/p4p/defaults";
 
 interface Props {
   open: boolean;
@@ -53,12 +61,24 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
       if (!emp.categories) emp.categories = [];
       if (!emp.supervisorId) emp.supervisorId = "";
       if (!emp.supervisorName) emp.supervisorName = "";
+      if (!emp.sourceConfig) emp.sourceConfig = {};
       setData(emp);
     }
   }, [open, employee]);
 
   const setField = <K extends keyof Employee>(k: K, v: Employee[K]) =>
     setData((d) => ({ ...d, [k]: v }));
+
+  const handleOverride = (field: string) => {
+    setData((d) => ({
+      ...d,
+      sourceConfig: unlockField(d.sourceConfig, field),
+    }));
+    showToast.success(
+      "Field unlocked",
+      `You now own this field. Changes will be saved as manual.`
+    );
+  };
 
   useEffect(() => {
     if (!data.jobGrade || data.isAdjunct) return;
@@ -260,18 +280,36 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
             </div>
 
             <div className="p-4 sm:p-5 space-y-4">
-              <div>
-                <Label>Name</Label>
-                <Input value={data.name} onChange={(e) => setField("name", e.target.value)} placeholder="Full name" />
-              </div>
+              <LockedField
+                label="Name"
+                source={getFieldSource(data.sourceConfig, "name")}
+                onOverride={() => handleOverride("name")}
+              >
+                <Input
+                  value={data.name}
+                  onChange={(e) => setField("name", e.target.value)}
+                  placeholder="Full name"
+                />
+              </LockedField>
 
-              <div>
-                <Label>Email</Label>
-                <Input type="email" value={data.email || ""} onChange={(e) => setField("email", e.target.value)} placeholder="Email address" />
-              </div>
+              <LockedField
+                label="Email"
+                source={getFieldSource(data.sourceConfig, "email")}
+                onOverride={() => handleOverride("email")}
+              >
+                <Input
+                  type="email"
+                  value={data.email || ""}
+                  onChange={(e) => setField("email", e.target.value)}
+                  placeholder="Email address"
+                />
+              </LockedField>
 
-              <div>
-                <Label>Job Grade</Label>
+              <LockedField
+                label="Job Grade"
+                source={getFieldSource(data.sourceConfig, "jobGrade")}
+                onOverride={() => handleOverride("jobGrade")}
+              >
                 <Select value={data.jobGrade} onValueChange={(v) => setField("jobGrade", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -282,20 +320,37 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </LockedField>
 
-              <div>
-                <Label>Department</Label>
-                <Input value={data.department || ""} onChange={(e) => setField("department", e.target.value)} placeholder="Department" />
-              </div>
+              <LockedField
+                label="Department"
+                source={getFieldSource(data.sourceConfig, "department")}
+                onOverride={() => handleOverride("department")}
+              >
+                <Input
+                  value={data.department || ""}
+                  onChange={(e) => setField("department", e.target.value)}
+                  placeholder="Department"
+                />
+              </LockedField>
 
-              <div>
-                <Label>Role</Label>
-                <Input value={data.role || ""} onChange={(e) => setField("role", e.target.value)} placeholder="Role (e.g., Senior Specialist)" />
-              </div>
+              <LockedField
+                label="Role"
+                source={getFieldSource(data.sourceConfig, "role")}
+                onOverride={() => handleOverride("role")}
+              >
+                <Input
+                  value={data.role || ""}
+                  onChange={(e) => setField("role", e.target.value)}
+                  placeholder="Role (e.g., Senior Specialist)"
+                />
+              </LockedField>
 
-              <div>
-                <Label>Supervisor/Manager</Label>
+              <LockedField
+                label="Supervisor/Manager"
+                source={getFieldSource(data.sourceConfig, "supervisorId")}
+                onOverride={() => handleOverride("supervisorId")}
+              >
                 <Select
                   value={data.supervisorId || "none"}
                   onValueChange={(v) => {
@@ -317,7 +372,7 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </LockedField>
 
               <div className="flex items-center gap-2 pt-1">
                 <Checkbox
@@ -339,10 +394,17 @@ export function EmployeeModal({ open, onClose, employee }: Props) {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label>Join Date</Label>
-                  <Input type="date" value={data.joinDate} onChange={(e) => setField("joinDate", e.target.value)} />
-                </div>
+                <LockedField
+                  label="Join Date"
+                  source={getFieldSource(data.sourceConfig, "joinDate")}
+                  onOverride={() => handleOverride("joinDate")}
+                >
+                  <Input
+                    type="date"
+                    value={data.joinDate}
+                    onChange={(e) => setField("joinDate", e.target.value)}
+                  />
+                </LockedField>
                 {globals.prorationOn && (
                   <div>
                     <Label>Months Worked</Label>

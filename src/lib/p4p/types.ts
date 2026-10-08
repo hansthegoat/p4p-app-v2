@@ -29,6 +29,25 @@ export interface Category {
   kpis: KPI[];
 }
 
+/**
+ * Where did a given employee field's value come from?
+ *
+ * - "manual"             → entered by HR (default, editable)
+ * - "external:<provider>" → synced from an HRMS or other integration
+ *
+ * When a field is external, it renders locked in the UI until HR
+ * clicks Override. Overriding sets the source back to "manual".
+ */
+export type FieldSource = "manual" | `external:${string}`;
+
+/**
+ * Maps employee field names to their source.
+ *
+ * Missing keys are treated as "manual".
+ * Example: { "department": "external:ao-hrms" }
+ */
+export type SourceConfig = Partial<Record<string, FieldSource>>;
+
 export interface Employee {
   id: string;
   name: string;
@@ -44,11 +63,16 @@ export interface Employee {
   kpis: KPI[];
   categories?: Category[];
   roleType?: 'employee' | 'hr' | 'admin';
-  roleStatus?: 'pending' | 'active' | 'rejected';   // ← make sure this line exists
+  roleStatus?: 'pending' | 'active' | 'rejected';
   supervisorId?: string;
   supervisorName?: string;
   isManager?: boolean;
   needsKpiSetup?: boolean;
+  /**
+   * Where each field's value came from. Missing keys are "manual".
+   * Only present when at least one field is externally synced.
+   */
+  sourceConfig?: SourceConfig;
 }
 
 /**

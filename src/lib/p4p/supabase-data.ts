@@ -689,6 +689,7 @@ function mapEmployeeFromDB(row: any): Employee {
     categories: row.categories || [],
     kpis: row.kpis || [],
     needsKpiSetup: row.needs_kpi_setup ?? false,
+    sourceConfig: row.source_config || {},
   } as Employee & { needsKpiSetup?: boolean };
 }
 
@@ -716,6 +717,7 @@ function mapEmployeeToDB(
     categories: emp.categories || [],
     kpis: emp.kpis || [],
     needs_kpi_setup: (emp as any).needsKpiSetup ?? false,
+    source_config: emp.sourceConfig || {},
   };
 
   if (opts.includeAuthId) {

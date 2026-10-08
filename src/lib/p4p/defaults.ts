@@ -1,4 +1,11 @@
-import type { Employee, GradePoint, Globals, BonusConfig } from "./types";
+import type {
+  Employee,
+  GradePoint,
+  Globals,
+  BonusConfig,
+  FieldSource,
+  SourceConfig,
+} from "./types";
 
 export const DEFAULT_GRADES: GradePoint[] = [
   { code: "B", name: "President", points: 100 },
@@ -138,3 +145,58 @@ export const DEFAULT_BONUS_CONFIG: BonusConfig = {
     profit: 1000000,
   },
 };
+
+// ============================================
+// SOURCE TRACKING HELPERS
+// ============================================
+// Pure functions for reading and writing FieldSource values on
+// an employee's sourceConfig. Missing keys are treated as "manual".
+
+/**
+ * Get the source of a specific field. Defaults to "manual" if
+ * the field has no entry in sourceConfig.
+ */
+export function getFieldSource(
+  config: SourceConfig | undefined,
+  field: string
+): FieldSource {
+  return config?.[field] ?? "manual";
+}
+
+/**
+ * Is this field locked (i.e., synced from an external system)?
+ * Locked fields are greyed out in the UI until HR overrides them.
+ */
+export function isFieldLocked(
+  config: SourceConfig | undefined,
+  field: string
+): boolean {
+  const source = getFieldSource(config, field);
+  return source !== "manual";
+}
+
+/**
+ * Set a field's source. Returns a new object.
+ * Pass "manual" to unlock a field.
+ */
+export function setFieldSource(
+  config: SourceConfig | undefined,
+  field: string,
+  source: FieldSource
+): SourceConfig {
+  return {
+    ...(config ?? {}),
+    [field]: source,
+  };
+}
+
+/**
+ * Reset a field's source back to "manual".
+ * Convenience wrapper for the Override action.
+ */
+export function unlockField(
+  config: SourceConfig | undefined,
+  field: string
+): SourceConfig {
+  return setFieldSource(config, field, "manual");
+}
