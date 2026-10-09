@@ -23,6 +23,8 @@ import type {
   KpiUpdateComment,
   KpiRequest,
   BonusConfig,
+  Workflow,
+  WorkflowInstance,
 } from "./types";
 import { newId } from "./defaults";
 import { sendEmail } from "@/lib/email";
@@ -60,6 +62,15 @@ import {
   fetchAppSettings,
   upsertAppSetting,
 } from "./supabase-data";
+import {
+  startInstance,
+  advanceInstance,
+} from "./workflow-engine";
+import {
+  fetchAllWorkflows,
+  fetchInstancesForEntities,
+  upsertWorkflowInstance,
+} from "./workflow-data";
 
 // ============================================
 // STATE TYPES
@@ -75,7 +86,9 @@ interface State {
   appraisals: AppraisalRequest[];
   notifications: Notification[];
   kpiUpdateRequests: KpiUpdateRequest[];
-  kpiRequests: KpiRequest[];
+  kpiRequests: KpiRequest[];  
+  workflows: Workflow[];
+  workflowInstances: WorkflowInstance[];
   bonusRevealed: boolean;
 }
 
@@ -161,6 +174,23 @@ interface Ctx extends State {
     categories: Category[],
     justification: string
   ) => Promise<void>;
+
+    getWorkflowForProcess: (processKey: string) => Workflow | null;
+  getWorkflowInstanceForEntity: (
+    entityType: string,
+    entityId: string
+  ) => WorkflowInstance | null;
+  startAppraisalWorkflow: (
+    appraisalId: string,
+    employeeId: string
+  ) => Promise<void>;
+  advanceAppraisalWorkflow: (
+    instanceId: string,
+    actorId: string,
+    actorName: string,
+    action: "approved" | "rejected",
+    comment?: string
+  ) => Promise<void>;
 }
 
 const C = createContext<Ctx | null>(null);
@@ -217,6 +247,8 @@ function loadInitial(): State {
     notifications: [],
     kpiUpdateRequests: [],
     kpiRequests: [],
+    workflows: [],
+    workflowInstances: [],
     bonusRevealed: false,
   };
 }
@@ -239,7 +271,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     const refetchFromCloud = async () => {
       setIsSyncing(true);
       try {
-        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudKpiRequests, cloudSettings] =
+        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudKpiRequests, cloudSettings, cloudWorkflows] =
           await Promise.all([
             fetchAllEmployees(),
             fetchAllTemplates(),
@@ -248,6 +280,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
             fetchAllKpiUpdateRequests(),
             fetchAllKpiRequests(),
             fetchAppSettings(),
+            fetchAllWorkflows(),
           ]);
 
         if (cancelled) return;
@@ -268,6 +301,19 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
         if (cancelled) return;
 
+        let cloudInstances: WorkflowInstance[] = [];
+try {
+  if (cloudAppraisals.length > 0) {
+    const map = await fetchInstancesForEntities(
+      "appraisal",
+      cloudAppraisals.map((a) => a.id)
+    );
+    cloudInstances = Object.values(map);
+  }
+} catch (err) {
+  console.error("Workflow instances load failed:", err);
+}
+
         setState((s) => ({
           ...s,
           employees: cloudEmployees,
@@ -277,6 +323,8 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           notifications: cloudNotifications,
           kpiUpdateRequests: cloudKpiUpdates,
           kpiRequests: cloudKpiRequests,
+          workflows: cloudWorkflows,
+          workflowInstances: cloudInstances,
           bonusRevealed: cloudSettings.bonus_revealed === true,
           bonusConfig: (cloudSettings.bonus_config as BonusConfig) ?? s.bonusConfig,
         }));
@@ -303,7 +351,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
       setIsSyncing(true);
       try {
-        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudKpiRequests, cloudSettings] =
+        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudKpiRequests, cloudSettings, cloudWorkflows] =
           await Promise.all([
             fetchAllEmployees(),
             fetchAllTemplates(),
@@ -312,6 +360,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
             fetchAllKpiUpdateRequests(),
             fetchAllKpiRequests(),
             fetchAppSettings(),
+            fetchAllWorkflows(),
           ]);
 
         if (cancelled) return;
@@ -332,6 +381,19 @@ export function P4PProvider({ children }: { children: ReactNode }) {
 
         if (cancelled) return;
 
+        let cloudInstances: WorkflowInstance[] = [];
+try {
+  if (cloudAppraisals.length > 0) {
+    const map = await fetchInstancesForEntities(
+      "appraisal",
+      cloudAppraisals.map((a) => a.id)
+    );
+    cloudInstances = Object.values(map);
+  }
+} catch (err) {
+  console.error("Workflow instances load failed:", err);
+}
+
         setState((s) => ({
           ...s,
           employees: cloudEmployees,
@@ -342,6 +404,8 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           kpiUpdateRequests: cloudKpiUpdates,
           kpiRequests: cloudKpiRequests,
           bonusRevealed: cloudSettings.bonus_revealed === true,
+          workflows: cloudWorkflows,
+          workflowInstances: cloudInstances,
         }));
 
         setIsCloudSynced(true);
@@ -375,6 +439,8 @@ export function P4PProvider({ children }: { children: ReactNode }) {
             notifications: [],
             kpiUpdateRequests: [],
             kpiRequests: [],
+            workflows: [],
+            workflowInstances: [],
             bonusRevealed: false,
           });
         } else if (event === "TOKEN_REFRESHED" && session?.user) {
@@ -428,7 +494,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadDemo = useCallback(() => {
-    setState({
+    return setState({
       globals: DEFAULT_GLOBALS,
       bonusConfig: DEFAULT_BONUS_CONFIG,
       grades: DEFAULT_GRADES,
@@ -439,6 +505,8 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       notifications: [],
       kpiUpdateRequests: [],
       kpiRequests: [],
+      workflows: [],
+      workflowInstances: [],
       bonusRevealed: false,
     });
   }, []);
@@ -881,6 +949,92 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     return "Performance Improvement Plan";
   };
 
+    const getWorkflowForProcess = useCallback(
+    (processKey: string): Workflow | null =>
+      state.workflows.find(
+        (w) => w.processKey === processKey && w.isActive
+      ) ?? null,
+    [state.workflows]
+  );
+
+  const getWorkflowInstanceForEntity = useCallback(
+    (entityType: string, entityId: string): WorkflowInstance | null =>
+      state.workflowInstances.find(
+        (i) => i.entityType === entityType && i.entityId === entityId
+      ) ?? null,
+    [state.workflowInstances]
+  );
+
+  const startAppraisalWorkflow = useCallback(
+    async (appraisalId: string, employeeId: string) => {
+      const workflow = state.workflows.find(
+        (w) => w.processKey === "appraisal" && w.isActive
+      );
+      if (!workflow) return;
+
+      const employee = state.employees.find((e) => e.id === employeeId);
+      if (!employee) return;
+
+      const { instance, firstActors } = startInstance(
+        workflow,
+        "appraisal",
+        appraisalId,
+        employee,
+        state.employees
+      );
+
+      setState((s) => ({
+        ...s,
+        workflowInstances: [
+          ...s.workflowInstances.filter((i) => i.id !== instance.id),
+          instance,
+        ],
+      }));
+
+      try {
+        await upsertWorkflowInstance(instance);
+      } catch (err) {
+        console.error("startAppraisalWorkflow persist failed:", err);
+        return;
+      }
+
+      // All stages skipped — flag for follow-up. Do not auto-approve in
+      // File 3; the UI wiring in File 4 will handle this case.
+      if (instance.status === "completed") {
+        console.warn(
+          "Workflow completed on start (no resolvable actors). Appraisal left pending."
+        );
+        return;
+      }
+
+      if (firstActors.length === 0) return;
+
+      const now = new Date().toISOString();
+      const notifs: Notification[] = firstActors.map((a) => ({
+        id: newId(),
+        userId: a.id,
+        type: "workflow_action_required",
+        message: `${employee.name}'s appraisal needs your review`,
+        link: `/appraisals-review`,
+        read: false,
+        createdAt: now,
+      }));
+
+      const deduped = dedupeNotifications(state.notifications, notifs);
+      if (deduped.length === 0) return;
+
+      setState((s) => ({
+        ...s,
+        notifications: [...s.notifications, ...deduped],
+      }));
+
+      insertNotifications(deduped).catch((err) =>
+        console.error("workflow_action_required notification failed:", err)
+      );
+    },
+    [state.workflows, state.employees, state.notifications]
+  );
+
   const submitAppraisal = useCallback(
     (employeeId: string, period: string, year: number, month: number) => {
       const employee = state.employees.find((e) => e.id === employeeId);
@@ -999,8 +1153,20 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       }
 
       sendAppraisalNotification("submitted", appraisal);
+
+      // If a workflow exists for appraisals, start an instance and let
+      // the engine route notifications.
+      startAppraisalWorkflow(appraisal.id, employeeId).catch((err) =>
+        console.error("startAppraisalWorkflow failed:", err)
+      );
     },
-    [state.employees, state.appraisals, state.notifications, sendAppraisalNotification]
+    [
+      state.employees,
+      state.appraisals,
+      state.notifications,
+      sendAppraisalNotification,
+      startAppraisalWorkflow,
+    ]
   );
 
   const saveKPIProof = useCallback(
@@ -1303,6 +1469,102 @@ export function P4PProvider({ children }: { children: ReactNode }) {
       }
     },
     [sendAppraisalNotification]
+  );
+
+
+    // ============================================
+  // WORKFLOW WIRING
+  // ============================================
+
+
+  const advanceAppraisalWorkflow = useCallback(
+    async (
+      instanceId: string,
+      actorId: string,
+      actorName: string,
+      action: "approved" | "rejected",
+      comment?: string
+    ) => {
+      const instance = state.workflowInstances.find((i) => i.id === instanceId);
+      if (!instance) throw new Error("Workflow instance not found");
+
+      const appraisal = state.appraisals.find((a) => a.id === instance.entityId);
+      if (!appraisal) throw new Error("Appraisal not found for workflow");
+
+      const employee = state.employees.find((e) => e.id === appraisal.employeeId);
+      if (!employee) throw new Error("Employee not found for workflow");
+
+      const result = advanceInstance(
+        instance,
+        actorId,
+        actorName,
+        action,
+        employee,
+        state.employees,
+        comment
+      );
+
+      setState((s) => ({
+        ...s,
+        workflowInstances: s.workflowInstances.map((i) =>
+          i.id === result.instance.id ? result.instance : i
+        ),
+      }));
+
+      try {
+        await upsertWorkflowInstance(result.instance);
+      } catch (err) {
+        console.error("advanceAppraisalWorkflow persist failed:", err);
+      }
+
+      if (result.rejected) {
+        rejectAppraisal(
+          appraisal.id,
+          actorId,
+          actorName,
+          comment ?? "Rejected by workflow"
+        );
+        return;
+      }
+
+      if (result.completed) {
+        approveAppraisal(appraisal.id, actorId, actorName);
+        return;
+      }
+
+      if (result.nextActors.length === 0) return;
+
+      const now = new Date().toISOString();
+      const notifs: Notification[] = result.nextActors.map((a) => ({
+        id: newId(),
+        userId: a.id,
+        type: "workflow_action_required",
+        message: `${employee.name}'s appraisal needs your review`,
+        link: `/appraisals-review`,
+        read: false,
+        createdAt: now,
+      }));
+
+      const deduped = dedupeNotifications(state.notifications, notifs);
+      if (deduped.length === 0) return;
+
+      setState((s) => ({
+        ...s,
+        notifications: [...s.notifications, ...deduped],
+      }));
+
+      insertNotifications(deduped).catch((err) =>
+        console.error("workflow_action_required notification failed:", err)
+      );
+    },
+    [
+      state.workflowInstances,
+      state.appraisals,
+      state.employees,
+      state.notifications,
+      approveAppraisal,
+      rejectAppraisal,
+    ]
   );
 
   const getEmployeeAppraisals = useCallback(
@@ -2582,7 +2844,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
   const refreshFromCloud = useCallback(async () => {
     setIsSyncing(true);
     try {
-      const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudKpiRequests, cloudSettings] =
+        const [cloudEmployees, cloudTemplates, cloudMonthly, cloudAppraisals, cloudKpiUpdates, cloudKpiRequests, cloudSettings, cloudWorkflows] =
         await Promise.all([
           fetchAllEmployees(),
           fetchAllTemplates(),
@@ -2591,6 +2853,7 @@ export function P4PProvider({ children }: { children: ReactNode }) {
           fetchAllKpiUpdateRequests(),
           fetchAllKpiRequests(),
           fetchAppSettings(),
+          fetchAllWorkflows(),
         ]);
 
       let cloudNotifications: Notification[] = [];
@@ -2607,6 +2870,19 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         // Best-effort
       }
 
+      let cloudInstances: WorkflowInstance[] = [];
+try {
+  if (cloudAppraisals.length > 0) {
+    const map = await fetchInstancesForEntities(
+      "appraisal",
+      cloudAppraisals.map((a) => a.id)
+    );
+    cloudInstances = Object.values(map);
+  }
+} catch (err) {
+  console.error("Workflow instances load failed:", err);
+}
+
       setState((s) => ({
         ...s,
         employees: cloudEmployees,
@@ -2616,6 +2892,8 @@ export function P4PProvider({ children }: { children: ReactNode }) {
         notifications: cloudNotifications,
         kpiUpdateRequests: cloudKpiUpdates,
         kpiRequests: cloudKpiRequests,
+        workflows: cloudWorkflows,
+        workflowInstances: cloudInstances,
         bonusRevealed: cloudSettings.bonus_revealed === true,
       }));
 
@@ -2691,6 +2969,10 @@ export function P4PProvider({ children }: { children: ReactNode }) {
     syncToCloud,
     setBonusRevealed,
     refreshFromCloud,
+    getWorkflowForProcess,
+    getWorkflowInstanceForEntity,
+    startAppraisalWorkflow,
+    advanceAppraisalWorkflow,
   };
 
   if (typeof window !== "undefined" && import.meta.env.DEV) {

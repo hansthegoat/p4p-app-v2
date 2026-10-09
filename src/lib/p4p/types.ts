@@ -308,7 +308,8 @@ export interface Notification {
     | 'new_comment'
     | 'trigger_pip'
     | 'trigger_probation'
-    | 'trigger_management_action';
+    | 'trigger_management_action'
+    | 'workflow_action_required';
   message: string;
   link?: string;
   read: boolean;
@@ -460,4 +461,83 @@ export interface BonusConfig {
     revenue: number | null;
     profit: number | null;
   };
+}
+
+
+// ============================================
+// WORKFLOW ENGINE (v0)
+// ============================================
+
+/**
+ * Who can act on a workflow stage.
+ * - "supervisor" → the employee's direct supervisor
+ * - "hod"        → the employee's department head
+ * - "hr"         → any HR user in the org
+ * - "specific"   → a specific employee (by id)
+ */
+export type WorkflowActorRole =
+  | "supervisor"
+  | "hod"
+  | "hr"
+  | "specific";
+
+/**
+ * One stage in a workflow. v0 supports approve/reject only.
+ * The actorRole decides who acts. If actorRole is "specific",
+ * actorId is required.
+ */
+export interface WorkflowStage {
+  id: string;
+  name: string;
+  actorRole: WorkflowActorRole;
+  /** Only set when actorRole === "specific" */
+  actorId?: string;
+  /** Only used when actorRole === "specific" — display name */
+  actorName?: string;
+}
+
+/**
+ * A configured workflow for one process.
+ * v0: one workflow per org per process.
+ */
+export interface Workflow {
+  id: string;
+  orgId: string;
+  processKey: string;
+  name: string;
+  stages: WorkflowStage[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * One history entry in a workflow instance's history array.
+ */
+export interface WorkflowHistoryEntry {
+  stageIndex: number;
+  stageName: string;
+  actorId: string;
+  actorName: string;
+  action: "approved" | "rejected" | "skipped" | "started";
+  comment?: string;
+  actedAt: string;
+}
+
+/**
+ * A runtime instance of a workflow tied to one business entity
+ * (e.g., one appraisal). Tracks current stage, history, status.
+ */
+export interface WorkflowInstance {
+  id: string;
+  orgId: string;
+  workflowId: string | null;
+  entityType: string;
+  entityId: string;
+  currentStageIndex: number;
+  stagesSnapshot: WorkflowStage[];
+  status: "active" | "completed" | "cancelled" | "rejected";
+  history: WorkflowHistoryEntry[];
+  startedAt: string;
+  completedAt?: string;
 }

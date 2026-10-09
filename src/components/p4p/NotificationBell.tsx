@@ -8,7 +8,7 @@ import { dropdown } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import {
   Bell, CheckCheck, ClipboardCheck, CheckCircle2, XCircle,
-  RefreshCw, MessageSquare, AlertTriangle, AlertOctagon, Loader2,
+  RefreshCw, MessageSquare, AlertTriangle, AlertOctagon, Loader2, Inbox,
 } from "lucide-react";
 import type { Notification } from "@/lib/p4p/types";
 
@@ -268,6 +268,9 @@ function NotifIcon({ type }: { type: string }) {
     trigger_management_action: {
       Icon: AlertOctagon,
       tone: "text-red-700 dark:text-red-400",
+    },     workflow_action_required: {
+      Icon: Inbox,
+      tone: "text-amber-600 dark:text-amber-400",
     },
   };
   const m = map[type] || { Icon: Bell, tone: "text-muted-foreground" };
